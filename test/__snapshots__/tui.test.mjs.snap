@@ -1,0 +1,141 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`frame snapshots (demo fixture, ANSI stripped) > 80x24 1`] = `
+" ∩∩ HARTII BETA mainnet  #10,412,877                 1,234.56 QUAI  0x0000…0d01
+ ▂▂·▃·▃▂▂▂▃▅·▃▃▂·▂▄▃█▅▃▂··▃▆▆▄▁▁▁ 1s
+────────────────────────────────────────────────────────────────────────────────
+  BALANCES  ────────── ≈ 1,435.56 QUAI │  WATCHLIST  ───────────────── 3 tokens
+  QUAI                       1,234.56  │  DEMO             0.0000186  ▲ +12.4%
+  DEMO           50,000         ≈ 105  │  HRTI              0.000091   ▼ -3.2%
+  HRTI           12,000          ≈ 96  │  CAMEL         0.0000000043  ▲ +41.8%
+                                       │
+                                       │
+                                       │
+
+  LIVE TRADES  ─────────────────────────────────────── per block · newest first
+  ── block 10,412,877 ────────────────────────────────────────────────────────
+  14:02:11  ▼ SELL BLOCK      40.8 QUAI   122.4K BLOCK  0x0000…0d11
+  14:02:08  ▼ SELL DEMO        3.3 QUAI     20.7K DEMO  0x0000…0d12
+  ── block 10,412,876 ────────────────────────────────────────────────────────
+  14:02:05  ▲ BUY  DEMO       18.4 QUAI    193.0K DEMO  0x0000…0d13
+  14:02:01  ▼ SELL BLOCK      43.6 QUAI   153.7K BLOCK  0x0000…0d11
+  ── block 10,412,875 ────────────────────────────────────────────────────────
+  14:01:59  ▲ BUY  DEMO       28.2 QUAI    132.1K DEMO  0x0000…0d12
+  14:01:56  ▲ BUY  HRTI       10.2 QUAI    107.7K HRTI  0x0000…0d13
+
+  Send   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
+ Tab pane · ←→ action · Enter open                       ? help · q quit   DEMO"
+`;
+
+exports[`frame snapshots (demo fixture, ANSI stripped) > 120x40 1`] = `
+"   ▄▄  ▄▄    ▄▀▀▀▄   H A R T I I   terminal wallet for Quai  BETA                ▄█  █▀█    █ █ ▄█  ▀▀█    █▀█ ▀▀█ ▀▀█
+  ▀▀▀▀▄▀▀▀▀▄ ▀▀▀▀▀   mainnet · cyprus-1                                   BLOCK   █  █ █  ▄ ▀▀█  █  █▀▀  ▄ █▀█  █   █
+  ▀▀▀▀▀▀▀▀▀▀▀▀▀      demo  0x000000…000d01                               1s ago  ▀▀▀ ▀▀▀ ▀    ▀ ▀▀▀ ▀▀▀ ▀  ▀▀▀  ▀   ▀
+  ▀▀ ▀▀    ▀▀ ▀▀     1,234.56 QUAI                                     last 32 blocks ▂▂·▃·▃▂▂▂▃▅·▃▃▂·▂▄▃█▅▃▂··▃▆▆▄▁▁▁
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  BALANCES  ─────────────────── ≈ 1,435.56 QUAI │  LIVE TRADES  ────────────────────────────── per block · newest first
+  QUAI                                1,234.56  │  ── block 10,412,877 ───────────────────────────────────────────────
+  DEMO                    50,000         ≈ 105  │  14:02:11  ▼ SELL BLOCK      40.8 QUAI   122.4K BLOCK  0x0000…0d11
+  HRTI                    12,000          ≈ 96  │  14:02:08  ▼ SELL DEMO        3.3 QUAI     20.7K DEMO  0x0000…0d12
+                                                │  ── block 10,412,876 ───────────────────────────────────────────────
+                                                │  14:02:05  ▲ BUY  DEMO       18.4 QUAI    193.0K DEMO  0x0000…0d13
+                                                │  14:02:01  ▼ SELL BLOCK      43.6 QUAI   153.7K BLOCK  0x0000…0d11
+                                                │  ── block 10,412,875 ───────────────────────────────────────────────
+                                                │  14:01:59  ▲ BUY  DEMO       28.2 QUAI    132.1K DEMO  0x0000…0d12
+                                                │  14:01:56  ▲ BUY  HRTI       10.2 QUAI    107.7K HRTI  0x0000…0d13
+                                                │  ── block 10,412,874 ───────────────────────────────────────────────
+                                                │  14:01:51  ▲ BUY  BLOCK       2.1 QUAI     7.4K BLOCK  0x0000…0d11
+                                                │  14:01:47  ▼ SELL CAMEL       3.3 QUAI    21.0K CAMEL  0x0000…0d12
+  WATCHLIST  ───────────────────────── 3 tokens │  ── block 10,412,873 ───────────────────────────────────────────────
+  DEMO                     0.0000186  ▲ +12.4%  │  14:01:42  ▲ BUY  HRTI       47.2 QUAI    522.7K HRTI  0x0000…0d13
+  HRTI                      0.000091   ▼ -3.2%  │  14:01:38  ▲ BUY  DEMO       13.5 QUAI    110.5K DEMO  0x0000…0d11
+  CAMEL                 0.0000000043  ▲ +41.8%  │  ── block 10,412,872 ───────────────────────────────────────────────
+                                                │  14:01:34  ▼ SELL DEMO       41.3 QUAI    199.1K DEMO  0x0000…0d12
+                                                │  14:01:30  ▲ BUY  BLOCK      43.7 QUAI   144.4K BLOCK  0x0000…0d13
+                                                │  ── block 10,412,871 ───────────────────────────────────────────────
+                                                │  14:01:27  ▲ BUY  HRTI       45.6 QUAI    160.5K HRTI  0x0000…0d11
+                                                │  14:01:24  ▼ SELL BLOCK      12.8 QUAI   150.5K BLOCK  0x0000…0d12
+                                                │  ── block 10,412,870 ───────────────────────────────────────────────
+                                                │  14:01:20  ▲ BUY  BLOCK      43.6 QUAI   237.2K BLOCK  0x0000…0d13
+                                                │  14:01:16  ▲ BUY  BLOCK        45 QUAI   478.9K BLOCK  0x0000…0d11
+                                                │  ── block 10,412,869 ───────────────────────────────────────────────
+                                                │  14:01:13  ▲ BUY  HRTI       11.4 QUAI    126.5K HRTI  0x0000…0d12
+                                                │  14:01:10  ▲ BUY  BLOCK      23.8 QUAI   272.6K BLOCK  0x0000…0d13
+                                                │  ── block 10,412,868 ───────────────────────────────────────────────
+                                                │  14:01:08  ▲ BUY  BLOCK      31.3 QUAI   166.3K BLOCK  0x0000…0d11
+                                                │  14:01:05  ▲ BUY  HRTI        6.1 QUAI     67.6K HRTI  0x0000…0d12
+                                                │  ── block 10,412,867 ───────────────────────────────────────────────
+
+  Send   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
+ Tab pane · ←→ action · Enter open                                                               ? help · q quit   DEMO"
+`;
+
+exports[`frame snapshots (demo fixture, ANSI stripped) > help overlay at 80x24 1`] = `
+" ∩∩ HARTII BETA mainnet  #10,412,877                 1,234.56 QUAI  0x0000…0d01
+ ▂▂·▃·▃▂▂▂▃▅·▃▃▂·▂▄▃█▅▃▂··▃▆▆▄▁▁▁ 1s
+────────────────────────────────────────────────────────────────────────────────
+  BALANCES  ────────── ≈ 1,435.56 QUAI │  WATCHLIST  ───────────────── 3 tokens
+  QUA╭─ KEYS ─────────────────────────────────────────────────────────────╮.4%
+  DEM│                                                                    │.2%
+  HRT│  ↑ ↓  ← →          move within a pane / the action bar             │.8%
+     │  Tab · Shift-Tab   switch pane (actions, balances, watch, trades)  │
+     │  Enter             open the selected action / confirm a field      │
+     │  Esc               close a form or overlay, back to actions        │
+     │  a · d             watchlist: add / remove the selected token      │
+  LIV│  r                 refresh balances and watchlist now              │irst
+  ── │  y · n             confirm / cancel a transaction summary          │───
+  14:│  q · Ctrl-C        quit and restore the terminal                   │
+  14:│                                                                    │
+  ── │  Every write shows the exact simulated summary first.              │───
+  14:│  Spending limits apply to every action; keys stay in the keystore  │
+  14:│                                                                    │
+  ── ╰────────────────────────────────────────────────────────────────────╯───
+  14:01:59  ▲ BUY  DEMO       28.2 QUAI    132.1K DEMO  0x0000…0d12
+  14:01:56  ▲ BUY  HRTI       10.2 QUAI    107.7K HRTI  0x0000…0d13
+
+  Send   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
+ Tab pane · ←→ action · Enter open                       ? help · q quit   DEMO"
+`;
+
+exports[`frame snapshots (demo fixture, ANSI stripped) > send form with an inline error at 120x40 1`] = `
+"   ▄▄  ▄▄    ▄▀▀▀▄   H A R T I I   terminal wallet for Quai  BETA                ▄█  █▀█    █ █ ▄█  ▀▀█    █▀█ ▀▀█ ▀▀█
+  ▀▀▀▀▄▀▀▀▀▄ ▀▀▀▀▀   mainnet · cyprus-1                                   BLOCK   █  █ █  ▄ ▀▀█  █  █▀▀  ▄ █▀█  █   █
+  ▀▀▀▀▀▀▀▀▀▀▀▀▀      demo  0x000000…000d01                               1s ago  ▀▀▀ ▀▀▀ ▀    ▀ ▀▀▀ ▀▀▀ ▀  ▀▀▀  ▀   ▀
+  ▀▀ ▀▀    ▀▀ ▀▀     1,234.56 QUAI                                     last 32 blocks ▂▂·▃·▃▂▂▂▃▅·▃▃▂·▂▄▃█▅▃▂··▃▆▆▄▁▁▁
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  BALANCES  ─────────────────── ≈ 1,435.56 QUAI │  LIVE TRADES  ────────────────────────────── per block · newest first
+  QUAI                                1,234.56  │  ── block 10,412,877 ───────────────────────────────────────────────
+  DEMO                    50,000         ≈ 105  │  14:02:11  ▼ SELL BLOCK      40.8 QUAI   122.4K BLOCK  0x0000…0d11
+  HRTI                    12,000          ≈ 96  │  14:02:08  ▼ SELL DEMO        3.3 QUAI     20.7K DEMO  0x0000…0d12
+                                                │  ── block 10,412,876 ───────────────────────────────────────────────
+                                                │  14:02:05  ▲ BUY  DEMO       18.4 QUAI    193.0K DEMO  0x0000…0d13
+                                                │  14:02:01  ▼ SELL BLOCK      43.6 QUAI   153.7K BLOCK  0x0000…0d11
+                         ╭─ SEND ─────────────────────────────────────────────────────────────╮───────────────────────
+                         │                                                                    │.1K DEMO  0x0000…0d12
+                         │  Recipient                                                         │.7K HRTI  0x0000…0d13
+                         │  › not-an-address▏                                                 │───────────────────────
+                         │  ✕ "not-an-address" is not a valid address.                        │4K BLOCK  0x0000…0d11
+                         │  Amount                                                            │0K CAMEL  0x0000…0d12
+  WATCHLIST  ────────────│                                                                    │───────────────────────
+  DEMO                   │  ✕ Amount is required.                                             │.7K HRTI  0x0000…0d13
+  HRTI                   │  Token optional                                                    │.5K DEMO  0x0000…0d11
+  CAMEL                 0│                                                                    │───────────────────────
+                         │                                                                    │.1K DEMO  0x0000…0d12
+                         │                                                                    │4K BLOCK  0x0000…0d13
+                         │                                                                    │───────────────────────
+                         │  Enter next/submit · Tab field · Esc cancel                        │.5K HRTI  0x0000…0d11
+                         ╰────────────────────────────────────────────────────────────────────╯5K BLOCK  0x0000…0d12
+                                                │  ── block 10,412,870 ───────────────────────────────────────────────
+                                                │  14:01:20  ▲ BUY  BLOCK      43.6 QUAI   237.2K BLOCK  0x0000…0d13
+                                                │  14:01:16  ▲ BUY  BLOCK        45 QUAI   478.9K BLOCK  0x0000…0d11
+                                                │  ── block 10,412,869 ───────────────────────────────────────────────
+                                                │  14:01:13  ▲ BUY  HRTI       11.4 QUAI    126.5K HRTI  0x0000…0d12
+                                                │  14:01:10  ▲ BUY  BLOCK      23.8 QUAI   272.6K BLOCK  0x0000…0d13
+                                                │  ── block 10,412,868 ───────────────────────────────────────────────
+                                                │  14:01:08  ▲ BUY  BLOCK      31.3 QUAI   166.3K BLOCK  0x0000…0d11
+                                                │  14:01:05  ▲ BUY  HRTI        6.1 QUAI     67.6K HRTI  0x0000…0d12
+                                                │  ── block 10,412,867 ───────────────────────────────────────────────
+
+  Send   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
+ Tab pane · ←→ action · Enter open                                                               ? help · q quit   DEMO"
+`;

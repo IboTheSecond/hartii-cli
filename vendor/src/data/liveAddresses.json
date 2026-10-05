@@ -1,0 +1,107 @@
+{
+  "_doc": "Contracts that went live AFTER the site first shipped, recorded so EVERY build has them. Written by scripts/wire-v3-live.mjs and scripts/wire-burn-vault.mjs right after the owner's signed deploys, and committed. Before this file existed those addresses reached the bundle only through build-time environment variables, so the next ordinary `npm run build` would have silently switched the V3 launch flow, staking and the burn vault back off. A VITE_* variable still overrides an entry (previews, rehearsals). null / empty = not deployed: the feature stays dark. Mainnet only — never put a testnet address here.",
+  "contracts": {
+    "_doc": "Hartii Boost beta: mainnet only. Null keeps purchases disabled. Claude copies the readback-verified .boost-live.json address here after Orchard rehearsal; boostDeployBlock is its deployment block. Never store Orchard addresses here.",
+    "boost": "0x00445cdaaF747F164bFC9e474e16881b52DA478c",
+    "boostDeployBlock": 10456176
+  },
+  "mainnet": {
+    "launchFactoryV3": "0x00249722868732Ee678b88Db668EAf7cC75Ae12A",
+    "launchFactoryV4": "0x005566187B52313e03978C2caF4BE1a0A88eb90A",
+    "stakingFactory": null,
+    "burnVaults": {},
+    "externalVenues": {
+      "0x00341E50e2FaF1bdf8a8c8Dd418520309ECE130d": {
+        "symbol": "IBO",
+        "name": "IboQuai",
+        "venue": "quainance",
+        "market": "0x005701CF5a118A242319e093D88841E0f4318d98",
+        "launcher": "0x002879c58c8430626D99Bfd45504FFC484E6e811",
+        "explorerUrl": "https://quaiscan.io/address/0x005701CF5a118A242319e093D88841E0f4318d98",
+        "siteUrl": "https://quainance.com",
+        "graduatedAt": "2026-09-19",
+        "_afterGraduation": "IBO graduated 2026-09-19. router/wquai below are read-only starting points for resolvePoolFromChain (src/utils/externalVenuePoolReads.js) — the pair itself is NEVER trusted from config, it is re-derived from factory.getPair(token, wquai) on every quote and every send. See docs/quainance-external-venue.md, 'After graduation — the pool route'.",
+        "router": "0x000284FD8Df039CFF2949b62D854dc43c2Eae6E1",
+        "wquai": "0x006C3e2AaAE5DB1bCd11A1a097cE572312EADdBB"
+      }
+    },
+    "forwarders": [
+      {
+        "_doc": "QuaiForwarder: a contract whose ONLY possible action is paying one immutable destination, set at construction. It exists for in-app wallets that can call a contract but cannot make a plain value transfer. Deployed 2026-09-19. The destination is NOT recorded here on purpose — it is a private individual's address, this file is public, and the UI reads the destination back off the chain and shows it before anyone sends. Do not add a destination or an owner name to this entry.",
+        "address": "0x002a7Bd791D7d89E498301267c57971d9D806a5F"
+      }
+    ],
+    "relays": [
+      {
+        "_doc": "QuaiRelay: forwards exactly msg.value to the recipient NAMED IN THE CALL, in the same transaction. The general form of the forwarder above, and the one /blipsend offers publicly — a fixed-destination contract on a public page is a one-click send to a stranger's wallet. Stateless: no owner, no admin, no fee, no setter, no storage, no receive(). Deployed 2026-09-19, 600-byte runtime. Source at /blipsend-source/QuaiRelay.sol.txt.",
+        "address": "0x0031B09e63592B713768761cdDACC603974c10bD"
+      }
+    ],
+    "hartiiSwap": {
+      "_doc": "HartiiSwap (Uniswap V2 port) deployed on Quai mainnet 2026-09-23; readback verified (feeTo/feeToSetter = treasury, router.factory/WETH). Pairs are never stored here — always factory.getPair. farms: add {address, pair, rewardToken, label} when a farm is funded.",
+      "factory": "0x002E75653C6189087Eb9E512cE7319eC21140956",
+      "router": "0x006B3450cca780066A3A8aA8b508103d25315Ea4",
+      "lens": "0x00295dFCA930646abAC327C9CcB2f4e1E206C5Ec",
+      "wquai": "0x006C3e2AaAE5DB1bCd11A1a097cE572312EADdBB",
+      "farms": []
+    },
+    "lpLocker": {
+      "_doc": "LpLocker (contracts/contracts/swap/LpLocker.sol) — TIME-LOCKS LP, never permanently (owner override 2026-09-28, replaces an earlier dead-address-burn design). null until deployed via contracts/scripts/deploy-lp-locker.cjs; the deployed, read-back-verified address is copied here in the SAME commit. Every /pools/lock surface and the lp-holders API's locked.locks/lockerStakers stay empty/dark while this is null.",
+      "address": "0x00276419b3aa2E7d034D2d54d52b59BdfFF4e60E",
+      "_deployed": "2026-09-28: LpLocker deployed on mainnet; read-back MAX_LOCK_SECONDS=7776000 (90 days, per-lock maxUnlockAt), factory=HartiiSwap factory."
+    },
+    "agentVault": {
+      "_doc": "AgentVault + AgentVaultFactory (Agent Terminal, docs/superpowers/specs/2026-09-27-agent-terminal-design.md). factory is null until Plan 1's mainnet deploy (contracts/scripts/deploy-agent-vault.cjs writes .agent-vault-live.json; the deployed address is copied here in the SAME commit as functions/_lib/agentVaultConfig.js's AGENT_VAULT_FACTORY_ADDRESS). Every /api/agent/* route and the indexer's agent-event scan stay dark (503 / no-op) while this is null.",
+      "factory": "0x006C2be96D6Ca90d0105a2Bfa7aC2187f40e899d",
+      "deployBlock": 10341473,
+      "_deployed": "2026-09-28: AgentVaultFactory deployed on mainnet (owner: skip Orchard, go straight to mainnet); read-back verified implementation + allowlist (tokenFactory/router/wquai/nftFactory)."
+    },
+    "hartiiProfiles": {
+      "_doc": "HartiiProfiles (contracts/contracts/profiles/HartiiProfiles.sol) stays dark while address is null. After the owner-authorized mainnet deploy via contracts/scripts/deploy-profiles-arena-mining.cjs, copy only the read-back-verified mainnet address here; never put an Orchard address in this file.",
+      "address": "0x0015f71de1574c772B6815D25B233C065f42c896",
+      "deployBlock": 10341682,
+      "_deployed": "2026-09-28: deployed on mainnet (owner: straight to mainnet) via deploy-profiles-arena-mining.cjs; every constant + binding read back and verified (fees 10/10/1000 QUAI, arena caps 400/1400 units, cooldown 1h, refill 7d, shield 24h)."
+    },
+    "lpArena": {
+      "_doc": "LpArena (contracts/contracts/arena/LpArena.sol) stays dark while address is null. After the owner-authorized mainnet deploy via contracts/scripts/deploy-lp-arena-v2.cjs, copy only the read-back-verified mainnet address here; never put an Orchard address in this file.",
+      "address": "0x00614295C6AC13d3B7d93844b9BacC61a7680820",
+      "deployBlock": 10351500,
+      "_deployed": "2026-09-29: LpArena v2 deployed on mainnet via deploy-lp-arena-v2.cjs (tx 0x002b003182525ad39bfb4a0a7786db8182d580c9a76b5cce5968c634c71be3a0); same ABI as v1 — logic-only fix: a staked target is attackable regardless of opt-in (holding stake IS consent to be targeted in that pair); every constant + binding read back and verified (MIN_QUAI_SIDE 5 QUAI, damage denominator 20000, caps 400/1400 units, cooldown 1h, refill 7d, shield 24h).",
+      "v1Deprecated": {
+        "address": "0x0075B00Ca0313f88b0825BE62bBFB890c9F4C03F",
+        "deployBlock": 10341703,
+        "reason": "opt-out-after-stake immunity (security arena 2026-09-29); unstake-only"
+      },
+      "v2": true
+    },
+    "miningVaultFactory": {
+      "_doc": "MiningVaultFactory (contracts/contracts/mining/MiningVaultFactory.sol; creates contracts/contracts/mining/MiningVault.sol) stays dark while address is null. After the owner-authorized mainnet deploy via contracts/scripts/deploy-profiles-arena-mining.cjs, copy only the read-back-verified mainnet address here; never put an Orchard address in this file.",
+      "address": "0x0024596369Fc22A22b720B0A959630913d8D680b",
+      "deployBlock": 10342308,
+      "_deployed": "2026-09-29: MiningVaultFactory v2 deployed on mainnet (curve-launched tokens only; same-block + 3% slippage sweep guards; canSweep view); createFee 1,000 QUAI read back.",
+      "v1Abandoned": {
+        "address": "0x0059f740fb9AD9F2Db19DA5Dac3b71bF6BD6B68c",
+        "deployBlock": 10341712,
+        "_why": "2026-09-29: security review found a permanent-lock risk (fee-on-transfer tokens) and a sandwichable sweep; never used (0 vaults, no funds). Do not point any UI at it."
+      },
+      "v2": true
+    },
+    "wall": {
+      "_doc": "QuaiWallV2 ('Wall of Blocks — promote your memecoin'). Address is reconciled against src/abi/quaiWallV2.js. Wall #1 = the Global Wall ('Promote your memecoin'). Mainnet base 1 QUAI / wall fee 10 QUAI are read live via stats()/getWall() — never hardcoded in the UI.",
+      "address": "0x0003b264Bc457BF2dc6F4De80c6C714079febB64",
+      "_deployed": "2026-09-27: QuaiWallV2 deployed + read-back verified; base 1 QUAI, wall fee 10 QUAI; Orchard rehearsal 6/6 (0x0063Cfa80267367923Ce78fe159837C78be91d61); mainnet smoke engrave idx 0 at block 10317650. Public, live on mainnet since 2026-10-05."
+    },
+    "achievementRewards": {
+      "_doc": "AchievementRewards (contracts/contracts/rewards/AchievementRewards.sol) — anyone who has earned all 12 HartiiLabs achievement badges (src/utils/achievementBadges.js, the shared module the UI and functions/api/achievements/voucher.js both import) can claim a flat 25 QUAI, once per wallet, paying their own gas. Owner plan: fund with 2,000 QUAI (80 claims) after deploy. null until deployed via contracts/scripts/deploy-achievement-rewards.cjs; copy only the read-back-verified mainnet address here in the SAME commit as functions/_lib/achievementRewardsConfig.js. /rewards stays 'Coming soon' and POST /api/achievements/voucher answers 503 while this is null.",
+      "address": "0x001d607B22de6ACcFB4adEE62838DED222Aa0c8a",
+      "deployBlock": 10352297,
+      "attestor": "0x006C4c9bEFcE9E9fAbDd4799217BD37cbaEE816F",
+      "_deployed": "2026-09-29: deployed on mainnet via deploy-achievement-rewards.cjs (tx 0x002d00515b9aea40b44ede32ddf38c54f94780c49e4c86ed556583a36291c75e); owner = admin wallet, attestor + REWARD 25 QUAI read back; funded 2,000 QUAI (tx 0x001a002510e1d9e3b39b29fb5749d3368a22b059acc6c6ca8336bfd72958354b) = 80 claims."
+    },
+    "wallMeta": {
+      "_doc": "WallMeta (contracts/contracts/wall/WallMeta.sol) — author-only on-chain style metadata (animation/material/accentColor/speed/glow) for existing QuaiWallV2 engravings on THIS mainnet wall (immutable wall reference, set at deploy). Null until deployed via contracts/scripts/deploy-wall-meta.cjs; the deployed, read-back-verified address is copied here in the SAME commit as src/abi/wallMeta.js reconciliation. src/utils/wallMetaReads.js and src/components/WallStyleForm.jsx stay dark while this is null.",
+      "address": "0x003D2DAff5f3f984807bf154E9b4E214c7926aC9",
+      "_deployed": "2026-09-28: WallMeta deployed on mainnet bound to QuaiWallV2 0x0003b264…bB64, read-back verified (wall ref + range constants). Orchard rehearsal passed (set/update/readback, stranger reverts 'not the author', unknown idx reverts). Styles set for wall 1 idx 1 (metal/black accent/drift) and idx 2 (neon/white accent/float)."
+    }
+  }
+}
