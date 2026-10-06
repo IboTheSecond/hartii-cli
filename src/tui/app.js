@@ -276,7 +276,7 @@ export class TuiApp {
     else if (result?.demo) lines.push({ text: 'DEMO — fixture data, nothing signed', st: S.warn });
     else if (result?.dryRun) lines.push({ text: 'Simulated only — not sent', st: S.warn });
     else if (result?.status === 'success') lines.push({ text: 'Confirmed on-chain', st: S.up });
-    const flat = result?.summary ? flatten(result.summary) : flatten(result || {});
+    const flat = result?.qr ? [`Address: ${result.address}`,`Network: ${result.network} · chain ${result.chainId}`,`QR SVG: ${result.savedTo||'not saved'}`,...(result.paylink?[`HPAY: ${result.paylink}`]:[]),'Open the SVG to scan or share these exact request terms.'] : result?.summary ? flatten(result.summary) : flatten(result || {});
     for (const row of flat.slice(0, 18)) lines.push({ text: row, st: S.ink });
     if (result?.txHash) lines.push({ text: `tx ${result.txHash}`, st: S.muted });
     if (result?.quaiscanUrl) lines.push({ text: result.quaiscanUrl, st: S.muted });

@@ -4,13 +4,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getAddress } from 'quais';
-import { runWrite, WriteError } from '../src/writePipeline.js';
+import { runWrite, WriteError, PreBroadcastError } from '../src/writePipeline.js';
 import { SpendGuardError } from '../src/spendingGuard.js';
 import { AddressError } from '../src/address.js';
 
 const mkAddr = (label) => getAddress('0x00' + Buffer.from(label, 'utf8').toString('hex').padEnd(38, '0').slice(0, 38));
 const FROM = mkAddr('sender');
 const TO = mkAddr('dest');
+const HASH = '0x' + 'ab'.repeat(32);
 const NETWORK = { name: 'mainnet', chainId: 9 };
 const LIMITS = { perTxQuai: '100', dailyQuai: '500' };
 
@@ -27,17 +28,18 @@ function makeWalletAndProvider({ callFails = false, estimate = 50_000n, gasPrice
     estimateGas: vi.fn(async () => estimate),
     getFeeData: vi.fn(async () => ({ gasPrice })),
     getTransactionCount: vi.fn(async () => nonce),
+    getNetwork: vi.fn(async () => ({ chainId: 9n })),
   };
   const wallet = {
     getAddress: vi.fn(async () => FROM),
     sendTransaction: vi.fn(async (tx) => {
       sends.push(tx);
-      if (sendError) throw sendError;
+      if (sendError) { if (sendError.receipt && !sendError.transaction) sendError.transaction = { ...tx, hash: sendError.receipt.hash }; throw sendError; }
       return {
-        hash: '0xabc123',
+        hash: HASH,
         wait: vi.fn(async () => {
           if (waitError) throw waitError;
-          return { status: receiptStatus };
+          return { status: receiptStatus, hash: HASH };
         }),
       };
     }),
@@ -63,9 +65,9 @@ describe('runWrite — happy path', () => {
     const result = await runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 1_000000000000000000n, action: 'Send QUAI', yes: true, io });
 
     expect(result.ok).toBe(true);
-    expect(result.txHash).toBe('0xabc123');
+    expect(result.txHash).toBe(HASH);
     expect(result.status).toBe('success');
-    expect(result.quaiscanUrl).toBe('https://quaiscan.io/tx/0xabc123');
+    expect(result.quaiscanUrl).toBe(`https://quaiscan.io/tx/${HASH}`);
     expect(calls).toHaveLength(1);
     expect(sends).toHaveLength(1);
     expect(sends[0].gasLimit).toBe((50_000n * 1200n) / 1000n); // estimate * 1.2
@@ -164,6 +166,32 @@ describe('runWrite — address validation', () => {
 });
 
 describe('runWrite — spending guard', () => {
+  it('blocks a different write after an unknown receipt even with daily headroom', async () => {
+    const first = makeWalletAndProvider({ waitError: new Error('receipt unknown') });
+    await expect(runWrite({ wallet: first.wallet, provider: first.provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 10n, action: 'first', yes: true, io })).rejects.toThrow();
+    const second = makeWalletAndProvider();
+    await expect(runWrite({ wallet: second.wallet, provider: second.provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 1n, action: 'different command', yes: true, io })).rejects.toThrow(/pending|unconfirmed|unresolved/);
+    expect(second.wallet.sendTransaction).not.toHaveBeenCalled();
+    expect(second.provider.call).not.toHaveBeenCalled();
+  });
+
+  it('binds receipt identity to the actual submitted hash before releasing authority', async () => {
+    const { wallet, provider } = makeWalletAndProvider();
+    wallet.sendTransaction.mockResolvedValue({ hash: '0x' + 'ab'.repeat(32), wait: async () => ({ status: 1, hash: '0x' + 'cd'.repeat(32), fee: 7n }) });
+    await expect(runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 10n, action: 'x', yes: true, io })).rejects.toThrow(/identity|hash|unconfirmed/i);
+    const { getSpentToday } = await import('../src/spendingGuard.js');
+    expect(getSpentToday(home, FROM).reservedWei).toBeGreaterThan(0n);
+  });
+
+  it('rejects a signer switch or nonce change while confirmation is open', async () => {
+    for (const change of ['signer', 'nonce']) {
+      const { wallet, provider } = makeWalletAndProvider();
+      const confirmFn = async () => { if (change === 'signer') wallet.getAddress.mockResolvedValue(TO); else provider.getTransactionCount.mockResolvedValue(5); return true; };
+      await expect(runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 1n, action: 'x', io: { ...io, confirmFn } })).rejects.toThrow(/signer|nonce|changed|authority/);
+      expect(wallet.sendTransaction).not.toHaveBeenCalled();
+    }
+  });
+
   it('rejects over the per-tx cap before simulating', async () => {
     const { wallet, provider, calls } = makeWalletAndProvider();
     await expect(runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 101_000000000000000000n, action: 'x', yes: true, io })).rejects.toThrow(SpendGuardError);
@@ -193,7 +221,7 @@ describe('runWrite — simulate/send/receipt failures', () => {
       caught = err;
     }
     expect(caught).toBeInstanceOf(WriteError);
-    expect(caught.txHash).toBe('0xabc123');
+    expect(caught.txHash).toBe(HASH);
     expect(caught.status).toBe('reverted');
   });
 
@@ -206,14 +234,14 @@ describe('runWrite — simulate/send/receipt failures', () => {
       caught = err;
     }
     expect(caught).toBeInstanceOf(WriteError);
-    expect(caught.txHash).toBe('0xabc123');
+    expect(caught.txHash).toBe(HASH);
   });
 
-  it('never records spend when the receipt reverts', async () => {
+  it('records conservative gas but no principal when a revert receipt omits fee fields', async () => {
     const { wallet, provider } = makeWalletAndProvider({ receiptStatus: 0 });
     const { getSpentToday } = await import('../src/spendingGuard.js');
     await runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 10_000000000000000000n, action: 'x', yes: true, io }).catch(() => {});
-    expect(getSpentToday(home, FROM).spentWei).toBe(0n);
+    expect(getSpentToday(home, FROM).spentWei).toBe(180_000_000_000_000n);
   });
 });
 
@@ -230,18 +258,87 @@ describe('runWrite — JSON output', () => {
 });
 
 describe('M2 pipeline safety', () => {
+  const unknownStatuses = ['', false, true, 2, null, undefined];
+  const canonicalStatuses = [0, 1, 0n, 1n, '0', '1', '0x0', '0x1'];
+  for (const shape of ['returned', 'wait-exception', 'submission-exception']) {
+    it.each(unknownStatuses)(`${shape} retains the whole reservation for a non-final status %#`, async status => {
+      const receipt = status === undefined ? { fee: 7n } : { status, fee: 7n };
+      const error = Object.assign(Error('unknown receipt'), { code: 'CALL_EXCEPTION', receipt });
+      const { wallet, provider } = makeWalletAndProvider(shape === 'submission-exception' ? { sendError: error } : {});
+      if (shape !== 'submission-exception') wallet.sendTransaction.mockResolvedValue({ hash: HASH, wait: async () => { if (shape === 'wait-exception') throw error; return receipt; } });
+      await expect(runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 10n, action: 'x', yes: true, io })).rejects.toThrow(/unconfirmed|did not confirm|outcome unknown/i);
+      const { getSpentToday } = await import('../src/spendingGuard.js');
+      expect(getSpentToday(home, FROM)).toMatchObject({ spentWei: 0n, reservedWei: 180_000_000_000_010n });
+      expect(wallet.sendTransaction).toHaveBeenCalledTimes(1);
+    });
+    it.each(canonicalStatuses)(`${shape} finalizes only an explicit canonical status %#`, async status => {
+      const receipt = { status, fee: 7n, hash: HASH };
+      const error = Object.assign(Error('receipt carried by SDK exception'), { code: 'CALL_EXCEPTION', receipt });
+      const { wallet, provider } = makeWalletAndProvider(shape === 'submission-exception' ? { sendError: error } : {});
+      if (shape !== 'submission-exception') wallet.sendTransaction.mockResolvedValue({ hash: HASH, wait: async () => { if (shape === 'wait-exception') throw error; return receipt; } });
+      const ctx = { wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 10n, action: 'x', yes: true, io };
+      const reverted = [0, 0n, '0', '0x0'].includes(status);
+      if (shape === 'submission-exception') await expect(runWrite(ctx)).rejects.toThrow(/outcome unknown/);
+      else if (reverted) await expect(runWrite(ctx)).rejects.toThrow(/reverted/);
+      else expect((await runWrite(ctx)).status).toBe('success');
+      const { getSpentToday } = await import('../src/spendingGuard.js');
+      if (shape === 'submission-exception') expect(getSpentToday(home,FROM).reservedWei).toBeGreaterThan(0n);
+      else expect(getSpentToday(home, FROM)).toMatchObject({ spentWei: reverted ? 7n : 17n, reservedWei: 0n });
+      expect(wallet.sendTransaction).toHaveBeenCalledTimes(1);
+    });
+  }
+  it('retains a CALL_EXCEPTION receipt surfaced during submission without local signed-hash evidence', async () => {
+    const error = Object.assign(Error('reverted during submission'), { code: 'CALL_EXCEPTION', receipt: { status: 0, hash: HASH, fee: 7n } });
+    const { wallet, provider } = makeWalletAndProvider({ sendError: error });
+    await expect(runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 10n, action: 'x', yes: true, io })).rejects.toThrow(/outcome unknown/);
+    const { getSpentToday } = await import('../src/spendingGuard.js');
+    expect(getSpentToday(home, FROM).reservedWei).toBeGreaterThan(0n);
+  });
+  it('retains a CALL_EXCEPTION reservation if its receipt has no explicit final status', async () => {
+    const { wallet, provider } = makeWalletAndProvider({ waitError: Object.assign(Error('unknown'), { code: 'CALL_EXCEPTION', receipt: { status: null } }) });
+    await expect(runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 10n, action: 'x', yes: true, io })).rejects.toThrow(/did not confirm/);
+    const { getSpentToday } = await import('../src/spendingGuard.js');
+    expect(getSpentToday(home, FROM).reservedWei).toBeGreaterThan(0n);
+  });
+  it.each(['returned', 'thrown'])('charges mined revert gas (%s receipt) until the daily ceiling stops signing', async (shape) => {
+    const { wallet, provider } = makeWalletAndProvider({ estimate: 1n, gasPrice: 10n ** 18n });
+    const receipt = { status: 0, hash: HASH, gasUsed: 1n, fee: 10n ** 18n, hash: HASH };
+    wallet.sendTransaction.mockResolvedValue({ hash: HASH, wait: async () => {
+      if (shape === 'thrown') throw Object.assign(Error('reverted'), { code: 'CALL_EXCEPTION', receipt });
+      return receipt;
+    } });
+    const ctx = { wallet, provider, network: NETWORK, home, limits: { perTxQuai: '20', dailyQuai: '20' }, to: TO, value: 0n, action: 'x', yes: true, io };
+    for (let i = 0; i < 20; i++) await expect(runWrite(ctx)).rejects.toThrow(/reverted/);
+    const { getSpentToday } = await import('../src/spendingGuard.js');
+    expect(getSpentToday(home, FROM)).toMatchObject({ spentWei: 20n * 10n ** 18n, reservedWei: 0n });
+    await expect(runWrite(ctx)).rejects.toThrow(/daily limit/);
+    expect(wallet.sendTransaction).toHaveBeenCalledTimes(20);
+  });
+  it.each([
+    [{ status: 1, fee: 7n, hash: HASH }, 17n],
+    [{ status: 0, hash: HASH, gasUsed: 2n, gasPrice: 4n }, 8n],
+    [{ status: 0, hash: HASH, gasUsed: 2n, effectiveGasPrice: 5n }, 10n],
+    [{ status: 0, hash: HASH, gasUsed: 2n }, 6_000_000_000n],
+    [{ status: 0, hash: HASH }, 180_000_000_000_000n],
+  ])('settles receipt gas with actual fee or conservative signed terms %#', async (receipt, expected) => {
+    const { wallet, provider } = makeWalletAndProvider();
+    wallet.sendTransaction.mockResolvedValue({ hash: HASH, wait: async () => receipt });
+    await runWrite({ wallet, provider, network: NETWORK, home, limits: LIMITS, to: TO, value: 10n, action: 'x', yes: true, io }).catch(error => { if (receipt.status !== 0) throw error; });
+    const { getSpentToday } = await import('../src/spendingGuard.js');
+    expect(getSpentToday(home, FROM)).toMatchObject({ spentWei: expected, reservedWei: 0n });
+  });
   it('treats a missing receipt as unconfirmed and retains the reservation', async () => {
     const {wallet,provider}=makeWalletAndProvider();
-    wallet.sendTransaction.mockResolvedValue({hash:'0xabc123',wait:async()=>null});
+    wallet.sendTransaction.mockResolvedValue({hash:HASH,wait:async()=>null});
     await expect(runWrite({wallet,provider,network:NETWORK,home,limits:LIMITS,to:TO,value:10n,action:'x',yes:true,io})).rejects.toThrow(/unconfirmed/i);
     const {getSpentToday}=await import('../src/spendingGuard.js');
     expect(getSpentToday(home,FROM).reservedWei).toBeGreaterThanOrEqual(10n); // value + fee
   });
   it('returns a JSON-safe receipt snapshot on success',async()=>{
     const {wallet,provider}=makeWalletAndProvider();
-    wallet.sendTransaction.mockResolvedValue({hash:'0xabc123',wait:async()=>({status:1,blockNumber:20,gasUsed:100n})});
+    wallet.sendTransaction.mockResolvedValue({hash:HASH,wait:async()=>({status:1,hash:HASH,blockNumber:20,gasUsed:100n})});
     const r=await runWrite({wallet,provider,network:NETWORK,home,limits:LIMITS,to:TO,value:1n,action:'x',yes:true,io});
-    expect(r.receipt).toMatchObject({status:1,blockNumber:20,gasUsed:'100',transactionHash:'0xabc123'});
+    expect(r.receipt).toMatchObject({status:1,blockNumber:20,gasUsed:'100',transactionHash:HASH});
   });
   it.each([{estimate:0n},{estimate:-1n},{gasPrice:0n},{gasPrice:-1n},{nonce:-1},{nonce:1.5},{nonce:Number.MAX_SAFE_INTEGER+1}])('rejects malformed gas terms %#',async(terms)=>{
     const {wallet,provider}=makeWalletAndProvider(terms);
@@ -249,16 +346,16 @@ describe('M2 pipeline safety', () => {
     expect(wallet.sendTransaction).not.toHaveBeenCalled();
   });
   it('releases a reservation after a proven local signer failure',async()=>{
-    const {wallet,provider}=makeWalletAndProvider({sendError:Object.assign(Error('wrong password'),{notSubmitted:true})});
+    const {wallet,provider}=makeWalletAndProvider({sendError:new PreBroadcastError('Local signer preparation failed before delegation')});
     await expect(runWrite({wallet,provider,network:NETWORK,home,limits:LIMITS,to:TO,value:10n,action:'x',yes:true,io})).rejects.toThrow();
     const {getSpentToday}=await import('../src/spendingGuard.js');
     expect(getSpentToday(home,FROM).reservedWei).toBe(0n);
   });
-  it.each(['INSUFFICIENT_FUNDS','NONCE_EXPIRED','REPLACEMENT_UNDERPRICED'])('releases the reservation when the node rejects the send before broadcast (%s)',async(code)=>{
+  it.each(['INSUFFICIENT_FUNDS','NONCE_EXPIRED','REPLACEMENT_UNDERPRICED'])('retains authority for a node error code without local rejection proof (%s)',async(code)=>{
     const {wallet,provider}=makeWalletAndProvider({sendError:Object.assign(Error('node said no'),{code})});
-    await expect(runWrite({wallet,provider,network:NETWORK,home,limits:LIMITS,to:TO,value:10n,action:'x',yes:true,io})).rejects.toThrow(/rejected before broadcast/);
+    await expect(runWrite({wallet,provider,network:NETWORK,home,limits:LIMITS,to:TO,value:10n,action:'x',yes:true,io})).rejects.toThrow(/outcome unknown/);
     const {getSpentToday}=await import('../src/spendingGuard.js');
-    expect(getSpentToday(home,FROM)).toMatchObject({spentWei:0n,reservedWei:0n});
+    expect(getSpentToday(home,FROM).reservedWei).toBeGreaterThan(0n);
   });
   it('keeps the reservation when the send outcome is unknown (timeout / server error)',async()=>{
     const {wallet,provider}=makeWalletAndProvider({sendError:Object.assign(Error('socket hang up'),{code:'SERVER_ERROR'})});
@@ -267,15 +364,15 @@ describe('M2 pipeline safety', () => {
     expect(getSpentToday(home,FROM).reservedWei).toBeGreaterThanOrEqual(10n);
   });
   it('a revert surfaced the way quais really does it (wait() throws CALL_EXCEPTION + receipt) is final: reported as reverted, reservation released',async()=>{
-    const quaisRevert=Object.assign(Error('transaction execution reverted'),{code:'CALL_EXCEPTION',receipt:{status:0,hash:'0xabc123'}});
+    const quaisRevert=Object.assign(Error('transaction execution reverted'),{code:'CALL_EXCEPTION',receipt:{status:0,hash:HASH}});
     const {wallet,provider}=makeWalletAndProvider({waitError:quaisRevert});
     let caught; try { await runWrite({wallet,provider,network:NETWORK,home,limits:LIMITS,to:TO,value:10n,action:'x',yes:true,io}); } catch (err) { caught=err; }
     expect(caught).toBeInstanceOf(WriteError);
     expect(caught.status).toBe('reverted');
-    expect(caught.txHash).toBe('0xabc123');
+    expect(caught.txHash).toBe(HASH);
     expect(caught.message).not.toMatch(/did not confirm/);
     const {getSpentToday}=await import('../src/spendingGuard.js');
-    expect(getSpentToday(home,FROM)).toMatchObject({spentWei:0n,reservedWei:0n});
+    expect(getSpentToday(home,FROM)).toMatchObject({spentWei:180_000_000_000_000n,reservedWei:0n});
   });
 });
 

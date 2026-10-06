@@ -11,6 +11,15 @@ import { group, fmtPrice, fmtPct, shortAddr } from '../src/tui/format.js';
 import { colorDepth } from '../src/tui/theme.js';
 import { runTui } from '../src/tui/run.js';
 import { main } from '../src/cli.js';
+import {buildReceiveLink} from '../src/paylinks.js';
+
+it('TUI sends accept fixed-amount HPAY links and raw-address receiving omits request terms',()=>{
+ const to=buildReceiveLink({address:'0x0011111111111111111111111111111111111111',amount:'2.5'});
+ expect(validateAll('Send',{to,amount:'',token:''}).ok).toBe(true);
+ expect(validateAll('Send',{to:to.replace('chain=9','chain=15000'),amount:'',token:''}).ok).toBe(false);
+ expect(commandFor('Receive',{kind:'address',amount:'2.5',memo:'stale',out:'quai.svg'})).toEqual({fn:'receive',opts:{addressQr:true,out:'quai.svg'}});
+ expect(fieldsFor('Receive',{kind:'address'}).map(f=>f.key)).toEqual(['out']);
+});
 
 const NOW = Date.UTC(2026, 9, 5, 14, 2, 11);
 const data = () => demoState(NOW);

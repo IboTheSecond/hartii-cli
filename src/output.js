@@ -125,7 +125,7 @@ export function redactUrls(text) {
   return String(text).replace(/https?:\/\/[^\s"'<>)]+/gi, (raw) => {
     try {
       const u = new URL(raw);
-      const path = u.pathname.split('/').map((seg) => (/^[A-Za-z0-9_-]{16,}$/.test(seg) && !/^0x[0-9a-fA-F]+$/.test(seg) ? '***' : seg)).join('/');
+      const path = u.pathname.split('/').map((seg) => {let decoded;try{decoded=decodeURIComponent(seg);}catch{return '***';}return /^[A-Za-z0-9_-]{16,}$/.test(decoded)&&!/^0x[0-9a-fA-F]+$/.test(decoded)?'***':seg;}).join('/');
       return `${u.protocol}//${u.host}${path}${u.search || u.hash ? '?***' : ''}`;
     } catch { return '[redacted-url]'; }
   });

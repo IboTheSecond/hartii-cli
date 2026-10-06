@@ -7,8 +7,9 @@
 // run `export` to back it up. `export` itself requires the caller to type the wallet's own name
 // back (not just a y/N) — a plain `--yes` can never skip it; this is the one gate in the whole CLI
 // that is intentionally NOT governed by the global --yes flag.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { getAddress, Mnemonic } from 'quais';
+import {createReceiveQr} from '../qr.js';
 import {
   WalletError,
   assertValidWalletName,
@@ -41,6 +42,7 @@ function nextDefaultName(home) {
 async function promptNewPassword(deps) {
   const env = deps.env || process.env;
   if (typeof env.HARTII_PASSWORD === 'string' && env.HARTII_PASSWORD !== '') {
+    if (env.HARTII_PASSWORD.length < 8) throw new WalletError('New wallet password must be at least 8 characters.');
     return resolvePassword(deps);
   }
   const promptFn = deps.promptFn || readHiddenInput;
@@ -54,10 +56,12 @@ async function promptNewPassword(deps) {
 /** Persists `account` under `name`, switching the config's currentWallet to it (see header: every new/imported wallet becomes the active one — a CLI with no other signal should pick the wallet you just made). */
 async function persistAccount(home, name, account, deps) {
   assertValidWalletName(name);
+  loadConfig(home); // refuse corrupted policy before encrypting/writing any wallet
   const password = await promptNewPassword(deps);
   // `deps.scrypt` is a TEST-ONLY override (see keystore.js's encryptAccount) — real usage never
   // sets it, so production wallets are always encrypted at the real cost.
   const json = await encryptAccount(account, password, { scrypt: deps.scrypt });
+  loadConfig(home); // policy may have changed while encryption was running
   writeKeystoreFile(home, name, json);
   const cfg = loadConfig(home);
   saveConfig(home, { ...cfg, currentWallet: name });
@@ -96,11 +100,9 @@ export async function walletImport(home, kind, value, name, deps = {}) {
 export function walletList(home) {
   const cfg = loadConfig(home);
   return listWallets(home).map((name) => {
-    const p = keystorePath(home, name);
     let address = null;
     try {
-      const data = JSON.parse(readFileSync(p, 'utf8'));
-      address = getAddress('0x' + String(data.address || '').replace(/^0x/, ''));
+      address = publicKeystore(home, name).address;
     } catch {
       address = null;
     }
@@ -122,14 +124,12 @@ export function walletAddress(home, name, opts = {}) {
   const resolvedName = name || cfg.currentWallet;
   if (!resolvedName) throw new WalletError('No wallet selected. Run `hartii wallet new` or `hartii wallet use <name>`.');
   if (!walletExists(home, resolvedName)) throw new WalletError(`No wallet named "${resolvedName}".`);
-  const data = JSON.parse(readFileSync(keystorePath(home, resolvedName), 'utf8'));
-  const address = getAddress('0x' + String(data.address || '').replace(/^0x/, ''));
+  const { address } = publicKeystore(home, resolvedName);
   const result = { name: resolvedName, address };
   if (opts.qr) {
-    // Zero-dependency QR rendering is not yet implemented (no bundled QR encoder) — honest gap
-    // rather than a fake/placeholder box. TODO: a minimal ANSI QR renderer.
-    result.qr = null;
-    result.note = 'QR code rendering is not implemented yet — showing the address as text.';
+    result.qr=createReceiveQr(address);
+    result.network=cfg.network;
+    result.note='This QR contains the public address only. Verify the payer selects the intended network.';
   }
   return result;
 }
@@ -167,8 +167,8 @@ export async function walletExport(home, name, deps = {}) {
 export function walletRename(home, oldName, newName) {
   if (!oldName || !newName) throw new WalletError('Usage: hartii wallet rename <old> <new>');
   assertValidWalletName(newName);
-  renameKeystoreFile(home, oldName, newName);
   const cfg = loadConfig(home);
+  renameKeystoreFile(home, oldName, newName);
   if (cfg.currentWallet === oldName) saveConfig(home, { ...cfg, currentWallet: newName });
   return { oldName, newName };
 }
@@ -177,13 +177,14 @@ export function walletRename(home, oldName, newName) {
 export async function walletRemove(home, name, deps = {}) {
   if (!name) throw new WalletError('Usage: hartii wallet remove <name>');
   if (!walletExists(home, name)) throw new WalletError(`No wallet named "${name}".`);
+  loadConfig(home); // refuse corrupted policy before destructive confirmation
   const confirmFn = deps.confirmTypedFn || readVisibleInput;
   const typed = await confirmFn(`Type "${name}" to confirm PERMANENTLY removing this wallet's local keystore file: `, deps);
   if (String(typed).trim() !== name) {
     throw new WalletError('Remove cancelled — typed confirmation did not match the wallet name.');
   }
-  removeKeystoreFile(home, name);
   const cfg = loadConfig(home);
+  removeKeystoreFile(home, name);
   if (cfg.currentWallet === name) saveConfig(home, { ...cfg, currentWallet: null });
   return { name, removed: true };
 }
@@ -195,15 +196,25 @@ export function walletLockCheck(home, name) {
   if (!resolvedName) throw new WalletError('No wallet selected.');
   const p = keystorePath(home, resolvedName);
   if (!existsSync(p)) throw new WalletError(`No wallet named "${resolvedName}".`);
-  const data = JSON.parse(readFileSync(p, 'utf8'));
+  const { data, address } = publicKeystore(home, resolvedName);
   const version3 = Number(data.version) === 3;
   const hasCrypto = Boolean(data.Crypto || data.crypto);
   const perms = checkKeystorePerms(home);
-  const ownWalletIssues = perms.issues.filter((i) => i.includes(resolvedName));
   return {
     name: resolvedName,
-    address: getAddress('0x' + String(data.address || '').replace(/^0x/, '')),
+    address,
     encrypted: version3 && hasCrypto,
-    permsOk: !perms.applicable || ownWalletIssues.length === 0,
+    permsOk: perms.applicable ? perms.issues.length === 0 : null,
+    permissions: perms.applicable ? 'checked-posix-modes' : 'unverified-windows-acl',
   };
+}
+
+function publicKeystore(home, name) {
+  try {
+    const data = JSON.parse(readKeystoreFile(home, name));
+    if (!data || typeof data !== 'object' || Array.isArray(data) || !/^(0x)?[0-9a-fA-F]{40}$/.test(data.address || '')) throw new Error('Invalid public address');
+    return { data, address: getAddress('0x' + data.address.replace(/^0x/, '')) };
+  } catch {
+    throw new WalletError('Could not read a valid public keystore header. No secret was printed.');
+  }
 }

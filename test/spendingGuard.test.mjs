@@ -89,7 +89,7 @@ describe('durable spend safety', () => {
     reserveSpend(home, ADDRESS, 90_000000000000000000n, { perTxQuai: '100', dailyQuai: '100' }, { now: new Date('2026-01-01') });
     expect(() => checkSpend(home, ADDRESS, 11_000000000000000000n, { perTxQuai: '100', dailyQuai: '100' }, { now: new Date('2026-01-02') })).toThrow(/daily limit/);
   });
-  it('settles confirmed reservations once, while a proven revert releases them', () => {
+  it('settles confirmed reservations once, while a rejected-before-broadcast send releases them', () => {
     const id = reserveSpend(home, ADDRESS, 20n, LIMITS);
     settleSpend(home, ADDRESS, id, { confirmed: true });
     expect(getSpentToday(home, ADDRESS).spentWei).toBe(20n);

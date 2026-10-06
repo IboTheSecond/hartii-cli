@@ -17,6 +17,7 @@ import { runBuy } from './commands/buy.js';
 import { runSell } from './commands/sell.js';
 import { runSwap } from './commands/swap.js';
 import { runTx } from './commands/tx.js';
+import { runReceive } from './commands/receive.js';
 import { runWatch } from './commands/watch.js';
 import { runAirdrop } from './commands/airdrop.js';
 import { runOtc } from './commands/otc.js';
@@ -39,7 +40,7 @@ const writeCmd = (run, specific) => (c) => run({ ...writeOpts(c), ...specific(c)
 
 const mcp = (c) => (c.deps.runMcp || runMcp)({
   env: c.env, home: getHartiiHome(c.env), network: c.g.network, rpc: c.g.rpc, wallet: c.g.wallet, keyEnv: c.g.keyEnv,
-  allowWrites: c.flags['allow-writes'] !== undefined && c.flags['allow-writes'] !== 'false',
+  allowWrites: c.flags['allow-writes'] === true,
   maxPerTx: c.flags['max-per-tx'], maxPerDay: c.flags['max-per-day'],
   fetchFn: c.deps.fetchFn, providerFactory: c.deps.providerFactory, walletFactory: c.deps.walletFactory, now: c.deps.now, transport: c.deps.mcpTransport,
 });
@@ -67,6 +68,7 @@ const extra = (command) => async (c) => {
 
 export const COMMAND_TABLE = {
   wallet: (c) => runWallet(c.args, c.flags, c),
+  receive: (c)=>runReceive({...walletOpts(c),amount:c.flags.amount,memo:c.flags.memo,addressQr:c.flags['address-qr']===true,out:c.flags.out,expiresAt:c.flags.expires===undefined?null:Number(c.flags.expires)}),
   config: (c) => runConfig(c.args, c.home),
   balance: (c) => runBalance({ ...walletOpts(c), tokens: Boolean(c.flags.tokens), address: typeof c.flags.address === 'string' ? c.flags.address : undefined }, readDeps(c)),
   doctor: (c) => runDoctor(readOpts(c), { fetchFn: c.deps.fetchFn, now: c.deps.now }),

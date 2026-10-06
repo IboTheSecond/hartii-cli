@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { getAddress } from 'quais';
+import { getAddress, Wallet } from 'quais';
 import { runWrite, WriteError } from '../src/writePipeline.js';
 import { writeRuntime } from '../src/commandContext.js';
 import { withSpendLock, SpendGuardError, getSpentToday } from '../src/spendingGuard.js';
@@ -28,10 +28,11 @@ afterEach(() => { rmSync(home, { recursive: true, force: true }); vi.restoreAllM
 function rig({ gasPrice = 1n, estimate = 100_000n } = {}) {
   const sends = [];
   const provider = {
+    getNetwork: async () => ({ chainId: 9n }),
     call: vi.fn(async () => '0x'), createAccessList: vi.fn(async () => []), estimateGas: vi.fn(async () => estimate),
     getFeeData: vi.fn(async () => ({ gasPrice })), getTransactionCount: vi.fn(async () => 0),
   };
-  const wallet = { getAddress: async () => FROM, sendTransaction: vi.fn(async (tx) => { sends.push(tx); return { hash: '0x' + 'ab'.repeat(32), wait: async () => ({ status: 1 }) }; }) };
+  const wallet = { getAddress: async () => FROM, sendTransaction: vi.fn(async (tx) => { sends.push(tx); return { hash: '0x' + 'ab'.repeat(32), wait: async () => ({ status: 1, hash: '0x' + 'ab'.repeat(32) }) }; }) };
   return { provider, wallet, sends };
 }
 const base = (r, extra = {}) => ({ wallet: r.wallet, provider: r.provider, network: { name: 'mainnet', chainId: 9 }, home, limits: { perTxQuai: '100', dailyQuai: '500' }, to: TO, value: ONE, action: 'x', yes: true, ...extra });
@@ -69,10 +70,10 @@ describe('M4 chain pin', () => {
     mkdirSync(join(home, 'keystore'), { recursive: true });
     writeFileSync(join(home, 'keystore', 'w.json'), JSON.stringify({ address: FROM.slice(2) }));
     saveConfig(home, { network: 'mainnet', currentWallet: 'w', limits: { perTxQuai: '100', dailyQuai: '500' } });
-    const provider = { getNetwork: async () => ({ chainId: providerChain }), destroy() {} };
+    const provider = { getNetwork: async () => ({ chainId: providerChain }), getTransactionCount: async () => 0, destroy() {} };
     const signerSend = vi.fn(async () => ({ hash: '0x1' }));
     const fetchFn = async () => ({ status: 200, json: async () => ({ result: '0x9' }) });
-    return { signerSend, deps: { fetchFn, providerFactory: () => provider, walletFactory: () => ({ sendTransaction: signerSend }), env: { K: THROWAWAY }, io: { writeErr: () => {} } } };
+    return { signerSend, deps: { fetchFn, providerFactory: () => provider, walletFactory: key => ({ getAddress: async () => new Wallet(key).address, sendTransaction: signerSend }), env: { K: THROWAWAY }, io: { writeErr: () => {} } } };
   }
   it('refuses to sign a tx whose chain id is not the expected one', async () => {
     const { deps, signerSend } = runtimeRig(9n);
@@ -84,13 +85,13 @@ describe('M4 chain pin', () => {
   it('refuses when the provider reports a different chain right before signing', async () => {
     const { deps, signerSend } = runtimeRig(15000n);
     const rt = await writeRuntime({ home, keyEnv: 'K' }, deps);
-    await expect(rt.wallet.sendTransaction({ to: TO, chainId: 9n })).rejects.toThrow(/RPC reports chain/);
+    await expect(rt.wallet.sendTransaction({ from: rt.from, to: TO, data: '0x', value: 0n, gasLimit: 1n, gasPrice: 1n, nonce: 0, chainId: 9n })).rejects.toThrow(/RPC reports chain/);
     expect(signerSend).not.toHaveBeenCalled();
   });
   it('signs when everything agrees; runWrite supplies the chain id', async () => {
     const { deps, signerSend } = runtimeRig(9n);
     const rt = await writeRuntime({ home, keyEnv: 'K' }, deps);
-    await rt.wallet.sendTransaction({ to: TO, chainId: 9n });
+    await rt.wallet.sendTransaction({ from: rt.from, to: TO, data: '0x', value: 0n, gasLimit: 1n, gasPrice: 1n, nonce: 0, chainId: 9n });
     expect(signerSend).toHaveBeenCalled();
     const r = rig();
     await runWrite(base(r, { io: { write: () => {} } }));
@@ -112,12 +113,13 @@ describe('M5 wallet import secrets', () => {
     expect(code).toBe(1);
     expect(err.mock.calls.join('')).toMatch(/--from-arg/);
   });
-  it('--from-arg works for a key and warns about shell history', async () => {
+  it('--from-arg is refused without echoing or importing the supplied key', async () => {
     const spy = vi.spyOn(walletCommands, 'walletImport').mockResolvedValue({ name: 'n', address: 'a' });
     const err = vi.fn();
-    expect(await main(['wallet', 'import', 'key', '--from-arg', '0x' + '44'.repeat(32)], { env: { HARTII_HOME: home }, write: vi.fn(), writeErr: err })).toBe(0);
-    expect(spy).toHaveBeenCalledWith(home, 'key', '0x' + '44'.repeat(32), undefined, expect.any(Object));
-    expect(err.mock.calls.join('')).toMatch(/shell history/);
+    expect(await main(['wallet', 'import', 'key', '--from-arg', '0x' + '44'.repeat(32)], { env: { HARTII_HOME: home }, write: vi.fn(), writeErr: err })).toBe(1);
+    expect(spy).not.toHaveBeenCalled();
+    expect(err.mock.calls.join('')).toMatch(/removed|hidden prompt/);
+    expect(err.mock.calls.join('').includes('0x' + '44'.repeat(32))).toBe(false);
   });
 });
 

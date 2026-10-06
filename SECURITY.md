@@ -17,5 +17,8 @@ real keys, recovery phrases or passwords. We aim to acknowledge reports within a
 
 ## Design notes (see README "Security model")
 
-Keys live only in an encrypted keystore; every write is simulated and must report receipt status 1; there is no
-telemetry; network access is limited to your RPC, hartiilabs.com / hartiibiome.com and the live WebSocket.
+Keys are stored in encrypted local keystores; secret argv imports are refused. Recovery metadata is checked against the decrypted signing identity. Writes share simulation, chain/signer/nonce validation, exact spending accounting and conservative unresolved-transaction reservations. Canonical receipt status and matching locally known transaction identity are required; an RPC error alone does not release authority.
+
+Windows ACLs are not certified from POSIX file modes. Static file checks are not an operating-system sandbox against a privileged local attacker. No test suite establishes safety of every dependency or funded execution on every network. Start with an isolated profile and small amounts.
+
+Receiving QR codes and links is generated offline from public metadata. Shared payment memos are public. Local files, RPC/API/WebSocket infrastructure, browser explorer links and agent-client retention have separate privacy boundaries. See README for the full model. The CLI performs no application analytics itself.

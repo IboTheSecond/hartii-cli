@@ -8,11 +8,11 @@ import { redactUrls } from '../output.js';
 // Provider, specifically so every check is testable with one injected `fetchFn` and no quais
 // network plumbing — doctor's whole job is "is the real network reachable", so it should not
 // itself depend on the heavier machinery it's diagnosing.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { getAddress } from 'quais';
 import { resolveRuntimeNetwork } from '../network.js';
 import { isCyprus1QuaiAddress } from '../address.js';
-import { checkKeystorePerms, keystorePath } from '../keystore.js';
+import { checkKeystorePerms, keystorePath, readKeystoreFile } from '../keystore.js';
 import { getHartiiHome, loadConfig } from '../config.js';
 import { demoDoctorChecks } from '../demoFixtures.js';
 
@@ -69,8 +69,10 @@ export async function runDoctor(opts = {}, deps = {}) {
   // 3. Keystore perms.
   try {
     const perm = checkKeystorePerms(home);
-    if (!perm.applicable) {
-      checks.push({ name: 'keystorePerms', ok: true, detail: 'not checked on this platform (Windows ignores POSIX modes)' });
+    if (perm.status === 'not-applicable') {
+      checks.push({ name: 'keystorePerms', ok: true, status: 'not-applicable', detail: 'no keystore directory exists yet' });
+    } else if (!perm.applicable) {
+      checks.push({ name: 'keystorePerms', ok: null, status: 'unverified', detail: 'Windows ACL access has not been verified; POSIX modes cannot certify owner-only protection' });
     } else {
       checks.push({ name: 'keystorePerms', ok: perm.issues.length === 0, detail: perm.issues.length === 0 ? 'keystore files are owner-only' : perm.issues.join('; ') });
     }
@@ -86,12 +88,12 @@ export async function runDoctor(opts = {}, deps = {}) {
       checks.push({ name: 'addressLedger', ok: false, detail: `current wallet "${cfg.currentWallet}" has no keystore file` });
     } else {
       try {
-        const data = JSON.parse(readFileSync(p, 'utf8'));
+        const data = JSON.parse(readKeystoreFile(home, cfg.currentWallet));
         const address = getAddress('0x' + String(data.address || '').replace(/^0x/, ''));
         const ok = isCyprus1QuaiAddress(address);
         checks.push({ name: 'addressLedger', ok, detail: ok ? `${address} is a Cyprus-1 Quai address` : `${address} is NOT a Cyprus-1 Quai address` });
-      } catch (err) {
-        checks.push({ name: 'addressLedger', ok: false, detail: `could not read "${cfg.currentWallet}": ${err?.message || err}` });
+      } catch {
+        checks.push({ name: 'addressLedger', ok: false, detail: 'could not read a valid public wallet address' });
       }
     }
   } else {
@@ -118,11 +120,11 @@ export async function runDoctor(opts = {}, deps = {}) {
       const ok = skewMs <= CLOCK_SKEW_WARN_MS || blockMs === 0;
       checks.push({ name: 'clockSkew', ok, detail: blockMs === 0 ? 'could not read a block timestamp' : `${Math.round(skewMs / 1000)}s between local clock and latest block` });
     } catch (err) {
-      checks.push({ name: 'clockSkew', ok: false, detail: `could not read latest block: ${err?.message || err}` });
+      checks.push({ name: 'clockSkew', ok: false, detail: `could not read latest block: ${redactUrls(err?.message || err)}` });
     }
   } else {
     checks.push({ name: 'clockSkew', ok: false, detail: 'skipped (RPC unreachable)' });
   }
 
-  return { ok: checks.every((c) => c.ok), checks };
+  return { ok: checks.every((c) => c.ok !== false), verified: checks.every((c) => c.ok === true), checks };
 }

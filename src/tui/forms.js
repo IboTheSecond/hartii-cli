@@ -4,6 +4,7 @@
 // them, validates inline, then maps the values onto the SAME command functions the CLI uses, so a TUI
 // action has exactly the CLI's simulation, confirmation summary, spending-guard and receipt behaviour.
 import { assertCyprus1QuaiAddress } from '../address.js';
+import {exactReceiveAmount,parseNativePaylink} from '../paylinks.js';
 import { parseSlippageBps } from '../trade.js';
 import { validateMessage, hexToColor } from '../../vendor/src/utils/wallCurve.js';
 
@@ -49,9 +50,16 @@ const f = (key, label, validate, extra = {}) => ({ key, label, validate, ...extr
 
 /** Per-action field lists. `select` fields drive which other fields show (see fieldsFor). */
 export const ACTIONS = {
-  Send: { title: 'Send', command: 'send', fields: () => [
-    f('to', 'Recipient', v.address, { placeholder: '0x… Cyprus-1 Quai address' }),
-    f('amount', 'Amount', v.amount, { hint: 'QUAI, or tokens when a token is set. 1.5 · 50% · all' }),
+  Receive: {title:'Receive QUAI',command:'receive',select:{key:'kind',label:'QR type',options:['payment link','address']},fields:(values)=>[
+    ...(values.kind==='address'?[]:[
+    f('amount','Request amount',(value)=>String(value||'').trim()?err(exactReceiveAmount)(value):'',{optional:true,hint:'Blank lets the payer choose the amount.'}),
+    f('memo','Memo',(value)=>[...String(value||'')].length<=140?'':'At most 140 characters.',{optional:true}),
+    ]),
+    f('out','QR SVG file',v.required('SVG file'),{value:`hartii-receive-${Date.now()}.svg`,hint:'Offline QR image; public address only.'}),
+  ]},
+  Send: { title: 'Send', command: 'send', fields: (values) => [
+    f('to', 'Recipient', err(value=>{const input=String(value||'').trim();if(/^https?:\/\//i.test(input))parseNativePaylink(input);else assertCyprus1QuaiAddress(input);}), { placeholder: 'Quai address or HPAY payment link' }),
+    f('amount', 'Amount', value=>{if(!String(value||'').trim()&&/^https?:\/\//i.test(values.to||'')){try{if(parseNativePaylink(values.to).amountWei!==null)return '';}catch{/* recipient validation explains the error */}}return v.amount(value);}, { hint: 'Blank uses a fixed HPAY amount. Otherwise: 1.5 · 50% · all' }),
     f('token', 'Token', v.optionalTokenRef, { optional: true, hint: 'address or ticker; blank = QUAI' }),
   ] },
   Buy: { title: 'Buy', command: 'buy', fields: () => [
@@ -125,6 +133,7 @@ export function validateAll(action, values) {
 export function commandFor(action, values) {
   const t = (k) => (String(values[k] ?? '').trim() || undefined);
   switch (action) {
+    case 'Receive':return {fn:'receive',opts:{...(values.kind==='address'?{addressQr:true}:{amount:t('amount'),memo:t('memo')}),out:t('out')}};
     case 'Send': return { fn: 'send', opts: { to: t('to'), amount: t('amount'), token: t('token') } };
     case 'Buy': return { fn: 'buy', opts: { token: t('token'), quai: t('quai'), slippage: t('slippage') } };
     case 'Sell': return { fn: 'sell', opts: { token: t('token'), amount: t('amount'), slippage: t('slippage') } };

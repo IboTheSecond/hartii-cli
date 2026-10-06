@@ -48,6 +48,10 @@ describe('assertCyprus1QuaiAddress', () => {
     expect(() => assertCyprus1QuaiAddress(QI_ADDRESS)).toThrow(/Qi-ledger/);
   });
 
+  it('tells a Qi-ledger address to use a Quai address or wrap to WQI', () => {
+    expect(() => assertCyprus1QuaiAddress(QI_ADDRESS)).toThrow(/use a Quai address \(starts 0x00…\), or wrap your Qi to WQI first/);
+  });
+
   it('rejects a non-Cyprus-1 Quai address with a zone-specific message', () => {
     expect(() => assertCyprus1QuaiAddress(OTHER_ZONE_ADDRESS)).toThrow(/Cyprus-1/);
   });

@@ -13,10 +13,12 @@ import { safeTerminalText, redactUrls } from './output.js';
 // `resilientRead` import below) and the revert-reason classifier (`classifyError`), both pure and
 // generic enough to serve both packages without coupling this one to agent-mcp's vault semantics.
 import { getAddress } from 'quais';
+import { createHash } from 'node:crypto';
 import { resilientRead } from '../vendor/packages/agent-mcp/src/rpcClient.js';
 import { readGasPrice } from './gasPrice.js';
 import { classifyError } from '../vendor/packages/agent-mcp/src/errors.js';
-import { checkSpend, withSpendLock, reserveSpend, markSpendHash, settleSpend } from './spendingGuard.js';
+import { checkSpend, withSpendLock, reserveSpend, markSpendHash, settleSpend, assertNoPendingSpend } from './spendingGuard.js';
+import { NETWORKS } from './network.js';
 import { quaiscanTxUrl } from './quaiscan.js';
 import { confirm as defaultConfirm } from './prompt.js';
 import { formatAmount } from './amount.js';
@@ -25,6 +27,11 @@ import { CliError } from './errors.js';
 
 export class WriteError extends CliError {
   constructor(message, extra) { super(redactUrls(message), extra); }
+}
+const localPreBroadcastFailures = new WeakSet();
+/** Native-only phase evidence; JSON-RPC flags cannot manufacture this membership. */
+export class PreBroadcastError extends WriteError {
+  constructor(message) { super(message); localPreBroadcastFailures.add(this); }
 }
 
 // Live Cyprus-1 gas is ~58,000 gwei (2026-10-05): a transfer costs ~2 QUAI and a curve trade ~8-15 QUAI, so the
@@ -35,15 +42,74 @@ const GAS_LIMIT_BUFFER_NUM = 1200n; // *1.2 — same headroom/rationale as packa
 const GAS_LIMIT_BUFFER_DEN = 1000n;
 const RECEIPT_TIMEOUT_MS = 90_000;
 const RECEIPT_CONFIRMATIONS = 1;
-// quais error codes a node returns when it REJECTS a transaction at submission (never pooled, never
-// broadcast): the spending reservation can be released. Anything else at the send stage (timeout,
-// unknown server error) is ambiguous and stays reserved.
-const REJECTED_BEFORE_BROADCAST = new Set(['INSUFFICIENT_FUNDS', 'NONCE_EXPIRED', 'REPLACEMENT_UNDERPRICED', 'INVALID_ARGUMENT']);
+// RPC error codes/flags alone cannot prove a send was never broadcast.
+const validHash = value => typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/.test(value);
+const dataDigest = data => '0x' + createHash('sha256').update(data.toLowerCase()).digest('hex');
+const clone = value => structuredClone(value);
+function freeze(value) { if (value && typeof value === 'object') { for (const child of Object.values(value)) freeze(child); Object.freeze(value); } return value; }
+export function transactionIntentDigest(tx) {
+  const fields = ['from','to','data','value','gasLimit','gasPrice','nonce','chainId','accessList'];
+  return '0x' + createHash('sha256').update(JSON.stringify(jsonSafe(Object.fromEntries(fields.map(field => [field,tx[field] ?? null]))))).digest('hex');
+}
+async function assertProviderChain(provider, chainId) {
+  if (typeof provider.getNetwork !== 'function') throw new WriteError('Cannot verify provider chain authority.');
+  const actual = (await provider.getNetwork())?.chainId;
+  if (!['bigint','number','string'].includes(typeof actual) || actual === '' || BigInt(actual) !== BigInt(chainId)) throw new WriteError('Provider chain authority changed or disagrees with the reviewed network.');
+}
+function receiptIdentityMatches(receipt, hash, tx) {
+  const hashes = [receipt?.hash, receipt?.transactionHash].filter(value => value !== undefined && value !== null);
+  if (!validHash(hash) || !hashes.length || hashes.some(value => !validHash(value) || value.toLowerCase() !== hash.toLowerCase())) return false;
+  if (receipt.from !== undefined && String(receipt.from).toLowerCase() !== tx.from.toLowerCase()) return false;
+  if (receipt.to !== undefined && String(receipt.to).toLowerCase() !== tx.to.toLowerCase()) return false;
+  try { for (const field of ['nonce','chainId']) if (receipt[field] !== undefined && !uintMatches(receipt[field], tx[field])) return false; } catch { return false; }
+  return true;
+}
+function validateBeforeSubmit(validator, summary, transaction) {
+  if (validator === undefined) return;
+  try {
+    if (typeof validator !== 'function') throw new Error('Submit validation must be a local synchronous function.');
+    const result = validator({ summary: freeze(clone(jsonSafe(summary))), transaction });
+    if (result && typeof result.then === 'function') throw new Error('Submit validation must be synchronous.');
+  } catch (error) { throw new PreBroadcastError(error?.message || 'Local submit validation rejected this transaction.'); }
+}
+function uintMatches(value, expected) {
+  const valid = typeof value === 'bigint' ? value >= 0n : typeof value === 'number' ? Number.isSafeInteger(value) && value >= 0 : typeof value === 'string' && /^(?:\d+|0x[0-9a-fA-F]+)$/.test(value);
+  return valid && BigInt(value) === BigInt(expected);
+}
+function responseIdentityMatches(response, tx) {
+  for (const field of ['from','to','data']) if (response[field] !== undefined && (typeof response[field] !== 'string' || response[field].toLowerCase() !== String(tx[field]).toLowerCase())) return false;
+  try { for (const field of ['value','chainId','nonce','gasLimit','gasPrice']) if (response[field] !== undefined && !uintMatches(response[field], tx[field])) return false; } catch { return false; }
+  if (response.transactionHash !== undefined && (!validHash(response.transactionHash) || response.transactionHash.toLowerCase() !== response.hash?.toLowerCase())) return false;
+  return true;
+}
 
-/** quais' TransactionResponse.wait() THROWS a CALL_EXCEPTION carrying the receipt when the mined tx reverted. */
-function revertedReceiptOf(err) {
+// Only SDK/RPC canonical status representations establish a final mined outcome.
+// Numeric coercion would turn empty strings/booleans into receipts and release reservations.
+function finalReceiptStatus(receipt) {
+  if ([0, 0n, '0', '0x0'].includes(receipt?.status)) return 0;
+  if ([1, 1n, '1', '0x1'].includes(receipt?.status)) return 1;
+  return null;
+}
+
+/** A CALL_EXCEPTION may carry a final mined receipt; the error code alone proves nothing. */
+function minedReceiptOf(err) {
   const receipt = err?.receipt;
-  return err?.code === 'CALL_EXCEPTION' && receipt && Number(receipt.status) === 0 ? receipt : null;
+  return err?.code === 'CALL_EXCEPTION' && finalReceiptStatus(receipt) !== null ? receipt : null;
+}
+
+// Receipt fee is authoritative. Older SDK shapes expose gasUsed + gasPrice instead;
+// incomplete/malformed receipt fields fall back to the conservative signed gas ceiling.
+function minedFee(receipt, gasLimit, gasPrice) {
+  const uint = value => {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'boolean' || (typeof value === 'number' && !Number.isSafeInteger(value))) return null;
+    try { const n = BigInt(value); return n >= 0n ? n : null; } catch { return null; }
+  };
+  const fee = uint(receipt.fee);
+  if (fee !== null) return fee;
+  const used = uint(receipt.gasUsed);
+  const price = uint(receipt.gasPrice) ?? uint(receipt.effectiveGasPrice) ?? gasPrice;
+  return (used ?? gasLimit) * price;
 }
 
 function bumpGasLimit(estimate) {
@@ -85,36 +151,42 @@ function jsonSafe(obj) {
  * @returns {Promise<{ ok: boolean, dryRun?: boolean, aborted?: boolean, summary: object, txHash?: string, status?: string, quaiscanUrl?: string, error?: string }>}
  */
 export async function runWrite(ctx) {
-  const from = getAddress(await ctx.wallet.getAddress());
-  return withSpendLock(ctx.home, from, () => runWriteLocked(ctx));
+  const snapshot = { ...ctx, network: freeze({ ...ctx.network }), limits: freeze({ ...ctx.limits }), extraSummary: clone(ctx.extraSummary || {}) };
+  const from = assertCyprus1QuaiAddress(await snapshot.wallet.getAddress());
+  return withSpendLock(snapshot.home, from, () => runWriteLocked(snapshot, from));
 }
 
-async function runWriteLocked(ctx) {
+async function runWriteLocked(ctx, from) {
   const { wallet, provider, network, home, limits, action, extraSummary = {}, json = false, yes = false, dryRun = false } = ctx;
   const io = ctx.io || {};
   const write = io.write || ((s) => console.log(s));
   const confirmFn = io.confirmFn || defaultConfirm;
   const now = io.now;
 
-  const from = getAddress(await wallet.getAddress());
+  if (!Object.hasOwn(NETWORKS, network.name) || BigInt(network.chainId) !== BigInt(NETWORKS[network.name].chainId)) throw new WriteError('Invalid selected network authority.');
+  if (!dryRun) assertNoPendingSpend(home, from, network.chainId);
   // Defense in depth: every command that reaches this pipeline SHOULD already have validated `to`
   // itself (send.js does), but this is the one gate every future write command shares, so the
   // checksum/Cyprus-1/Qi-rejection check lives here too, not only at each call site.
   const to = assertCyprus1QuaiAddress(ctx.to);
-  const value = BigInt(ctx.value || 0n);
+  if (ctx.value !== undefined && !['bigint','string'].includes(typeof ctx.value)) throw new WriteError('Transaction value must be exact nonnegative wei.');
+  const value = BigInt(ctx.value ?? 0n);
+  if (ctx.spendWei !== undefined && !['bigint','string'].includes(typeof ctx.spendWei)) throw new WriteError('Spend valuation must be exact nonnegative wei.');
   const spendWei = BigInt(ctx.spendWei ?? value);
-  if (spendWei < value || spendWei < 0n) throw new WriteError('Invalid spend valuation.');
+  if (value < 0n || spendWei < value || spendWei < 0n) throw new WriteError('Invalid spend valuation.');
   if (/^0x0{40}$/i.test(to)) throw new WriteError('Zero-address destination is not allowed.');
   const data = ctx.data || '0x';
+  if (typeof data !== 'string' || !/^0x(?:[0-9a-fA-F]{2})*$/.test(data)) throw new WriteError('Invalid transaction calldata.');
   const tx = { from, to, data, value };
 
   // Spending guard — checked (never recorded) before anything touches the network, so a transaction
   // that would blow the cap never even gets simulated.
   checkSpend(home, from, spendWei, limits, { now });
+  if (!dryRun) await assertProviderChain(provider, network.chainId);
 
   // Simulate.
   try {
-    const simulation = await provider.call(tx);
+    const simulation = await provider.call(clone(tx));
     ctx.validateSimulation?.(simulation);
   } catch (err) {
     throw new WriteError(`Simulation failed: ${classifyError(err, { stage: 'simulate' })}`);
@@ -133,7 +205,7 @@ async function runWriteLocked(ctx) {
   let accessList;
   if (data && data !== '0x') {
     try {
-      accessList = await resilientRead(() => provider.createAccessList(tx), { primaryAttempts: 2 });
+      accessList = clone(await resilientRead(() => provider.createAccessList(clone(tx)), { primaryAttempts: 2 }));
     } catch (err) {
       throw new WriteError(`Could not build the access list: ${classifyError(err, { stage: 'read' })}`);
     }
@@ -153,7 +225,8 @@ async function runWriteLocked(ctx) {
     ]);
     gasLimit = bumpGasLimit(estimate);
     gasPrice = BigInt(price);
-    nonce = Number(n);
+    if (typeof n !== 'number') throw new Error('Invalid nonce representation.');
+    nonce = n;
     if (gasLimit <= 0n || gasPrice <= 0n || !Number.isSafeInteger(nonce) || nonce < 0) throw new Error('Invalid gas estimate, gas price or nonce.');
   } catch (err) {
     throw new WriteError(`Could not prepare gas terms: ${classifyError(err, { stage: 'read' })}`);
@@ -171,6 +244,7 @@ async function runWriteLocked(ctx) {
   const guardWei = spendWei + feeWei;
   checkSpend(home, from, guardWei, limits, { now });
   const summary = {
+    ...extraSummary,
     action,
     network: network.name,
     chainId: network.chainId,
@@ -182,7 +256,8 @@ async function runWriteLocked(ctx) {
     gasLimit: gasLimit.toString(),
     gasPriceWei: gasPrice.toString(),
     estimatedFeeQuai: formatAmount(feeWei),
-    ...extraSummary,
+    nonce,
+    dataDigest: dataDigest(data),
   };
 
   printSummary(summary, { write: json ? (io.writeErr || console.error) : write, json, colors: io.colors });
@@ -199,45 +274,58 @@ async function runWriteLocked(ctx) {
   }
 
   const chainId = BigInt(network.chainId);
-  const sendTx = accessList ? { from, to, data, value, gasLimit, gasPrice, nonce, chainId, accessList } : { from, to, data, value, gasLimit, gasPrice, nonce, chainId };
-  const reservation = reserveSpend(home, from, guardWei, limits, {now});
+  const sendTx = freeze(accessList ? { from, to, data, value, gasLimit, gasPrice, nonce, chainId, accessList } : { from, to, data, value, gasLimit, gasPrice, nonce, chainId });
+  const actualSigner = typeof wallet.prepareSigner === 'function' ? await wallet.prepareSigner() : await wallet.getAddress();
+  if (assertCyprus1QuaiAddress(actualSigner).toLowerCase() !== from.toLowerCase()) throw new WriteError('Signing wallet authority changed from the reviewed sender.');
+  await assertProviderChain(provider, chainId);
+  const finalNonce = await provider.getTransactionCount(from, 'pending');
+  if (typeof finalNonce !== 'number' || !Number.isSafeInteger(finalNonce) || finalNonce !== nonce) throw new WriteError('Wallet nonce changed after review; no transaction was sent. Review fresh terms before retrying.');
+  assertNoPendingSpend(home, from, chainId);
+  validateBeforeSubmit(ctx.validateBeforeSubmit, summary, sendTx);
+  const intentDigest = transactionIntentDigest(sendTx);
+  const reservation = reserveSpend(home, from, guardWei, limits, {now, authority: { chainId: String(chainId), nonce,
+    to: to.toLowerCase(), valueWei: value.toString(), dataDigest: dataDigest(data), intentDigest,
+    spendWei: spendWei.toString(), maxFeeWei: feeWei.toString(), createdAt: (now || new Date()).toISOString(),
+  }});
   let sent;
   try {
-    sent = await wallet.sendTransaction(sendTx);
+    validateBeforeSubmit(ctx.validateBeforeSubmit, summary, sendTx);
+    sent = await wallet.sendTransaction(sendTx, { validateBeforeSubmit: () => validateBeforeSubmit(ctx.validateBeforeSubmit, summary, sendTx) });
   } catch (err) {
-    const rejected = Boolean(err?.notSubmitted || err?.code === 4001 || err?.code === 'ACTION_REJECTED' || REJECTED_BEFORE_BROADCAST.has(err?.code));
+    // No successful SDK response means no locally returned signed hash. RPC
+    // receipt/transaction fields in a submission error cannot establish it.
+    const rejected = localPreBroadcastFailures.has(err);
     if (rejected) settleSpend(home, from, reservation, {confirmed:false,now});
     throw new WriteError(`Send failed (${rejected ? 'rejected before broadcast; nothing was sent and the spending allowance was released' : 'outcome unknown: the spending allowance stays reserved until you have checked quaiscan'}): ${classifyError(err, { stage: 'send' })}`);
   }
-  if (!sent || !sent.hash) {
+  if (!sent || !validHash(sent.hash)) {
     throw new WriteError('Send returned no transaction hash — treat as UNCONFIRMED, not failed: check on-chain before retrying.');
   }
 
   markSpendHash(home, from, reservation, sent.hash);
+  if (!responseIdentityMatches(sent, sendTx)) throw new WriteError('Submitted transaction identity disagrees with reviewed authority; outcome is UNCONFIRMED.', { txHash: sent.hash, status: 'unconfirmed' });
   let receipt;
   try {
     receipt = await sent.wait(RECEIPT_CONFIRMATIONS, RECEIPT_TIMEOUT_MS);
   } catch (err) {
-    // A mined-but-reverted tx is FINAL (quais surfaces it as a thrown CALL_EXCEPTION with the receipt,
-    // never as a status-0 receipt): release the reservation and say "reverted", not "unconfirmed".
-    if (revertedReceiptOf(err)) {
-      settleSpend(home, from, reservation, {confirmed:false,now});
-      throw new WriteError(`Transaction reverted on-chain (tx ${sent.hash}).`, { txHash: sent.hash, status: 'reverted' });
+    receipt = minedReceiptOf(err);
+    if (!receipt) {
+      throw new WriteError(`Sent (tx ${sent.hash}) but its receipt did not confirm within ${RECEIPT_TIMEOUT_MS / 1000}s: ${classifyError(err, { stage: 'wait' })}. Check the hash on-chain before doing anything else — do not resend.`, {
+        txHash: sent.hash,
+      });
     }
-    throw new WriteError(`Sent (tx ${sent.hash}) but its receipt did not confirm within ${RECEIPT_TIMEOUT_MS / 1000}s: ${classifyError(err, { stage: 'wait' })}. Check the hash on-chain before doing anything else — do not resend.`, {
-      txHash: sent.hash,
-    });
   }
-  if (!receipt || receipt.status == null || ![0, 1].includes(Number(receipt.status))) {
+  const status = finalReceiptStatus(receipt);
+  if (status === null || !receiptIdentityMatches(receipt, sent.hash, sendTx)) {
     throw new WriteError(`Transaction is UNCONFIRMED (tx ${sent.hash}); spending allowance remains reserved. Check its receipt before retrying.`, {txHash:sent.hash,status:'unconfirmed'});
   }
-  if (Number(receipt.status) === 0) {
-    settleSpend(home, from, reservation, {confirmed:false,now});
+  if (status === 0) {
+    settleSpend(home, from, reservation, {confirmed:false,chargedWei:minedFee(receipt,gasLimit,gasPrice),now});
     throw new WriteError(`Transaction reverted on-chain (tx ${sent.hash}).`, { txHash: sent.hash, status: 'reverted' });
   }
 
-  // Only now — a confirmed, successful send — does the guard's running total actually move.
-  settleSpend(home, from, reservation, {confirmed:true,now});
+  // Successful writes charge guarded value plus gas; reverts above charge gas only.
+  settleSpend(home, from, reservation, {confirmed:true,chargedWei:spendWei+minedFee(receipt,gasLimit,gasPrice),now});
 
   const quaiscanUrl = quaiscanTxUrl(network.name, sent.hash);
   return { ok: true, txHash: sent.hash, status: 'success', quaiscanUrl, summary: jsonSafe(summary), receipt: {status:1,blockNumber:receipt.blockNumber ?? null,transactionHash:receipt.hash || receipt.transactionHash || sent.hash,gasUsed:receipt.gasUsed == null ? null : String(receipt.gasUsed)} };

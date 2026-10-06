@@ -55,7 +55,7 @@ export function isCyprus1QuaiAddress(address) {
 export function assertCyprus1QuaiAddress(address) {
   const checksummed = checksumAddress(address);
   if (isQiAddress(checksummed)) {
-    throw new AddressError(`${checksummed} is a Qi-ledger address, not Quai — this wallet only sends on the Quai ledger.`);
+    throw new AddressError(`${checksummed} is a Qi-ledger address. Hartii pays on the Quai ledger — use a Quai address (starts 0x00…), or wrap your Qi to WQI first.`);
   }
   if (!isQuaiAddress(checksummed)) {
     throw new AddressError(`${checksummed} is not a Quai-ledger address.`);

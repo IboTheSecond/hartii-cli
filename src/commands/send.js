@@ -9,6 +9,7 @@ import { readGasPrice } from '../gasPrice.js';
 import { ERC20_IFACE, readErc20, tokenAddressOf } from '../toolKit.js';
 import { DEMO_ADDRESS, DEMO_NETWORK } from '../demoFixtures.js';
 import { CliError } from '../errors.js';
+import {parseNativePaylink,exactReceiveAmount} from '../paylinks.js';
 
 export class SendError extends CliError {}
 
@@ -17,6 +18,13 @@ export class SendError extends CliError {}
  * @param {{ fetchFn?: typeof fetch, providerFactory?: (rpcUrl:string)=>any, io?: object, passwordDeps?: object, now?: Date }} [deps]
  */
 async function runSendCore(opts, deps = {}) {
+  let paymentRequest=null;
+  if(typeof opts.to==='string'&&/^https?:\/\//i.test(opts.to)){
+    paymentRequest=parseNativePaylink(opts.to);
+    if(opts.token)throw new SendError('HPAY requests in the CLI send native QUAI only.');
+    if(opts.amount&&paymentRequest.amountWei!==null&&exactReceiveAmount(opts.amount)!==paymentRequest.amountWei)throw new SendError('Provided amount differs from this payment request. Request a new link or send directly to the reviewed address.');
+    opts={...opts,to:paymentRequest.to,amount:opts.amount||paymentRequest.amount};
+  }
   if (!opts.to) throw new SendError('Usage: hartii send <to> <amount> [--token <addr>]');
   if (!opts.amount) throw new SendError('Usage: hartii send <to> <amount> [--token <addr>]');
 
@@ -33,6 +41,7 @@ async function runSendCore(opts, deps = {}) {
 
   const ctx = await writeRuntime(opts, deps);
   const { net, provider, from: fromAddress } = ctx;
+  if(paymentRequest&&net.chainId!==9)throw new SendError('HPAY payments require Quai mainnet chain 9.');
   const to = assertCyprus1QuaiAddress(opts.to);
   let target = to;
   let spendWei;
@@ -40,6 +49,7 @@ async function runSendCore(opts, deps = {}) {
   let value;
   let action;
   let extraSummary = {};
+  if(paymentRequest)extraSummary={paymentRequest:'HPAY · mainnet',memo:paymentRequest.memo||undefined,expiresAt:paymentRequest.expiresAt??undefined};
 
   if (opts.token) {
     const tokenAddress = await tokenAddressOf(opts.token, deps, net.name);
@@ -93,6 +103,7 @@ async function runSendCore(opts, deps = {}) {
     value,
     action,
     extraSummary,
+    validateBeforeSubmit:paymentRequest&&paymentRequest.expiresAt!==null?()=>{if(paymentRequest.expiresAt*1000<=Date.now())throw new SendError('Payment request expired before signing.');}:undefined,
   }, SendError);
 }
 

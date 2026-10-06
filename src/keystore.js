@@ -12,31 +12,34 @@
 // This module never prints a private key or mnemonic phrase — every function here returns them to
 // its caller (the `wallet` command layer), which is responsible for the loud, explicit `export`
 // confirmation gate (see commands/walletCmd.js). Nothing in this file logs.
-import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync, readdirSync, unlinkSync, renameSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, unlinkSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { encryptKeystoreJson, decryptKeystoreJson, Mnemonic, QuaiHDWallet, Zone, randomBytes, computeAddress, getAddress } from 'quais';
+import { encryptKeystoreJson, decryptKeystoreJson, Mnemonic, HDNodeWallet, QuaiHDWallet, Zone, randomBytes, computeAddress, getAddress } from 'quais';
+import { securePath, atomicPrivateWrite, renamePrivateFile } from './secureFiles.js';
 import { assertCyprus1QuaiAddress } from './address.js';
 import { CliError } from './errors.js';
 
 export class WalletError extends CliError {}
 
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+const RESERVED_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+const validName = name => typeof name === 'string' && NAME_RE.test(name) && !RESERVED_NAME.test(name) && !/^[0-9a-fA-F]{64}$/.test(name);
 
 /** Rejects anything that isn't a safe, simple filename component — defense against path traversal via a wallet name. */
 export function assertValidWalletName(name) {
-  if (!NAME_RE.test(String(name || ''))) {
-    throw new WalletError(`"${name}" is not a valid wallet name (letters, digits, "-", "_", starting with a letter/digit, max 64 chars).`);
+  if (!validName(name)) {
+    throw new WalletError('Invalid wallet name: use letters, digits, "-", "_", starting with a letter/digit, max 64 characters; reserved names and secret-like values are forbidden.');
   }
   return name;
 }
 
 export function keystoreDir(home) {
-  return join(home, 'keystore');
+  try { return securePath(join(home, 'keystore')).path; } catch (error) { throw new WalletError(error.message); }
 }
 
 export function keystorePath(home, name) {
   assertValidWalletName(name);
-  return join(keystoreDir(home), `${name}.json`);
+  try { return securePath(join(keystoreDir(home), `${name}.json`), { regularFile: true }).path; } catch (error) { throw new WalletError(error.message); }
 }
 
 /** @returns {string[]} wallet names, sorted — the ".json" extension stripped. */
@@ -46,7 +49,8 @@ export function listWallets(home) {
   return readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => f.slice(0, -'.json'.length))
-    .filter((n) => NAME_RE.test(n))
+    .filter(validName)
+    .filter(n => { keystorePath(home, n); return true; })
     .sort();
 }
 
@@ -136,12 +140,20 @@ export function accountFromPrivateKey(privateKey) {
  * @returns {Promise<string>}
  */
 export async function encryptAccount(account, password, opts = {}) {
-  if (!password) throw new WalletError('A password is required to encrypt a wallet.');
-  const keystoreAccount = { address: account.address, privateKey: account.privateKey };
-  if (account.mnemonicPhrase) {
-    keystoreAccount.mnemonic = { path: account.path, locale: 'en', entropy: account.entropy };
+  if (typeof password !== 'string' || !password) throw new WalletError('A password is required to encrypt a wallet.');
+  try {
+    const checked = accountFromPrivateKey(account.privateKey);
+    if (checked.address !== getAddress(account.address)) throw new WalletError('Account address/private key identity mismatch.');
+    const keystoreAccount = { address: checked.address, privateKey: account.privateKey };
+    if (account.mnemonicPhrase) {
+      keystoreAccount.mnemonic = { path: account.path, locale: 'en', entropy: account.entropy };
+      verifyRecovery(keystoreAccount);
+    }
+    return await encryptKeystoreJson(keystoreAccount, password, opts.scrypt ? { scrypt: opts.scrypt } : undefined);
+  } catch (error) {
+    if (error instanceof WalletError) throw error;
+    throw new WalletError('Could not encrypt the account safely. No wallet file was written.');
   }
-  return encryptKeystoreJson(keystoreAccount, password, opts.scrypt ? { scrypt: opts.scrypt } : undefined);
 }
 
 /**
@@ -153,13 +165,32 @@ export async function encryptAccount(account, password, opts = {}) {
  */
 export async function decryptAccount(json, password) {
   try {
-    return await decryptKeystoreJson(json, password);
+    const account = await decryptKeystoreJson(json, password);
+    const checked = accountFromPrivateKey(account.privateKey);
+    if (checked.address !== getAddress(account.address)) throw new Error('Keystore identity mismatch');
+    verifyRecovery(account);
+    return account;
   } catch (err) {
     if (/incorrect password/i.test(err?.message || '')) {
       throw new WalletError('Wrong password.');
     }
     // Malformed JSON/KDF errors may echo the file contents or sensitive SDK arguments.
     throw new WalletError('Could not decrypt keystore. Check that the file is a valid supported keystore and try again.');
+  }
+}
+
+/** The SDK's primary MAC does not cover x-quais recovery metadata. Verify the advertised
+ * mnemonic/path actually derives the encrypted key before exporting a recovery phrase. */
+function verifyRecovery(account) {
+  if (!account.mnemonic) return;
+  try {
+    const { path, entropy, locale } = account.mnemonic;
+    if (locale !== 'en' || typeof path !== 'string' || path.length > 128 || !/^m\/44'\/994'\/\d+'\/0\/\d+$/.test(path)) throw new Error('Unsupported recovery metadata');
+    const mnemonic = Mnemonic.fromEntropy(entropy);
+    const derived = HDNodeWallet.fromMnemonic(mnemonic, path);
+    if (derived.privateKey.toLowerCase() !== account.privateKey.toLowerCase()) throw new Error('Recovery identity mismatch');
+  } catch {
+    throw new WalletError('Recovery metadata does not match this wallet; no recovery phrase was exported.');
   }
 }
 
@@ -172,18 +203,11 @@ export async function decryptAccount(json, password) {
  * @param {{ force?: boolean }} [opts]
  */
 export function writeKeystoreFile(home, name, json, opts = {}) {
-  const dir = keystoreDir(home);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
   const p = keystorePath(home, name);
-  if (!opts.force && existsSync(p)) {
+  if (opts.force !== true && existsSync(p)) {
     throw new WalletError(`Wallet "${name}" already exists. Use a different name, or \`wallet remove ${name}\` first.`);
   }
-  writeFileSync(p, json, { mode: 0o600 });
-  try {
-    chmodSync(p, 0o600);
-  } catch {
-    // best-effort (Windows) — see config.js's identical note
-  }
+  try { atomicPrivateWrite(p, json, { replace: opts.force === true }); } catch (error) { throw new WalletError(error.message); }
 }
 
 /** @returns {string} the raw keystore JSON text. @throws {WalletError} if the wallet does not exist. */
@@ -204,7 +228,7 @@ export function renameKeystoreFile(home, oldName, newName) {
   const newPath = keystorePath(home, newName);
   if (!existsSync(oldPath)) throw new WalletError(`No wallet named "${oldName}".`);
   if (existsSync(newPath)) throw new WalletError(`A wallet named "${newName}" already exists.`);
-  renameSync(oldPath, newPath);
+  try { renamePrivateFile(oldPath, newPath); } catch (error) { throw new WalletError(error.message); }
 }
 
 /**
@@ -215,8 +239,9 @@ export function renameKeystoreFile(home, oldName, newName) {
  * @returns {{ applicable: boolean, issues: string[] }}
  */
 export function checkKeystorePerms(home) {
-  if (process.platform === 'win32') return { applicable: false, issues: [] };
   const dir = keystoreDir(home);
+  if (!existsSync(dir)) return { applicable: false, issues: [], status: 'not-applicable' };
+  if (process.platform === 'win32') return { applicable: false, issues: [], status: 'unverified' };
   const issues = [];
   if (existsSync(dir)) {
     const dirMode = statSync(dir).mode & 0o777;

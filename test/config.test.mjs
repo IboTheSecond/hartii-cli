@@ -32,7 +32,6 @@ describe('loadConfig', () => {
   });
 
   it('throws ConfigError on invalid JSON', () => {
-    saveConfig(home, { network: 'mainnet', limits: {} });
     const p = join(home, 'config.json');
     writeFileSync(p, 'not json');
     expect(() => loadConfig(home)).toThrow(ConfigError);

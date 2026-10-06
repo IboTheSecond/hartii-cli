@@ -15,14 +15,15 @@ afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
-it('M5: with --from-arg a quoted recovery phrase stays separate from its optional wallet name (and warns loudly)',async()=>{
+it('refuses a recovery phrase in argv without echoing it or importing it',async()=>{
   const phrase=Array(12).fill('abandon').join(' ');
   const spy=vi.spyOn(walletCommands,'walletImport').mockResolvedValue({name:'named',address:'test'});
   const writeErr=vi.fn();
   const code=await main(['wallet','import','mnemonic',phrase,'named','--from-arg','--json'],{env:{HARTII_HOME:home},write:vi.fn(),writeErr});
-  expect(code).toBe(0);
-  expect(writeErr.mock.calls.join(' ')).toMatch(/shell history/);
-  expect(spy).toHaveBeenCalledWith(home,'mnemonic',phrase,'named',expect.any(Object));
+  expect(code).toBe(1);
+  expect(writeErr.mock.calls.join(' ')).toMatch(/removed/);
+  expect(writeErr.mock.calls.join(' ')).not.toContain(phrase);
+  expect(spy).not.toHaveBeenCalled();
 });
 
 function capture() {
@@ -95,6 +96,11 @@ describe('main — globals', () => {
     expect(code).toBe(0);
     expect(runMcp).toHaveBeenCalledTimes(1);
     expect(out).toEqual([]);
+  });
+  it.each(['false','no','1','true'])('MCP write opt-in refuses string flag value %s', async value => {
+    const runMcp=vi.fn(async()=>0);
+    await main(['mcp',`--allow-writes=${value}`],{env:{HARTII_HOME:home},write:vi.fn(),writeErr:vi.fn(),runMcp});
+    expect(runMcp.mock.calls[0][0].allowWrites).toBe(false);
   });
 });
 

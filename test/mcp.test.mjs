@@ -47,6 +47,7 @@ function harness(over = {}) {
     throw new Error(`unexpected fetch ${u}`);
   });
   const provider = {
+    getNetwork: vi.fn(async () => ({ chainId: 9n })),
     call: vi.fn(async (tx) => {
       for (const iface of [erc, curve, factoryI]) {
         let p; try { p = iface.parseTransaction({ data: tx.data }); } catch { /* next */ }
@@ -69,8 +70,8 @@ function harness(over = {}) {
     getFeeData: vi.fn(async () => ({ gasPrice: 1n })), getTransactionCount: vi.fn(async () => 0),
     getBalance: vi.fn(async () => 5n * 10n ** 18n), destroy: vi.fn(),
   };
-  const sendTransaction = vi.fn(async () => ({ hash: '0x' + 'cd'.repeat(32), wait: async () => ({ status: 1 }) }));
-  return { fetchFn, provider, sendTransaction, ctx: { home, env: {}, fetchFn, providerFactory: () => provider, walletFactory: () => ({ sendTransaction }), limits: {}, ...over } };
+  const sendTransaction = vi.fn(async () => ({ hash: '0x' + 'cd'.repeat(32), wait: async () => ({ status: 1, hash: '0x' + 'cd'.repeat(32) }) }));
+  return { fetchFn, provider, sendTransaction, ctx: { home, env: {}, fetchFn, providerFactory: () => provider, walletFactory: key => ({ getAddress: async () => new Wallet(key).address, sendTransaction }), limits: {}, ...over } };
 }
 
 async function connect(ctx) {

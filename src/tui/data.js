@@ -16,6 +16,7 @@ import { resolveRuntimeNetwork } from '../network.js';
 import { createProvider } from '../signer.js';
 import { runBalance } from '../commands/balance.js';
 import { runSend } from '../commands/send.js';
+import {runReceive} from '../commands/receive.js';
 import { runBuy } from '../commands/buy.js';
 import { runSell } from '../commands/sell.js';
 import { runSwap } from '../commands/swap.js';
@@ -29,7 +30,7 @@ import { getWebSocketImpl } from '../commands/watch.js';
 import { decodeMessage, encodeMessage, GLOBAL_CHANNEL, nextBackoffMs } from '../../vendor/src/utils/liveProtocol.js';
 import { demoState } from './demoData.js';
 
-const RUNNERS = { send: runSend, buy: runBuy, sell: runSell, swap: runSwap, airdrop: runAirdrop, otc: runOtc, claim: runClaim, wall: runWall };
+const RUNNERS = { receive:runReceive, send: runSend, buy: runBuy, sell: runSell, swap: runSwap, airdrop: runAirdrop, otc: runOtc, claim: runClaim, wall: runWall };
 const HISTORY = 32;
 const MAX_TRADES = 200;
 const REFRESH_MS = 30_000;

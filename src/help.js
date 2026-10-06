@@ -23,7 +23,8 @@ export const COMMANDS = [
 
   { name: 'wallet', group: 'wallet', summary: 'create / import / list / use / export wallets (encrypted keystore)', usage: ['hartii wallet new [name]', 'hartii wallet import mnemonic|key [name]', 'hartii wallet list', 'hartii wallet use <name>', 'hartii wallet address [--qr]', 'hartii wallet export [name]', 'hartii wallet rename <old> <new>', 'hartii wallet remove <name>', 'hartii wallet lock-check [name]'], examples: ['hartii wallet new main', 'hartii wallet use main'] },
   { name: 'whoami', group: 'wallet', summary: 'your current wallet, address and network', usage: ['hartii whoami'], examples: ['hartii whoami'], aliases: ['me'] },
-  { name: 'address', group: 'wallet', summary: 'print your receive address (also: `receive`, `addr`)', usage: ['hartii address'], examples: ['hartii address'], aliases: ['addr', 'receive'], to: { command: 'wallet', args: ['address'] } },
+  { name: 'address', group: 'wallet', summary: 'print your receive address (also: `addr`)', usage: ['hartii address'], examples: ['hartii address'], aliases: ['addr'], to: { command: 'wallet', args: ['address'] } },
+  { name: 'receive', group: 'wallet', summary: 'offline receive QR and HPAY payment link', usage: ['hartii receive [--amount <QUAI>] [--memo <text>] [--out <qr.svg>]', 'hartii receive --address-qr'], examples: ['hartii receive', 'hartii receive --amount 2.5 --memo Coffee --out payment.svg'] },
   { name: 'wallets', group: 'wallet', summary: 'list your wallets (same as `wallet list`)', usage: ['hartii wallets'], examples: ['hartii wallets'], aliases: ['ls'], to: { command: 'wallet', args: ['list'], dropArgs: true } },
   { name: 'use', group: 'wallet', summary: 'switch wallet (same as `wallet use <name>`)', usage: ['hartii use <name>'], examples: ['hartii use trading'], to: { command: 'wallet', args: ['use'] } },
   { name: 'balance', group: 'wallet', summary: 'QUAI balance; --tokens adds holdings with QUAI values', usage: ['hartii balance [--tokens] [--address <addr>]'], examples: ['hartii balance --tokens', 'hartii bal --address 0x00…'], aliases: ['bal'] },
@@ -40,7 +41,7 @@ export const COMMANDS = [
   { name: 'holders', group: 'read', summary: 'top holders of a token', usage: ['hartii holders <token> [--limit 20]'], examples: ['hartii holders QAXE'] },
   { name: 'trades', group: 'read', summary: 'recent trades of a token', usage: ['hartii trades <token> [--limit 20]'], examples: ['hartii trades QAXE'] },
   { name: 'watch', group: 'read', summary: 'live trade feed (NDJSON with --json)', usage: ['hartii watch <token|all>'], examples: ['hartii watch all', 'hartii watch DEMO --json'] },
-  { name: 'tx', group: 'read', summary: 'transaction status by hash', usage: ['hartii tx <hash>'], examples: ['hartii tx 0x…'] },
+  { name: 'tx', group: 'read', summary: 'transaction status and local pending reservations', usage: ['hartii tx <hash>', 'hartii tx pending'], examples: ['hartii tx pending', 'hartii tx 0x…'] },
   { name: 'block', group: 'read', summary: 'current block height', usage: ['hartii block'], examples: ['hartii block'], aliases: ['height'] },
   { name: 'gas', group: 'read', summary: 'live gas price and what a transfer costs', usage: ['hartii gas'], examples: ['hartii gas'] },
   { name: 'open', group: 'read', summary: 'quaiscan link for a tx hash or address (--browser opens it)', usage: ['hartii open <hash|address> [--browser]'], examples: ['hartii open 0x…'], aliases: ['explorer'] },

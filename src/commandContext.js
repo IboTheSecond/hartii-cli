@@ -9,7 +9,7 @@ import { assertCyprus1QuaiAddress } from './address.js';
 import { createProvider } from './signer.js';
 import { assertMarketNetwork } from './marketApi.js';
 import { assertToolsNetwork } from './biomeAddresses.js';
-import { runWrite, WriteError } from './writePipeline.js';
+import { runWrite, WriteError, PreBroadcastError, transactionIntentDigest } from './writePipeline.js';
 import { rethrowAs } from './errors.js';
 
 export async function withProviderCleanup(deps, operation) {
@@ -39,7 +39,7 @@ export async function writeRuntime(opts = {}, deps = {}) {
   await assertChainId(runtime.net.rpcUrl, runtime.net.chainId, { fetchFn: deps.fetchFn });
   const provider = (deps.providerFactory || createProvider)(runtime.net.rpcUrl);
   let name, address, envWallet;
-  if (opts.keyEnv) {
+  if (opts.keyEnv && !opts.dryRun) {
     const env = deps.env || deps.io?.env || process.env;
     const key = env[opts.keyEnv];
     if (!key || !/^(0x)?[0-9a-fA-F]{64}$/.test(key)) throw new WalletError('--key-env must name an environment variable containing a private key.');
@@ -49,18 +49,10 @@ export async function writeRuntime(opts = {}, deps = {}) {
   } else ({ name, address } = resolveWalletAddress(runtime.home, opts.wallet));
   const from = assertCyprus1QuaiAddress(address);
   let signer;
-  const wallet = {
-    getAddress: async () => from,
-    sendTransaction: async (tx) => {
-      if (opts.dryRun) throw new WalletError('A dry run cannot sign.');
-      // Chain pin: the populated tx must carry the expected chain id, and the provider must agree.
-      if (tx.chainId === undefined || BigInt(tx.chainId) !== BigInt(runtime.net.chainId)) { const e = new WalletError(`Refusing to sign: transaction chain id ${tx.chainId} is not the expected ${runtime.net.chainId}.`); e.notSubmitted = true; throw e; }
-      if (typeof provider.getNetwork === 'function') {
-        const live = BigInt((await provider.getNetwork()).chainId);
-        if (live !== BigInt(runtime.net.chainId)) { const e = new WalletError(`Refusing to sign: RPC reports chain ${live}, expected ${runtime.net.chainId}.`); e.notSubmitted = true; throw e; }
-      }
+  async function prepareSigner() {
+    if (opts.dryRun) { const error = new WalletError('A dry run cannot unlock or sign.'); error.notSubmitted = true; throw error; }
+    try {
       if (!signer) {
-        try {
         let privateKey;
         if (envWallet) privateKey = envWallet.privateKey;
         else {
@@ -70,9 +62,41 @@ export async function writeRuntime(opts = {}, deps = {}) {
           privateKey = account.privateKey;
         }
         signer = deps.walletFactory ? deps.walletFactory(privateKey, provider) : new Wallet(privateKey, provider);
-        } catch (err) { err.notSubmitted = true; throw err; }
       }
-      return signer.sendTransaction(tx);
+      const actual = assertCyprus1QuaiAddress(typeof signer.getAddress === 'function' ? await signer.getAddress() : signer.address);
+      if (actual.toLowerCase() !== from.toLowerCase()) throw new WalletError('Signing account does not match the reviewed wallet metadata.');
+      return actual;
+    } catch (error) {
+      signer = undefined;
+      const safe = error instanceof WalletError ? error : new WalletError('Could not prepare the selected signing account safely; nothing was sent.');
+      safe.notSubmitted = true; throw safe;
+    }
+  }
+  const wallet = {
+    getAddress: async () => from,
+    prepareSigner,
+    sendTransaction: async (tx, controls = {}) => {
+      if (opts.dryRun) throw new WalletError('A dry run cannot sign.');
+      const request = structuredClone(tx);
+      const intent = transactionIntentDigest(request);
+      try {
+        if (request.chainId === undefined || BigInt(request.chainId) !== BigInt(runtime.net.chainId)) throw new WalletError('Refusing to sign: transaction chain id does not match the selected network.');
+        if (!['from','to','data','value','gasLimit','gasPrice','nonce'].every(field => request[field] !== undefined)) throw new WalletError('Refusing to sign: complete reviewed transaction authority is required.');
+        if (assertCyprus1QuaiAddress(request.from).toLowerCase() !== from.toLowerCase()) throw new WalletError('Refusing to sign: sender does not match the reviewed account.');
+        assertCyprus1QuaiAddress(request.to);
+        await prepareSigner();
+        if (typeof provider.getNetwork !== 'function') throw new WalletError('Refusing to sign: RPC chain cannot be verified.');
+        const live = BigInt((await provider.getNetwork()).chainId);
+        if (live !== BigInt(runtime.net.chainId)) throw new WalletError(`Refusing to sign: RPC reports chain ${live}, expected ${runtime.net.chainId}.`);
+        const pendingNonce = await provider.getTransactionCount(from, 'pending');
+        if (!Number.isSafeInteger(pendingNonce) || pendingNonce !== request.nonce) throw new WalletError('Refusing to sign: wallet nonce changed; review fresh transaction terms.');
+        if (intent !== transactionIntentDigest(request)) throw new WalletError('Refusing to sign: reviewed transaction authority changed.');
+        controls.validateBeforeSubmit?.();
+      } catch (error) {
+        throw new PreBroadcastError(error instanceof WalletError ? error.message : 'Local authority verification failed before sending.');
+      }
+      // Never label an SDK send/broadcast error as locally not submitted.
+      return signer.sendTransaction(request);
     },
   };
   return { ...runtime, provider, from, wallet, json: opts.json, yes: opts.yes, dryRun: opts.dryRun, io: deps.io };

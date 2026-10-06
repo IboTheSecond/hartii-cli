@@ -5,10 +5,12 @@
 // identity). Nothing sensitive lives in config.json itself: wallet *keys* live only in
 // keystore.js's encrypted per-wallet files under `<home>/keystore/`; this file holds the small
 // amount of non-secret state (current network, current wallet name, spending-guard limits).
-import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { CliError } from './errors.js';
+import { assertValidWalletName } from './keystore.js';
+import { securePath, atomicPrivateWrite } from './secureFiles.js';
 
 export class ConfigError extends CliError {}
 
@@ -20,7 +22,19 @@ export function getHartiiHome(env = process.env) {
 }
 
 export function configPath(home) {
-  return join(home, 'config.json');
+  try { return securePath(join(home, 'config.json'), { regularFile: true }).path; } catch (error) { throw new ConfigError(error.message); }
+}
+
+const DECIMAL_LIMIT = /^\d{1,78}(\.\d{1,18})?$/;
+const plainObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+function validateConfig(value) {
+  if (!plainObject(value) || Object.keys(value).some(key => !['network', 'currentWallet', 'limits'].includes(key)) || !['mainnet', 'orchard'].includes(value.network) || !plainObject(value.limits) || Object.keys(value.limits).some(key => !['perTxQuai', 'dailyQuai'].includes(key)) || !['perTxQuai', 'dailyQuai'].every(key => typeof value.limits[key] === 'string' && DECIMAL_LIMIT.test(value.limits[key]))) {
+    throw new ConfigError('Config is malformed or has unsupported fields. Restore valid network and explicit decimal spending caps; defaults were not substituted.');
+  }
+  if (value.currentWallet !== null && value.currentWallet !== undefined) {
+    try { assertValidWalletName(value.currentWallet); } catch { throw new ConfigError('Config contains an invalid wallet selection.'); }
+  }
+  return { network: value.network, currentWallet: value.currentWallet ?? null, limits: { perTxQuai: value.limits.perTxQuai, dailyQuai: value.limits.dailyQuai } };
 }
 
 function defaultConfig() {
@@ -51,12 +65,7 @@ export function loadConfig(home) {
   } catch {
     throw new ConfigError(`${p} is not valid JSON — fix or delete it.`);
   }
-  const defaults = defaultConfig();
-  return {
-    ...defaults,
-    ...parsed,
-    limits: { ...defaults.limits, ...(parsed.limits || {}) },
-  };
+  return validateConfig(parsed);
 }
 
 /**
@@ -67,16 +76,9 @@ export function loadConfig(home) {
  * @param {object} cfg
  */
 export function saveConfig(home, cfg) {
-  if (!existsSync(home)) {
-    mkdirSync(home, { recursive: true, mode: 0o700 });
-  }
+  const checked = validateConfig(cfg);
   const p = configPath(home);
-  writeFileSync(p, JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
-  try {
-    chmodSync(p, 0o600);
-  } catch {
-    // best-effort (Windows) — see header note
-  }
+  try { atomicPrivateWrite(p, JSON.stringify(checked, null, 2) + '\n', { replace: true }); } catch (error) { throw new ConfigError(error.message); }
 }
 
 /** Dotted-path get, e.g. "limits.perTxQuai". Returns undefined for an unknown path. */
@@ -100,17 +102,19 @@ export function configSet(cfg, key, value) {
   if (!SETTABLE_KEYS.has(key)) {
     throw new ConfigError(`"${key}" is not a settable config key. Settable keys: ${[...SETTABLE_KEYS].join(', ')}.`);
   }
-  const next = { ...cfg, limits: { ...cfg.limits } };
+  const checked = validateConfig(cfg);
+  const next = { ...checked, limits: { ...checked.limits } };
   if (key === 'network') {
     const v = String(value).toLowerCase();
     if (v !== 'mainnet' && v !== 'orchard') throw new ConfigError('network must be "mainnet" or "orchard".');
     next.network = v;
   } else if (key === 'currentWallet') {
+    assertValidWalletName(value);
     next.currentWallet = value;
   } else if (key === 'limits.perTxQuai' || key === 'limits.dailyQuai') {
     // Same shape the spending guard accepts (<= 18 decimals): a limit the guard cannot parse would
     // otherwise refuse EVERY later write with a confusing error.
-    if (!/^\d+(\.\d{1,18})?$/.test(String(value))) throw new ConfigError(`${key} must be a plain decimal QUAI amount with at most 18 decimals.`);
+    if (!DECIMAL_LIMIT.test(String(value))) throw new ConfigError(`${key} must be a plain decimal QUAI amount with at most 18 decimals and 78 whole digits.`);
     next.limits[key.split('.')[1]] = String(value);
   }
   return next;

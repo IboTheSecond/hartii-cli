@@ -66,7 +66,8 @@ export async function main(argv, deps = {}) {
     const handler = COMMAND_TABLE[command];
     if (!handler) {
       const near = suggest(command);
-      throw new Error(`Unknown command "${command}".${near.length ? ` Did you mean: ${near.join(', ')}?` : ''} Run \`hartii ?\` for every command.`);
+      const label=/^[a-z][a-z0-9_-]{0,31}$/i.test(command)?` "${safeTerminalText(command)}"`:'';
+      throw new Error(`Unknown command${label}.${near.length ? ` Did you mean: ${near.join(', ')}?` : ''} Run \`hartii ?\` for every command.`);
     }
     const result = await handler({ args, flags, g: globals, deps, env, io, write, home: globals.demo ? null : getHartiiHome(env) });
     if (RAW_COMMANDS.has(command)) return result; // the handler already owns stdout and returns the exit code

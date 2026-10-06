@@ -38,10 +38,10 @@ import { createProvider } from '../signer.js';
 import { safeTerminalText, redactUrls } from '../output.js';
 import { WalletError } from '../keystore.js';
 
-const AMOUNT = z.string().describe('Plain decimal, a percentage like "50%", or "all".');
-const TOKEN = z.string().describe('Token ticker or 0x Cyprus-1 Quai address.');
-const SLIPPAGE = z.string().optional().describe('Slippage tolerance in percent, default 3.');
-const WRITE_TOKEN = z.string().describe('Token 0x Cyprus-1 Quai ADDRESS only (tickers are rejected for writes: they are spoofable).');
+const AMOUNT = z.string().min(1).max(100).describe('Plain decimal, a percentage like "50%", or "all".');
+const TOKEN = z.string().min(1).max(128).describe('Token ticker or 0x Cyprus-1 Quai address.');
+const SLIPPAGE = z.string().min(1).max(100).optional().describe('Slippage tolerance in percent, default 3.');
+const WRITE_TOKEN = z.string().min(1).max(42).describe('Token 0x Cyprus-1 Quai ADDRESS only (tickers are rejected for writes: they are spoofable).');
 const MAX_MCP_SLIPPAGE_BPS = 1000; // 10%
 
 /** Writes act only on an explicit address; a ticker could resolve to a look-alike token. */
@@ -103,7 +103,7 @@ function context(ctx) {
     if (ctx.keyEnv) {
       const key = env[ctx.keyEnv];
       if (!key || !/^(0x)?[0-9a-fA-F]{64}$/.test(key)) throw new WalletError('--key-env must name an environment variable containing a private key.');
-      return new Wallet(key.startsWith('0x') ? key : `0x${key}`).address;
+      try { return new Wallet(key.startsWith('0x') ? key : `0x${key}`).address; } catch { throw new WalletError('Invalid --key-env private key. No secret was returned.'); }
     }
     return resolveWalletAddress(readRuntime({ home: ctx.home, network: ctx.network, rpc: ctx.rpc }, {}).home, ctx.wallet).address;
   };
@@ -165,7 +165,7 @@ export function buildTools(ctx) {
     inputSchema: { ...inputSchema, confirm: CONFIRM },
     write: true,
     handler: async (args = {}) => {
-      if (!ctx.allowWrites) throw new Error('Write tools are disabled: start the server with --allow-writes.');
+      if (ctx.allowWrites !== true) throw new Error('Write tools are disabled: start the server with --allow-writes.');
       const execute = args.confirm === true;
       if (args.slippage !== undefined) checkMcpSlippage(args.slippage);
       const { confirm: _omit, ...rest } = args;
@@ -185,7 +185,7 @@ export function buildTools(ctx) {
         const address = c.readAddress();
         const rt = readRuntime(c.base(), { limits: ctx.limits });
         const spent = getSpentToday(rt.home, address);
-        return { address, network: rt.net.name, writesEnabled: Boolean(ctx.allowWrites), limits: { perTxQuai: rt.limits.perTxQuai, dailyQuai: rt.limits.dailyQuai }, spentTodayQuai: formatAmount(BigInt(spent.spentWei)), reservedQuai: formatAmount(BigInt(spent.reservedWei || 0)) };
+        return { address, network: rt.net.name, writesEnabled: ctx.allowWrites === true, limits: { perTxQuai: rt.limits.perTxQuai, dailyQuai: rt.limits.dailyQuai }, spentTodayQuai: formatAmount(BigInt(spent.spentWei)), reservedQuai: formatAmount(BigInt(spent.reservedWei || 0)) };
       },
     },
     {
@@ -265,5 +265,12 @@ export function buildTools(ctx) {
       (a, m) => runClaim({ ...c.base(), sub: 'claim', id: a.campaignId, ...m }, c.deps())),
   ];
 
-  return tools.filter((t) => !t.write || ctx.allowWrites).map((t) => ({ ...t, handler: async (args) => annotateTokens(await t.handler(args)) }));
+  return tools.filter((t) => !t.write || ctx.allowWrites === true).map((t) => {
+    const schema = z.object(t.inputSchema).strict();
+    return { ...t, handler: async (args = {}) => {
+      const parsed = schema.safeParse(args);
+      if (!parsed.success) throw new WalletError('Invalid tool arguments: unsupported parameters, types, or bounds.');
+      return annotateTokens(await t.handler(parsed.data));
+    } };
+  });
 }

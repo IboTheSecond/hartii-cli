@@ -12,10 +12,10 @@ testnet for the wallet basics). Three ways to use it, one engine underneath:
 
 It is wired to Hartii's own products: HartiiLabs bonding curves, HartiiSwap, Airdrop, OTC Link, Claim and the
 Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`, `@modelcontextprotocol/sdk`
-and `zod`; there is no telemetry and no network traffic other than your RPC, the public hartiilabs.com /
-hartiibiome.com APIs and the live WebSocket.
+and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
+The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: first release candidate (0.1.0). Everything below is covered by mocked-RPC tests; run it against
+> Status: beta (0.2.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Install
@@ -49,13 +49,32 @@ Global flags work anywhere on the line: `--json`, `--network mainnet|orchard`, `
 Default network is mainnet (`https://rpc.quai.network/cyprus1`, chain 9); Orchard is
 `https://orchard.rpc.quai.network/cyprus1`, chain 15000. The chain id is verified before every write.
 
+## Receive and send QUAI
+
+```bash
+hartii receive                              # address + HPAY link + terminal QR; never unlocks
+hartii receive --amount 2.5 --memo Coffee     # exact mainnet QUAI request
+hartii receive --out payment.svg             # share or scan a locally generated SVG
+hartii receive --address-qr                  # raw public-address QR for a wallet scanner
+hartii wallet address --qr                   # the selected address as QR
+hartii send 0xYOUR_CYPRUS1_QUAI_ADDRESS 2.5 --dry-run
+hartii send "https://hartiibiome.com/hpay?to=...&amt=...&chain=9&v=1" --dry-run
+hartii tx pending                           # inspect local reservations; no signing
+```
+
+HPAY requests encode native QUAI in exact integer wei and target mainnet chain 9. They contain no private key or recovery phrase. Address QR codes do not identify a network: the payer must select the displayed network. On Orchard, use an explicit `--address-qr`; a mainnet HPAY request is refused. A large memo may need a wider terminal; SVG export preserves the complete QR.
+
+The CLI accepts fixed-address HPAY links only from the approved HTTPS Hartii origins, with explicit chain/version, unambiguous fields, positive exact amounts and valid expiry. A conflicting supplied amount or token transfer is refused. `@name` links should be resolved in HPAY or regenerated as address links. Expiry is checked again before submission. Normal address sending uses the same simulation, confirmation, identity and spending checks. The TUI Actions menu includes Receive and Send.
+
+No transaction is sent by receiving, `--demo` or `--dry-run`. Review the full recipient, amount, network and maximum fee before approving a real write.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `hartii` / `hartii ui [--demo]` | Full-screen TUI. Piped (no TTY) it prints one plain 80×24 frame. |
-| `wallet new [name]` · `import mnemonic [name]` · `import key [name]` | Create/import a wallet (first Cyprus-1 Quai address). The recovery phrase / key is read from a **hidden prompt or stdin**, never from argv; `--from-arg` (secret as an argument) still works but prints a loud shell-history warning. Phrases and keys are **never printed** here. |
-| `wallet list` · `use <name>` · `address [--qr]` · `rename <old> <new>` · `lock-check [name]` | Manage wallets. `address --qr` is not implemented yet. |
+| `wallet new [name]` · `import mnemonic [name]` · `import key [name]` | Create/import a wallet (first Cyprus-1 Quai address). The recovery phrase / key is read from a **hidden prompt or stdin**, never from argv; `--from-arg` is refused with a migration error: use the hidden prompt or stdin. Phrases and keys are **never printed** here. |
+| `wallet list` · `use <name>` · `address [--qr]` · `rename <old> <new>` · `lock-check [name]` | Manage wallets. `address --qr` renders the public receive address as a real offline QR. |
 | `wallet export [name]` · `wallet remove <name>` | The only place a mnemonic/key can appear (export) — behind a typed confirmation of the wallet name. |
 | `balance [--tokens] [--address <addr>]` | QUAI balance; `--tokens` adds indexed holdings with QUAI values and price source. `--address` reads any Cyprus-1 Quai address. |
 | `send <to> <amount> [--token <addr\|ticker>]` | QUAI or ERC-20 transfer. `amount` = decimal, `50%` or `all` (QUAI "all" reserves gas). |
@@ -71,7 +90,7 @@ Default network is mainnet (`https://rpc.quai.network/cyprus1`, chain 9); Orchar
 | `help` · `?` · `commands` · `completion <shell>` | Help for everything (`hartii ?`, `hartii buy ?`), a flat command list, shell completion. |
 | `init` · `whoami` · `limits` · `networks` · `about` · `update` | First-run checklist, who you are, your spending caps and today's spend, networks, version/links, newest download + sha256. |
 | `price` · `quote <buy\|sell>` · `holders` · `trades` · `gas` · `block` · `open` | Read-only lookups; no wallet needed. |
-| shortcuts | `bal`, `pf`/`portfolio`, `ls`, `use`, `addr`/`receive`, `top`, `new`, `search`, `me`. |
+| shortcuts | `bal`, `pf`/`portfolio`, `ls`, `use`, `addr`, `top`, `new`, `search`, `me`. |
 | `config get <key>` · `config set <key> <value>` | Keys: `network`, `currentWallet`, `limits.perTxQuai`, `limits.dailyQuai`. |
 | `doctor` | Health checklist. |
 | `mcp [--allow-writes --max-per-tx <q> --max-per-day <q>]` | stdio MCP server (see below). |
@@ -221,8 +240,10 @@ agent spend.
   from an environment variable for CI and prints a loud warning.
 - **Keys and mnemonics are never printed**, except by `wallet export` after you type the wallet's name back.
 - **Spending guard** on every write, including MCP: `limits.perTxQuai` (default 100) and `limits.dailyQuai` (default
-  500), tracked in `~/.hartii/spend.json`; only a confirmed receipt moves the daily total, and unconfirmed sends stay
-  reserved. Native QUAI value is capped directly; token-denominated writes are valued in QUAI from a live quote and
+  500), tracked in `~/.hartii/spend.json`. Canonical mined successes charge guarded value plus gas; canonical mined
+  reverts charge gas even though the requested value did not move. Unknown or non-final receipts retain the full
+  guarded-value-plus-gas reservation; check the transaction before retrying or reconciling allowance.
+  Native QUAI value is capped directly; token-denominated writes are valued in QUAI from a live quote and
   **refused** if no QUAI valuation exists.
 - **No blind signing**: every write is simulated from your address, carries an access list, an explicit gas limit, and
   must return receipt status 1 before success is reported. Quai-ledger addresses only; mainnet requires checksummed
@@ -237,18 +258,17 @@ agent spend.
 - **MCP limits**: write tools take a token **address**, never a ticker; slippage above 10% is rejected; `--allow-writes`
   refuses to start without explicit `--max-per-tx` and `--max-per-day` (they only tighten the config caps); the fee
   ceiling cannot be raised over MCP.
-- **Fee ceiling**: a write whose estimated fee (gas limit x gas price) exceeds max(1 QUAI, 5% of the value moved) is
+- **Fee ceiling**: a write whose estimated fee (gas limit x gas price) exceeds max(25 QUAI, 5% of the value moved) is
   refused unless a human passes `--max-fee <quai>`. The estimated fee counts toward the spending guard.
 - **Chain pinned at signing**: every transaction carries the expected chain id (9 mainnet / 15000 orchard) and the signer
   refuses unless the provider agrees immediately before signing.
 - **Token addresses beside names**: every summary and MCP result shows a token's address right next to its (third-party,
   spoofable) symbol, e.g. `SYM (0x...)`.
 - **RPC URLs are redacted** (credentials, query strings, key-like path segments) in every error and output.
-- **Stale lock recovery**: every write holds `~/.hartii/spend.lock`. If a process died mid-write the next write refuses and
-  prints the lock path and its age. Check your recent transactions on quaiscan first (the dead process may have
-  broadcast), then delete `~/.hartii/spend.lock` by hand. The CLI never removes it automatically.
-- **No telemetry.** Network access is limited to the configured RPC, hartiilabs.com / hartiibiome.com, and
-  `wss://hartiilabs.com/api/live/ws`.
+- **Pending authority**: a locally unresolved send blocks new signing by the same sender on that chain, even when a daily budget has room. Legacy unbound reservations conservatively block all chains for that sender. The profile-wide file lock also serializes active writes. State is scoped to the configured `HARTII_HOME`; it cannot coordinate other wallets or deliberately separate profiles.
+- **Read-only recovery view**: run `hartii tx pending`, then `hartii tx <hash>` for recorded hashes. A missing hash or stale process is not proof of cancellation. Never delete reservations or blindly resend; reconcile the exact chain, sender, nonce, destination, value, receipt and gas first. The CLI never automatically expires or unlocks uncertain authority.
+- **Private storage**: new/renamed wallet files publish without overwriting another destination; linked and hardlinked paths are refused. Malformed config does not restore broader default limits. Recovery metadata must derive the same key/address before an exported phrase is returned. Windows ACLs remain explicitly unverified rather than certified from POSIX bits.
+- **Privacy**: the CLI keeps encrypted wallets, config, watchlists and spending/transaction metadata in the selected local profile. RPC, Hartii APIs, WebSocket providers and browsers opened to explorer links can process network metadata. MCP clients may send or retain tool output under their own policies. Receiving QR codes and HPAY links is offline and exposes only the public address and optional payment request; memo text in a shared link is public.
 
 ## Develop
 

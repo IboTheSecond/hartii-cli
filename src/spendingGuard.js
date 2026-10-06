@@ -1,10 +1,11 @@
 ﻿// Local accident-prevention caps. Every write holds the home-wide lock through its receipt.
-// Unknown submissions retain durable reservations; only status 1 records confirmed spend.
-import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, unlinkSync, openSync, closeSync } from 'node:fs';
+// Unknown submissions retain durable reservations; every mined outcome charges its gas.
+import { readFileSync, writeFileSync, unlinkSync, openSync, closeSync, fsyncSync, fstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { parseQuai } from 'quais';
 import { CliError } from './errors.js';
+import { securePath, secureDirectory, atomicPrivateWrite } from './secureFiles.js';
 export class SpendGuardError extends CliError {}
 export const ledgerPath = home => join(home, 'spend.json');
 const todayUtc = (now = new Date()) => now.toISOString().slice(0, 10);
@@ -16,9 +17,12 @@ function amount(value) {
 }
 function loadLedger(home) {
   const path = ledgerPath(home);
-  if (!existsSync(path)) return {};
   try {
-    const ledger = JSON.parse(readFileSync(path, 'utf8'));
+    const directory = securePath(home);
+    if (directory.stat && !directory.stat.isDirectory()) throw new Error();
+    const file = securePath(path, { regularFile: true });
+    if (!file.stat) return {};
+    const ledger = JSON.parse(readFileSync(file.path, 'utf8'));
     if (!object(ledger)) throw new Error();
     for (const [address, entry] of Object.entries(ledger)) {
       if (!/^0x[0-9a-f]{40}$/.test(address) || !object(entry) || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || !uintText(entry.spentWei)) throw new Error();
@@ -26,6 +30,11 @@ function loadLedger(home) {
         if (!object(entry.reservations)) throw new Error();
         for (const r of Object.values(entry.reservations)) {
           if (!object(r) || !uintText(r.amountWei) || typeof r.date !== 'string' || (r.txHash !== null && !/^0x[0-9a-fA-F]+$/.test(r.txHash))) throw new Error();
+          if (r.chainId !== undefined) {
+            if (!['9','15000'].includes(r.chainId) || !Number.isSafeInteger(r.nonce) || r.nonce < 0
+              || !/^0x[0-9a-f]{40}$/.test(r.to) || !uintText(r.valueWei) || !uintText(r.spendWei) || !uintText(r.maxFeeWei)
+              || !/^0x[0-9a-f]{64}$/.test(r.dataDigest) || !/^0x[0-9a-f]{64}$/.test(r.intentDigest) || typeof r.createdAt !== 'string') throw new Error();
+          }
         }
       }
     }
@@ -35,12 +44,8 @@ function loadLedger(home) {
   }
 }
 function saveLedger(home, ledger) {
-  mkdirSync(home, { recursive: true, mode: 0o700 });
-  const temporary = join(home, `spend.${randomUUID()}.tmp`);
-  try {
-    writeFileSync(temporary, JSON.stringify(ledger, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
-    renameSync(temporary, ledgerPath(home));
-  } finally { if (existsSync(temporary)) unlinkSync(temporary); }
+  try { secureDirectory(home); atomicPrivateWrite(ledgerPath(home), JSON.stringify(ledger, null, 2) + '\n', { replace: true }); }
+  catch { throw new SpendGuardError('Spending ledger could not be safely committed. Pending authority has not been reset; reconcile before further writes.'); }
 }
 function currentEntry(ledger, address, now) {
   const key = String(address).toLowerCase();
@@ -50,6 +55,43 @@ function currentEntry(ledger, address, now) {
 }
 function totals(entry) {
   return { spentWei: BigInt(entry.spentWei), reservedWei: Object.values(entry.reservations).reduce((sum, r) => sum + BigInt(r.amountWei), 0n), date: entry.date };
+}
+/** Public pending metadata only. Never loads config, providers, keys or passwords. */
+export function listSpendReservations(home, address) {
+  const wanted = address === undefined ? null : String(address).toLowerCase();
+  if (wanted !== null && !/^0x[0-9a-f]{40}$/.test(wanted)) throw new SpendGuardError('Invalid ledger wallet address.');
+  const rows = [];
+  for (const [account, entry] of Object.entries(loadLedger(home))) {
+    if (wanted !== null && account !== wanted) continue;
+    for (const [id, r] of Object.entries(entry.reservations || {})) {
+      rows.push({ id, address: account, date: r.date, createdAt: r.createdAt ?? null,
+        chainId: r.chainId ?? null, txHash: r.txHash, nonce: r.nonce ?? null,
+        to: r.to ?? null, valueWei: r.valueWei ?? null, dataDigest: r.dataDigest ?? null,
+        intentDigest: r.intentDigest ?? null, guardedValueWei: r.spendWei ?? null,
+        gasTotalWei: r.maxFeeWei ?? null, amountWei: r.amountWei,
+        status: 'unconfirmed', legacy: !r.chainId || !r.intentDigest,
+      });
+    }
+  }
+  return rows;
+}
+
+/** Unknown authority blocks the signer, even when its amount fits remaining caps. */
+export function assertNoPendingSpend(home, address, chainId) {
+  const chain = String(chainId);
+  const pending = listSpendReservations(home, address).filter((r) => r.legacy || r.chainId === chain);
+  if (pending.length) throw new SpendGuardError('Unconfirmed spending authority exists for this signer and chain. Reconcile pending transaction receipts before another write; remaining daily headroom does not permit a retry.');
+}
+
+/** A lock record is a fact on disk, never proof that its PID is currently active. */
+export function inspectSpendLock(home) {
+  try {
+    const file = securePath(join(home, 'spend.lock'), { regularFile: true });
+    if (!file.stat) return { exists: false, pid: null, startedAt: null, unverified: false, unreadable: false };
+    const record = JSON.parse(readFileSync(file.path, 'utf8'));
+    if (!Number.isSafeInteger(record?.pid) || record.pid <= 0 || typeof record.startedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(record.startedAt) || !Number.isFinite(Date.parse(record.startedAt))) throw new Error();
+    return { exists: true, pid: record.pid, startedAt: record.startedAt, unverified: true, unreadable: false };
+  } catch { return { exists: true, pid: null, startedAt: null, unverified: true, unreadable: true }; }
 }
 export function checkSpend(home, address, amountWei, limits, opts = {}) {
   const value = amount(amountWei);
@@ -73,29 +115,35 @@ export function getSpentToday(home, address, opts = {}) {
 // Call under withSpendLock BEFORE invoking the signer. A crash or an ambiguous send error
 // cannot make the same daily allowance spendable again.
 export function reserveSpend(home, address, amountWei, limits, opts = {}) {
+  if (opts.authority) assertNoPendingSpend(home, address, opts.authority.chainId);
   checkSpend(home, address, amountWei, limits, opts);
   const ledger = loadLedger(home), entry = currentEntry(ledger, address, opts.now), id = randomUUID();
-  entry.reservations[id] = { amountWei: amount(amountWei).toString(), date: todayUtc(opts.now), txHash: null };
+  entry.reservations[id] = { amountWei: amount(amountWei).toString(), date: todayUtc(opts.now), txHash: null, ...(opts.authority || {}) };
   saveLedger(home, ledger); return id;
 }
 export function markSpendHash(home, address, id, txHash) {
-  if (!/^0x[0-9a-fA-F]+$/.test(txHash)) throw new SpendGuardError('Invalid transaction hash for spending reservation.');
+  if (!/^0x[0-9a-fA-F]{64}$/.test(txHash)) throw new SpendGuardError('Invalid transaction hash for spending reservation.');
   const ledger = loadLedger(home), entry = ledger[String(address).toLowerCase()];
   if (!entry?.reservations?.[id]) throw new SpendGuardError('Spending reservation does not exist.');
-  entry.reservations[id].txHash = txHash; saveLedger(home, ledger);
+  const current = entry.reservations[id].txHash;
+  if (current && current.toLowerCase() !== txHash.toLowerCase()) throw new SpendGuardError('Spending reservation hash identity changed.');
+  entry.reservations[id].txHash = txHash.toLowerCase(); saveLedger(home, ledger);
 }
-export function settleSpend(home, address, id, { confirmed, now } = {}) {
+export function settleSpend(home, address, id, { confirmed, chargedWei, now } = {}) {
   if (typeof confirmed !== 'boolean') throw new SpendGuardError('A confirmed receipt status is required to settle a reservation.');
   const ledger = loadLedger(home), entry = currentEntry(ledger, address, now), reservation = entry.reservations[id];
   if (!reservation) throw new SpendGuardError('Spending reservation does not exist or is already settled.');
-  if (confirmed) entry.spentWei = (BigInt(entry.spentWei) + BigInt(reservation.amountWei)).toString();
+  const charge = chargedWei === undefined ? (confirmed ? BigInt(reservation.amountWei) : 0n) : amount(chargedWei);
+  entry.spentWei = (BigInt(entry.spentWei) + charge).toString();
   delete entry.reservations[id]; saveLedger(home, ledger);
 }
 // Lock the entire shared file, including different wallets. Never automatically reclaim a
 // stale lock: the stopped process might have broadcast. Review receipts first.
 export async function withSpendLock(home, _address, operation) {
-  mkdirSync(home, { recursive: true, mode: 0o700 });
-  const path = join(home, 'spend.lock'); let fd;
+  let path;
+  try { secureDirectory(home); path = securePath(join(home, 'spend.lock'), { regularFile: true }).path; }
+  catch { throw new SpendGuardError('Wallet spending storage path is unsafe or unreadable.'); }
+  let fd, identity;
   try { fd = openSync(path, 'wx', 0o600); }
   catch (error) {
     if (error.code !== 'EEXIST') throw error;
@@ -109,6 +157,13 @@ export async function withSpendLock(home, _address, operation) {
   }
   try {
     writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+    fsyncSync(fd);
+    identity = fstatSync(fd);
     return await operation();
-  } finally { closeSync(fd); unlinkSync(path); }
+  } finally {
+    closeSync(fd);
+    const current = securePath(path, { regularFile: true }).stat;
+    if (!current || !identity || current.dev !== identity.dev || current.ino !== identity.ino || current.size !== identity.size || current.mtimeMs !== identity.mtimeMs || current.ctimeMs !== identity.ctimeMs) throw new SpendGuardError('Write lock changed unexpectedly and was not removed. A write may have occurred; reconcile receipts before retrying.');
+    unlinkSync(path);
+  }
 }

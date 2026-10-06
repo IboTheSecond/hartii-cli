@@ -11,7 +11,7 @@ import { PKG_VERSION } from '../version.js';
 import { getHartiiHome, loadConfig } from '../config.js';
 import { readRuntime } from '../commandContext.js';
 
-const DECIMAL = /^\d+(\.\d{1,18})?$/;
+const DECIMAL = /^\d{1,78}(\.\d{1,18})?$/;
 
 export const INSTRUCTIONS = [
   'Hartii CLI MCP server (BETA, not independently audited): a personal Quai wallet and Hartii market tools.',
@@ -49,10 +49,10 @@ export function resolveMcpContext(opts = {}) {
   for (const [flag, key] of [['maxPerTx', 'perTxQuai'], ['maxPerDay', 'dailyQuai']]) {
     const v = opts[flag];
     if (v === undefined || v === null || v === false) continue;
-    if (!DECIMAL.test(String(v)) || Number(v) <= 0) throw new Error(`--${flag === 'maxPerTx' ? 'max-per-tx' : 'max-per-day'} must be a positive QUAI amount like 5 or 0.5.`);
+    if (!DECIMAL.test(String(v)) || !/[1-9]/.test(String(v))) throw new Error(`--${flag === 'maxPerTx' ? 'max-per-tx' : 'max-per-day'} must be a bounded positive QUAI amount like 5 or 0.5.`);
     limits[key] = String(v);
   }
-  if (opts.allowWrites && (limits.perTxQuai === undefined || limits.dailyQuai === undefined)) {
+  if (opts.allowWrites === true && (limits.perTxQuai === undefined || limits.dailyQuai === undefined)) {
     throw new Error('--allow-writes requires explicit --max-per-tx <quai> AND --max-per-day <quai> (they can only tighten the config caps). Refusing to start.');
   }
   const home = opts.home || getHartiiHome(env);
@@ -60,7 +60,7 @@ export function resolveMcpContext(opts = {}) {
   return {
     home, env, limits,
     network: opts.network || undefined, rpc: opts.rpc || undefined, wallet: opts.wallet || undefined, keyEnv: opts.keyEnv || undefined,
-    allowWrites: Boolean(opts.allowWrites),
+    allowWrites: opts.allowWrites === true,
     fetchFn: opts.fetchFn, providerFactory: opts.providerFactory, walletFactory: opts.walletFactory, now: opts.now,
   };
 }

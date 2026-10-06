@@ -118,11 +118,12 @@ describe('walletList / walletUse / walletAddress', () => {
     expect(result.address).toBe(created.address);
   });
 
-  it('walletAddress --qr is honest about not being implemented', async () => {
+  it('walletAddress --qr encodes the selected public address without an unlock', async () => {
     await walletCmd.walletNew(home, 'bob', deps());
     const result = walletCmd.walletAddress(home, 'bob', { qr: true });
-    expect(result.qr).toBeNull();
-    expect(result.note).toMatch(/not implemented/i);
+    expect(result.qr.payload).toBe(result.address);
+    expect(result.qr.matrix.length).toBeGreaterThan(20);
+    expect(result.note).toMatch(/public address only/i);
   });
 
   it('walletAddress throws when nothing is selected', () => {
@@ -197,7 +198,7 @@ describe('walletLockCheck', () => {
     const result = walletCmd.walletLockCheck(home, 'alice');
     expect(result.address).toBe(created.address);
     expect(result.encrypted).toBe(true);
-    expect(result.permsOk).toBe(true);
+    expect(result.permsOk).toBe(process.platform === 'win32' ? null : true);
   });
 
   it('throws for an unknown wallet', () => {

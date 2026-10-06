@@ -10,6 +10,8 @@ import { resilientRead } from '../../vendor/packages/agent-mcp/src/rpcClient.js'
 import { DEMO_NETWORK } from '../demoFixtures.js';
 import { readRuntime } from '../commandContext.js';
 import { CliError } from '../errors.js';
+import { listSpendReservations, inspectSpendLock } from '../spendingGuard.js';
+import { getHartiiHome } from '../config.js';
 
 export class TxError extends CliError {}
 
@@ -20,7 +22,12 @@ const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
  * @param {{ providerFactory?: Function }} [deps]
  */
 async function runTxCore(opts = {}, deps = {}) {
-  if (!opts.hash) throw new TxError('Usage: hartii tx <hash>');
+  if(opts.hash==='pending'){
+    const home=opts.home||getHartiiHome();
+    const pending=listSpendReservations(home);
+    return {readOnly:true,pending,count:pending.length,lock:inspectSpendLock(home),note:pending.length?'These local reservations are unresolved; they do not prove a transaction is still pending on chain. Inspect each hash with hartii tx <hash>. Never delete reservations or retry a send without verified receipt and nonce reconciliation.':'No unresolved reservations in this profile.'};
+  }
+  if (!opts.hash) throw new TxError('Usage: hartii tx <hash> | hartii tx pending');
   if (!HASH_RE.test(opts.hash)) throw new TxError(`"${opts.hash}" is not a well-formed 32-byte transaction hash.`);
 
   if (opts.demo) {
@@ -52,7 +59,8 @@ async function runTxCore(opts = {}, deps = {}) {
     throw new TxError('Receipt lookup unavailable; transaction status is unknown.');
   }
 
-  const status = receipt ? (Number(receipt.status) === 1 ? 'success' : Number(receipt.status) === 0 ? 'reverted' : 'unknown') : 'pending';
+  const receiptStatus=receipt?.status;
+  const status = receipt ? ([1,1n,'1','0x1'].includes(receiptStatus) ? 'success' : [0,0n,'0','0x0'].includes(receiptStatus) ? 'reverted' : 'unknown') : 'pending';
   return {
     hash: opts.hash,
     network: net.name,

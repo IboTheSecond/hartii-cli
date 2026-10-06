@@ -12,6 +12,7 @@ import { ERC20_ABI } from '../src/abi/erc20.js';
 import { NetworkError } from '../src/network.js';
 import { getSpentToday } from '../src/spendingGuard.js';
 import { formatAmount } from '../src/amount.js';
+import { buildReceiveLink } from '../src/paylinks.js';
 
 const TOKEN = getAddress('0x00' + Buffer.from('token', 'utf8').toString('hex').padEnd(38, '0').slice(0, 38));
 const TO = getAddress('0x00' + Buffer.from('recipient', 'utf8').toString('hex').padEnd(38, '0').slice(0, 38));
@@ -49,6 +50,7 @@ function nativeProvider({ balance = 100_000000000000000000n, estimate = 39_000n,
     estimateGas: vi.fn(async () => estimate),
     getFeeData: vi.fn(async () => ({ gasPrice })),
     getTransactionCount: vi.fn(async () => nonce),
+    getNetwork: vi.fn(async () => ({ chainId: 9n })),
   };
 }
 
@@ -61,8 +63,8 @@ function mockWalletFactory(address, { receiptStatus = 1 } = {}) {
   return (_privateKey, _provider) => ({
     getAddress: vi.fn(async () => address),
     sendTransaction: vi.fn(async (tx) => ({
-      hash: '0xabc123',
-      wait: vi.fn(async () => ({ status: receiptStatus })),
+      hash: '0x' + 'ab'.repeat(32),
+      wait: vi.fn(async () => ({ status: receiptStatus, hash: '0x' + 'ab'.repeat(32) })),
       ...tx,
     })),
   });
@@ -87,6 +89,7 @@ function erc20Provider({ symbol = 'TEST', decimals = 18, balance = 1_000_0000000
     estimateGas: vi.fn(async () => estimate),
     getFeeData: vi.fn(async () => ({ gasPrice })),
     getTransactionCount: vi.fn(async () => nonce),
+    getNetwork: vi.fn(async () => ({ chainId: 9n })),
   };
 }
 
@@ -110,6 +113,25 @@ describe('runSend — network guard', () => {
 });
 
 describe('runSend — native QUAI', () => {
+  it('sends the exact amount and recipient from an HPAY link through the guarded pipeline', async () => {
+    const sendTransaction = vi.fn(async tx => ({ hash: '0x' + 'ab'.repeat(32), wait: async () => ({status:1,hash:'0x'+'ab'.repeat(32)}), ...tx }));
+    const result = await runSend({home,to:buildReceiveLink({address:TO,amount:'0.000000000000000001',memo:'Invoice 12'}),yes:true}, {
+      fetchFn:chainOkFetch(),providerFactory:()=>nativeProvider(),walletFactory:()=>({getAddress:async()=>account.address,sendTransaction}),passwordDeps:{env:{HARTII_PASSWORD:PASSWORD}},
+    });
+    expect(result.ok).toBe(true);
+    expect(sendTransaction.mock.calls[0][0]).toMatchObject({to:TO,value:1n});
+    expect(result.summary.memo).toBe('Invoice 12');
+  });
+  it('refuses a conflicting explicit amount before network or password access', async () => {
+    const providerFactory=vi.fn(),promptFn=vi.fn();
+    await expect(runSend({home,to:buildReceiveLink({address:TO,amount:'2.5'}),amount:'3',yes:true},{providerFactory,passwordDeps:{promptFn}})).rejects.toThrow(/differs/);
+    expect(providerFactory).not.toHaveBeenCalled();expect(promptFn).not.toHaveBeenCalled();
+  });
+  it('refuses an expired payment link before network access', async () => {
+    const providerFactory=vi.fn();
+    await expect(runSend({home,to:buildReceiveLink({address:TO,amount:'2.5',expiresAt:1}),yes:true},{providerFactory})).rejects.toThrow(/expired/);
+    expect(providerFactory).not.toHaveBeenCalled();
+  });
   it('sends a plain decimal amount end to end', async () => {
     const provider = nativeProvider();
     const providerFactory = vi.fn(() => provider);
