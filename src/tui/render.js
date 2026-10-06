@@ -264,6 +264,55 @@ function formOverlay(s, cols, rows, o) {
   s.put(b.x + 3, b.y + h - 2, 'Enter next/submit · Tab field · Esc cancel', S.faint);
 }
 
+/** Hard-wraps one summary line to `width` code points (nothing is ever clipped away in a confirm overlay). */
+function wrapLine(text, width) {
+  const chars = Array.from(String(text));
+  return chars.length <= width ? [chars.join('')] : rewrap(chars, width);
+}
+function rewrap(chars, width) {
+  const out = [];
+  let i = 0;
+  while (i < chars.length) {
+    const room = out.length ? width - 2 : width;
+    out.push((out.length ? '  ' : '') + chars.slice(i, i + room).join(''));
+    i += room;
+  }
+  return out;
+}
+
+/**
+ * Geometry of a confirm overlay: EVERY summary line is wrapped (never clipped) and the visible window scrolls.
+ * `tooSmall` means the transaction cannot be reviewed at this terminal size, so it must not be confirmable.
+ */
+export function confirmLayout(o, cols, rows) {
+  const raw = (o.lines || []).map((l) => (typeof l === 'string' ? { text: l, st: S.ink } : { text: String(l.text), st: l.st || S.ink }));
+  const w = Math.min(cols - 4, Math.max(40, ...raw.map((l) => Array.from(l.text).length + 6), o.title.length + 8));
+  const lines = raw.flatMap((l) => wrapLine(l.text, w - 6).map((text) => ({ text, st: l.st })));
+  const h = Math.min(rows - 2, lines.length + 6);
+  const cap = h - 5;
+  return { w, h, cap, lines, maxScroll: Math.max(0, lines.length - cap), tooSmall: lines.length > cap && cap < 5 };
+}
+
+function confirmOverlay(s, cols, rows, o) {
+  const L = confirmLayout(o, cols, rows);
+  const b = overlayBox(s, cols, rows, o.title.toUpperCase(), L.w, L.h);
+  if (L.tooSmall) {
+    s.put(b.x + 3, b.y + 2, clip('Terminal too small to review this transaction: resize or use the CLI.', L.w - 6), S.warn);
+    s.put(b.x + 3, b.y + L.h - 2, 'n  cancel', S.key);
+    return;
+  }
+  const scroll = Math.min(Math.max(0, o.scroll || 0), L.maxScroll);
+  L.lines.slice(scroll, scroll + L.cap).forEach((l, i) => s.put(b.x + 3, b.y + 2 + i, clip(l.text, L.w - 6), l.st));
+  if (L.maxScroll > 0) {
+    const below = L.lines.length - (scroll + L.cap);
+    const marks = [scroll > 0 ? `▲ ${scroll} above` : '', below > 0 ? `▼ ${below} more line${below === 1 ? '' : 's'}` : 'end of summary'].filter(Boolean).join(' · ');
+    s.put(b.x + 3, b.y + L.h - 3, clip(marks, L.w - 6), S.warn);
+  }
+  const atEnd = scroll >= L.maxScroll;
+  const footer = o.notice || (atEnd ? o.footer : '↑↓ PgUp PgDn scroll, y at the end · n cancel');
+  s.put(b.x + 3, b.y + L.h - 2, clip(footer, L.w - 6), S.key);
+}
+
 function textOverlay(s, cols, rows, o) {
   const lines = o.lines || [];
   const w = Math.min(cols - 4, Math.max(40, ...lines.map((l) => Array.from(String(l.text ?? l)).length + 6), o.title.length + 8));
@@ -281,6 +330,7 @@ function overlays(s, cols, rows, o) {
   if (!o) return;
   if (o.type === 'help') return helpOverlay(s, cols, rows);
   if (o.type === 'form' || o.type === 'prompt') return formOverlay(s, cols, rows, o);
+  if (o.type === 'confirm') return confirmOverlay(s, cols, rows, o);
   return textOverlay(s, cols, rows, o);
 }
 

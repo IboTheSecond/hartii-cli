@@ -44,7 +44,7 @@ export async function runDoctor(opts = {}, deps = {}) {
 
   const home = opts.home || getHartiiHome();
   const cfg = loadConfig(home);
-  const net = resolveRuntimeNetwork({ network: opts.network || cfg.network, rpc: opts.rpc });
+  const net = resolveRuntimeNetwork({ network: opts.network || cfg.network, rpc: opts.rpc, allowInsecureRpc: opts.allowInsecureRpc });
   const apiBase = opts.apiBase || API_BASE;
   const fetchFn = deps.fetchFn;
   const now = deps.now || new Date();

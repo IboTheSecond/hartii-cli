@@ -155,15 +155,24 @@ export async function withSpendLock(home, _address, operation) {
     } catch { /* unreadable lock: still report the path */ }
     throw new SpendGuardError(`Another write is in progress (lock file: ${path}).${info} If no hartii process is running, a previous one stopped mid-write: check your recent transactions on quaiscan first (it may have broadcast), then delete that file to continue. The CLI never removes it automatically.`);
   }
+  let outcome, failure, failed = false;
   try {
     writeFileSync(fd, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
     fsyncSync(fd);
     identity = fstatSync(fd);
-    return await operation();
-  } finally {
+    outcome = await operation();
+  } catch (error) { failed = true; failure = error; }
+  // Lock cleanup must never mask what the operation actually did (a successful send's tx hash, or its real
+  // error). On drift the lock file is left in place - the NEXT write still fails closed on it - and the
+  // operator is told on stderr.
+  try {
     closeSync(fd);
     const current = securePath(path, { regularFile: true }).stat;
     if (!current || !identity || current.dev !== identity.dev || current.ino !== identity.ino || current.size !== identity.size || current.mtimeMs !== identity.mtimeMs || current.ctimeMs !== identity.ctimeMs) throw new SpendGuardError('Write lock changed unexpectedly and was not removed. A write may have occurred; reconcile receipts before retrying.');
     unlinkSync(path);
+  } catch (error) {
+    try { process.stderr.write(`WARNING: ${error?.message || 'Could not release the write lock.'} The operation's own result is reported unchanged; further writes stay blocked until you reconcile and remove ${path}.\n`); } catch { /* stderr closed */ }
   }
+  if (failed) throw failure;
+  return outcome;
 }

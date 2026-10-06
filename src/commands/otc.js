@@ -7,13 +7,12 @@
 // sequential from 1. No partial fills, no ERC-20-for-ERC-20.
 import { Interface } from 'quais';
 import { withAddr } from '../output.js';
-import { withProviderCleanup, toolsRuntime, readRuntime, writeVia } from '../commandContext.js';
-import { resolveWalletAddress } from './balance.js';
+import { withProviderCleanup, toolsRuntime, readRuntime, resolveSender, writeVia } from '../commandContext.js';
 import { assertCyprus1QuaiAddress } from '../address.js';
 import { parseAmount, formatAmount } from '../amount.js';
 import { biomeAddress, ToolError } from '../biomeAddresses.js';
 import { HARTII_OTC_ABI } from '../abi/hartiiTools.js';
-import { view, readErc20, ensureAllowance, approvalStop, tokenAddressOf } from '../toolKit.js';
+import { view, pagedIds, readErc20, ensureAllowance, approvalStop, tokenAddressOf } from '../toolKit.js';
 import { createProvider } from '../signer.js';
 import { DEMO_ADDRESS, DEMO_NETWORK, DEMO_TOKEN } from '../demoFixtures.js';
 
@@ -120,7 +119,7 @@ async function runOtcCore(opts, deps = {}) {
     });
     if (result.ok && !result.dryRun) {
       try {
-        const ids = (await view(provider, IFACE, contract, 'offersByMaker', [from, 0, 500]))[0];
+        const { ids } = await pagedIds(provider, IFACE, contract, 'offersByMaker', [from]);
         if (ids.length) { result.offerId = ids[ids.length - 1].toString(); result.link = `https://hartiibiome.com/otc.html?offer=${result.offerId}&chain=9&v=1`; }
       } catch { /* best effort: the receipt is the source of truth */ }
     }
@@ -155,9 +154,12 @@ async function listOffers(opts, deps, nowSec) {
   const provider = (deps.providerFactory || createProvider)(net.rpcUrl);
   const limit = Math.min(Math.max(Number(opts.limit) || 25, 1), MAX_LIST);
   let ids;
+  let truncated = false;
   if (opts.mine) {
-    const { address } = resolveWalletAddress(home, opts.wallet);
-    ids = (await view(provider, IFACE, contract, 'offersByMaker', [assertCyprus1QuaiAddress(address), 0, 500]))[0].map(BigInt).reverse().slice(0, limit);
+    const { address } = resolveSender(home, opts, deps);
+    const all = await pagedIds(provider, IFACE, contract, 'offersByMaker', [assertCyprus1QuaiAddress(address)]);
+    truncated = all.truncated;
+    ids = all.ids.reverse().slice(0, limit);
   } else {
     const count = BigInt((await view(provider, IFACE, contract, 'offerCount'))[0]);
     ids = [];
@@ -168,7 +170,7 @@ async function listOffers(opts, deps, nowSec) {
   for (const id of ids) { const o = await readOffer(provider, contract, id, cache); if (o) offers.push(o); }
   const wantStatus = opts.status || (opts.mine ? 'all' : 'open');
   const items = offers.map((o) => offerJson(o, nowSec)).filter((o) => wantStatus === 'all' || o.status === wantStatus);
-  return { contract, addressSource: source, network: net.name, status: wantStatus, scanned: ids.length, items };
+  return { contract, addressSource: source, network: net.name, status: wantStatus, scanned: ids.length, ...(truncated ? { truncated: true, note: 'Only the first 5000 of your offers were read; the newest are missing.' } : {}), items };
 }
 
 export function runOtc(opts = {}, deps = {}) { return withProviderCleanup(deps, (d) => runOtcCore(opts, d)); }

@@ -1,6 +1,6 @@
 /* eslint-disable no-control-regex -- asserting that terminal control characters are stripped */
 import { describe, it, expect, vi } from 'vitest';
-import { renderFrame, MENU } from '../src/tui/render.js';
+import { renderFrame, MENU, confirmLayout } from '../src/tui/render.js';
 import { demoState } from '../src/tui/demoData.js';
 import { TuiApp } from '../src/tui/app.js';
 import { Screen } from '../src/tui/screen.js';
@@ -396,5 +396,96 @@ describe('entry points', () => {
     expect(stdout.writes.join('')).toContain('\u001b[?1049l');
     expect(stdin.setRawMode).toHaveBeenLastCalledWith(false);
     expect(stdout.writes.join('')).toContain('\u001b[?25h');
+  });
+});
+
+describe('confirm overlay shows the WHOLE transaction (review finding: it used to truncate)', () => {
+  // a realistic 22-line swap summary, with a path line longer than the overlay is wide
+  const SUMMARY = [
+    'Swap TEST (0x0012340000000000000000000000000000000001) -> QUAI',
+    '  feeBps: 30', '  feeIncludedInQuote: true', '  tokenIn: QUAI', '  tokenOut: TEST (0x0012340000000000000000000000000000000001)',
+    '  amountIn: 12.5', '  expectedOut: 1043.221', '  minOut: 1011.9', '  slippageBps: 300',
+    '  path: 0x0000000000000000000000000000000000000d01 -> 0x0012340000000000000000000000000000000001',
+    '  network: mainnet', '  chainId: 9', '  from: 0x0000000000000000000000000000000000000d01', '  to: 0x00aa0000000000000000000000000000000000bb',
+    '  valueQuai: 12.5', '  guardedQuai: 12.5', '  guardedWithFeeQuai: 12.61', '  gasLimit: 312000', '  gasPriceWei: 58000000000',
+    '  estimatedFeeQuai: 0.11', '  nonce: 7', '  dataDigest: 0x' + 'ab'.repeat(32),
+  ];
+  const open = (cols, rows) => {
+    const app = new TuiApp({ data: data(), size: { cols, rows }, deps: { now: () => NOW } });
+    const summary = SUMMARY.slice();
+    const decision = app.makeIo(summary).confirmFn('Proceed?');
+    return { app, decision };
+  };
+  const shownText = (app) => app.frame().toPlain();
+
+  it('80x24 snapshot of the scrollable confirm overlay', () => {
+    expect(SUMMARY).toHaveLength(22);
+    expect(shownText(open(80, 24).app)).toMatchSnapshot();
+  });
+
+  it('every line (and every character of the long path/digest lines) is reachable by scrolling', () => {
+    const { app } = open(80, 24);
+    const L = confirmLayout(app.ui.overlay, 80, 24);
+    expect(L.maxScroll).toBeGreaterThan(0);
+    expect(shownText(app)).toMatch(/▼ \d+ more lines?/);
+    const seen = new Set();
+    const x = Math.floor((80 - L.w) / 2), y = Math.floor((24 - L.h) / 2); // only the overlay's own text rows/columns
+    for (let i = 0; i <= L.maxScroll + 1; i++) {
+      for (const line of shownText(app).split('\n').slice(y + 2, y + 2 + L.cap)) seen.add(Array.from(line).slice(x + 3, x + L.w - 3).join(''));
+      app.key({ name: 'down' });
+    }
+    const flat = [...seen].join('\n');
+    const compact = (t) => t.replace(/[^A-Za-z0-9.:>-]/g, '');
+    const flatCompact = compact(flat);
+    for (const line of SUMMARY) expect(flatCompact).toContain(compact(line));
+    expect(shownText(app)).toMatch(/end of summary/);
+  });
+
+  it('y is refused until the end was reached, then confirms', async () => {
+    const { app, decision } = open(80, 24);
+    let resolved = null;
+    decision.then((v) => { resolved = v; });
+    app.key({ str: 'y', name: 'y' });
+    await Promise.resolve();
+    expect(app.ui.overlay.type).toBe('confirm');
+    expect(resolved).toBe(null);
+    expect(shownText(app)).toMatch(/Scroll to the end/);
+    app.key({ name: 'end' });
+    app.key({ str: 'y', name: 'y' });
+    expect(await decision).toBe(true);
+  });
+
+  it('n cancels at any scroll position', async () => {
+    const { app, decision } = open(80, 24);
+    app.key({ str: 'n', name: 'n' });
+    expect(await decision).toBe(false);
+  });
+
+  it('a short summary that fits needs no scrolling and confirms immediately', async () => {
+    const app = new TuiApp({ data: data(), size: { cols: 120, rows: 40 }, deps: { now: () => NOW } });
+    const decision = app.makeIo(['Send QUAI', '  to: 0x0011', '  valueQuai: 1']).confirmFn('Proceed?');
+    expect(shownText(app)).toMatch(/y\s+confirm and sign/);
+    app.key({ str: 'y', name: 'y' });
+    expect(await decision).toBe(true);
+  });
+
+  it('a terminal too small to show the summary refuses y outright', async () => {
+    const { app, decision } = open(80, 10);
+    expect(confirmLayout(app.ui.overlay, 80, 10).tooSmall).toBe(true);
+    app.key({ name: 'end' });
+    app.key({ str: 'y', name: 'y' });
+    await Promise.resolve();
+    expect(app.ui.overlay.type).toBe('confirm');
+    expect(app.ui.overlay.notice).toMatch(/Too small to review/);
+    app.key({ str: 'n', name: 'n' });
+    expect(await decision).toBe(false);
+  });
+
+  it('too-small rendering says so instead of a partial summary', () => {
+    const app = new TuiApp({ data: data(), size: { cols: 80, rows: 18 }, deps: { now: () => NOW } });
+    app.ui.overlay = { type: 'confirm', title: 'Confirm', lines: SUMMARY.slice(0, 2), footer: 'y  confirm and sign     n  cancel' };
+    // 18 rows leaves room for 11 lines: fine. Force the tiny case through the layout contract:
+    expect(confirmLayout({ title: 'Confirm', lines: SUMMARY }, 80, 18).tooSmall).toBe(false);
+    expect(confirmLayout({ title: 'Confirm', lines: SUMMARY }, 80, 11).tooSmall).toBe(true);
   });
 });

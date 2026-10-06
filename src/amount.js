@@ -23,7 +23,9 @@ export function parseAmount(input, opts = {}) {
 
   if (raw.toLowerCase() === 'all') {
     if (opts.balanceWei === undefined) throw new AmountError('"all" needs a known balance to resolve against.');
-    return { amountWei: BigInt(opts.balanceWei), isAll: true, isPercent: false, percent: null };
+    const all = BigInt(opts.balanceWei);
+    if (all <= 0n) throw new AmountError('Nothing to spend: the balance is zero.');
+    return { amountWei: all, isAll: true, isPercent: false, percent: null };
   }
 
   const pctMatch = raw.match(PERCENT_RE);
@@ -37,6 +39,7 @@ export function parseAmount(input, opts = {}) {
     // Integer basis-points math (2 decimal places of percent precision) — never floats on money.
     const bps = Math.round(pct * 100);
     const amountWei = (balanceWei * BigInt(bps)) / 10000n;
+    if (amountWei <= 0n) throw new AmountError(`Nothing to spend: ${raw} of a balance of ${balanceWei} base units rounds down to zero.`);
     return { amountWei, isAll: bps === 10000, isPercent: true, percent: pct };
   }
 

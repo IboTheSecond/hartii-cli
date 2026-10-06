@@ -13,6 +13,7 @@
 //    HARTII_PASSWORD (or --key-env), never a prompt.
 //  * Strings that originate from third parties (token names, symbols, metadata) are stripped of control
 //    characters and must be treated as DATA by the model, not as instructions.
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { Wallet } from 'quais';
 import { runBalance, resolveWalletAddress } from '../commands/balance.js';
@@ -75,6 +76,31 @@ export function annotateTokens(value) {
   return out;
 }
 
+const REVIEW_TTL_MIN = 10;
+const GAS_TOLERANCE_PCT = 20n; // gas may drift this much between review and signing; anything else must match exactly
+const REVIEW_TOKEN = z.string().regex(/^0x[0-9a-f]{64}$/).optional().describe('The reviewToken returned by the dry run; required together with confirm:true.');
+// Fields that legitimately move between a dry run and the real run; everything else in the summary is a reviewed term.
+const VOLATILE_SUMMARY = new Set(['gasLimit', 'gasPriceWei', 'estimatedFeeQuai', 'guardedWithFeeQuai', 'nonce', 'dataDigest', 'note']);
+
+/** Digest of the reviewed terms (tool, chain, from, to, value, calldata shape, every semantic summary field, expiry window). */
+export function reviewDigest(tool, summary) {
+  const terms = Object.fromEntries(Object.entries(summary).filter(([k]) => !VOLATILE_SUMMARY.has(k)).sort(([a], [b]) => (a < b ? -1 : 1)));
+  return '0x' + createHash('sha256').update(JSON.stringify({ v: 1, tool, ttlMin: REVIEW_TTL_MIN, terms })).digest('hex');
+}
+
+/** io.validateBeforeSubmit for the confirmed run: the first transaction about to be signed must match the reviewed terms. */
+function reviewBinding(tool, token, review) {
+  let checked = false;
+  return ({ summary }) => {
+    if (checked) return; // a multi-transaction flow reviewed one summary; later steps are re-quoted under the same caps
+    checked = true;
+    const changed = () => { throw new Error('Terms changed since the review: dry-run again, show the user the new summary, then confirm with the new reviewToken.'); };
+    if (reviewDigest(tool, summary) !== token) changed();
+    const within = (now, then) => now * 100n <= then * (100n + GAS_TOLERANCE_PCT);
+    if (!within(BigInt(summary.gasLimit), review.gasLimit) || !within(BigInt(summary.gasPriceWei), review.gasPriceWei)) changed();
+  };
+}
+
 const CONFIRM = z.boolean().optional().describe('Omit or false = dry run (simulate and show the summary only). true = sign and send for real.');
 
 /** Strips control characters from every string in a JSON-able value (third-party text is untrusted). */
@@ -108,14 +134,14 @@ function context(ctx) {
     return resolveWalletAddress(readRuntime({ home: ctx.home, network: ctx.network, rpc: ctx.rpc }, {}).home, ctx.wallet).address;
   };
   const base = (extra = {}) => ({ home: ctx.home, network: ctx.network || undefined, rpc: ctx.rpc || undefined, wallet: ctx.wallet || undefined, keyEnv: ctx.keyEnv || undefined, ...extra });
-  const deps = () => ({
+  const deps = (validateBeforeSubmit) => ({
     fetchFn: ctx.fetchFn,
     providerFactory: ctx.providerFactory,
     walletFactory: ctx.walletFactory,
     limits: ctx.limits,
     now: ctx.now,
     env,
-    io: { write: () => {}, writeErr: () => {}, confirmFn: async () => true, env, now: ctx.now },
+    io: { write: () => {}, writeErr: () => {}, confirmFn: async () => true, env, now: ctx.now, ...(validateBeforeSubmit ? { validateBeforeSubmit } : {}) },
     passwordDeps: {
       env,
       writeErr: (s) => process.stderr.write(s),
@@ -158,20 +184,37 @@ export function buildTools(ctx) {
   const c = context(ctx);
   const exclusive = makeMutex();
 
-  // A write handler: dry-run unless confirm === true. Returns the pipeline's own result plus the mode.
+  // A write handler: dry-run unless confirm === true. A dry run returns a `reviewToken`; confirm:true needs that same
+  // token, and the real run is checked against the reviewed terms immediately before signing (see reviewBinding).
+  const reviews = new Map(); // token -> { expiresAt }, one use each
   const writeTool = (name, description, inputSchema, run) => ({
     name,
-    description: `${description} DRY RUN by default: returns the simulated confirmation summary without signing; pass confirm:true to sign and send. Subject to the local per-transaction and per-day spending caps.`,
-    inputSchema: { ...inputSchema, confirm: CONFIRM },
+    description: `${description} DRY RUN by default: returns the simulated confirmation summary and a reviewToken without signing; to sign and send pass confirm:true AND that reviewToken (it binds the exact terms you showed the user and expires in ${REVIEW_TTL_MIN} minutes; if the terms moved you must dry-run again). Subject to the local per-transaction and per-day spending caps.`,
+    inputSchema: { ...inputSchema, confirm: CONFIRM, reviewToken: REVIEW_TOKEN },
     write: true,
     handler: async (args = {}) => {
       if (ctx.allowWrites !== true) throw new Error('Write tools are disabled: start the server with --allow-writes.');
       const execute = args.confirm === true;
       if (args.slippage !== undefined) checkMcpSlippage(args.slippage);
-      const { confirm: _omit, ...rest } = args;
+      const { confirm: _omit, reviewToken, ...rest } = args;
       return exclusive(async () => {
-        const result = await run(rest, { dryRun: !execute, yes: true, json: true });
-        return { mode: execute ? 'executed' : 'dry-run', ...result, ...(execute ? {} : { next: 'Nothing was signed. Re-call with confirm:true to execute exactly this.' }) };
+        const nowMs = ctx.now ? new Date(ctx.now).getTime() : Date.now();
+        if (!execute) {
+          const result = await run(rest, { dryRun: true, yes: true, json: true });
+          if (!result?.summary) throw new Error('This dry run produced no reviewable summary, so it cannot be confirmed.');
+          const token = reviewDigest(name, result.summary);
+          for (const [k, v] of reviews) if (v.expiresAt <= nowMs) reviews.delete(k);
+          if (reviews.size >= 64) reviews.delete(reviews.keys().next().value);
+          reviews.set(token, { expiresAt: nowMs + REVIEW_TTL_MIN * 60_000, gasLimit: BigInt(result.summary.gasLimit), gasPriceWei: BigInt(result.summary.gasPriceWei) });
+          return { mode: 'dry-run', ...result, reviewToken: token, reviewExpiresInMinutes: REVIEW_TTL_MIN, next: 'Nothing was signed. Show the user this summary; to execute exactly this, re-call with the same arguments plus confirm:true and reviewToken.' };
+        }
+        const review = typeof reviewToken === 'string' ? reviews.get(reviewToken) : undefined;
+        if (!review) throw new Error('confirm:true needs the reviewToken from a dry run of these exact arguments (missing, unknown or already used). Dry-run first, show the user the summary, then confirm with its token.');
+        reviews.delete(reviewToken); // one use: a replay or a retry must be reviewed again
+        if (review.expiresAt <= nowMs) throw new Error(`The review expired (${REVIEW_TTL_MIN} minutes): dry-run again and show the user the fresh summary.`);
+        const binding = reviewBinding(name, reviewToken, review);
+        const result = await run(rest, { dryRun: false, yes: true, json: true }, binding);
+        return { mode: 'executed', ...result };
       });
     },
   });
@@ -244,25 +287,25 @@ export function buildTools(ctx) {
     },
     writeTool('hartii_send', 'Send QUAI, or an ERC-20 when `token` is set, to a Cyprus-1 Quai address.',
       { to: z.string(), amount: AMOUNT, token: WRITE_TOKEN.optional() },
-      (a, m) => runSend({ ...c.base(), to: a.to, amount: a.amount, token: a.token === undefined ? undefined : requireAddress(a.token, 'token'), ...m }, c.deps())),
+      (a, m, v) => runSend({ ...c.base(), to: a.to, amount: a.amount, token: a.token === undefined ? undefined : requireAddress(a.token, 'token'), ...m }, c.deps(v))),
     writeTool('hartii_buy', 'Buy a token with QUAI on its bonding curve.',
       { token: WRITE_TOKEN, quai: AMOUNT, slippage: SLIPPAGE },
-      (a, m) => runBuy({ ...c.base(), token: requireAddress(a.token, 'token'), quai: a.quai, slippage: a.slippage, ...m }, c.deps())),
+      (a, m, v) => runBuy({ ...c.base(), token: requireAddress(a.token, 'token'), quai: a.quai, slippage: a.slippage, ...m }, c.deps(v))),
     writeTool('hartii_sell', 'Sell a token for QUAI on its bonding curve (approves the exact amount first when needed).',
       { token: WRITE_TOKEN, amount: AMOUNT, slippage: SLIPPAGE },
-      (a, m) => runSell({ ...c.base(), token: requireAddress(a.token, 'token'), amount: a.amount, slippage: a.slippage, ...m }, c.deps())),
+      (a, m, v) => runSell({ ...c.base(), token: requireAddress(a.token, 'token'), amount: a.amount, slippage: a.slippage, ...m }, c.deps(v))),
     writeTool('hartii_swap', 'Swap on HartiiSwap (QUAI/WQUAI/tokens).',
       { tokenIn: WRITE_TOKEN, tokenOut: WRITE_TOKEN, amount: AMOUNT, slippage: SLIPPAGE },
-      (a, m) => runSwap({ ...c.base(), tokenIn: requireAddress(a.tokenIn, 'tokenIn', { allowNative: true }), tokenOut: requireAddress(a.tokenOut, 'tokenOut', { allowNative: true }), amount: a.amount, slippage: a.slippage, ...m }, c.deps())),
+      (a, m, v) => runSwap({ ...c.base(), tokenIn: requireAddress(a.tokenIn, 'tokenIn', { allowNative: true }), tokenOut: requireAddress(a.tokenOut, 'tokenOut', { allowNative: true }), amount: a.amount, slippage: a.slippage, ...m }, c.deps(v))),
     writeTool('hartii_otc_fill', 'Fill an OTC offer: pays amountWanted + the live service fee in QUAI and receives the offered tokens.',
       { id: z.string().describe('Offer id (positive integer).') },
-      (a, m) => runOtc({ ...c.base(), sub: 'fill', id: a.id, ...m }, c.deps())),
+      (a, m, v) => runOtc({ ...c.base(), sub: 'fill', id: a.id, ...m }, c.deps(v))),
     writeTool('hartii_otc_cancel', 'Cancel one of the configured wallet\'s own active OTC offers.',
       { id: z.string().describe('Offer id (positive integer).') },
-      (a, m) => runOtc({ ...c.base(), sub: 'cancel', id: a.id, ...m }, c.deps())),
+      (a, m, v) => runOtc({ ...c.base(), sub: 'cancel', id: a.id, ...m }, c.deps(v))),
     writeTool('hartii_claim', 'Claim the configured wallet\'s next unclaimed allocation in a HartiiClaim campaign (leaves are verified against the on-chain Merkle root).',
       { campaignId: z.string().describe('Campaign id, decimal or 0x hex.') },
-      (a, m) => runClaim({ ...c.base(), sub: 'claim', id: a.campaignId, ...m }, c.deps())),
+      (a, m, v) => runClaim({ ...c.base(), sub: 'claim', id: a.campaignId, ...m }, c.deps(v))),
   ];
 
   return tools.filter((t) => !t.write || ctx.allowWrites === true).map((t) => {

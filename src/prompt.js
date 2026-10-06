@@ -32,9 +32,8 @@ function readLine(label, deps) {
 
 /**
  * Reads one line from stdin with input masked (each keystroke echoed as nothing — not even "*",
- * matching the spec's "hidden prompt" requirement). Falls back to a plain (unmasked)
- * readline prompt when stdin is not a TTY (piped input, e.g. CI/tests) — there is nothing to mask
- * in a non-interactive stream, and raw-mode would throw there anyway.
+ * matching the spec's "hidden prompt" requirement). When stdin is not a TTY it REFUSES (a piped
+ * secret cannot be masked) unless `deps.allowPipedSecret` is true, set only by the explicit --stdin flag.
  * @param {string} label
  * @param {{ stdin?: NodeJS.ReadStream, stdout?: NodeJS.WriteStream }} [deps]
  * @returns {Promise<string>}
@@ -44,6 +43,11 @@ export function readHiddenInput(label, deps = {}) {
   const stdout = deps.stdout || process.stderr;
 
   if (!stdin.isTTY) {
+    // A secret read from a non-terminal stdin cannot be masked and would echo in plain text. Refuse unless the
+    // caller deliberately piped it (--stdin); HARTII_PASSWORD never reaches this function.
+    if (deps.allowPipedSecret !== true) {
+      return Promise.reject(new Error('Refusing to read a password or secret from a non-interactive stdin: it cannot be hidden. Run this in a terminal, set HARTII_PASSWORD for automation, or pass --stdin to deliberately pipe the secret in.'));
+    }
     return readLine(label, { ...deps, stdin, stdout });
   }
   if (stdin.readableEnded || stdin.destroyed) return Promise.reject(closedInput());

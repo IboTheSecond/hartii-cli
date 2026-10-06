@@ -5,6 +5,7 @@ import { parseAmount, formatAmount } from '../amount.js';
 import { resilientRead } from '../../vendor/packages/agent-mcp/src/rpcClient.js';
 import { quoteAndBuildBuy, parseSlippageBps, resolveCurveToken, divergenceSummary, quoteAs } from '../trade.js';
 import { DEMO_ADDRESS, DEMO_NETWORK, DEMO_TOKEN, DEMO_CURVE_META } from '../demoFixtures.js';
+import { reserveFeeWei } from '../gasReserve.js';
 import { localQuote } from '../curveQuote.js';
 import { CliError } from '../errors.js';
 
@@ -35,8 +36,8 @@ async function runBuyCore(opts, deps = {}) {
   const { tokenInfo, curveAddress, tokenAddress } = await resolveCurveToken(opts.token, { provider, network: ctx.net.name, deps: ctx.deps, ErrorClass: BuyError });
 
   let quaiWei;
+  let balanceWei;
   if (String(opts.quai).trim().toLowerCase() === 'all' || /%$/.test(String(opts.quai).trim())) {
-    let balanceWei;
     try {
       balanceWei = BigInt(await resilientRead(() => provider.getBalance(fromAddress), { primaryAttempts: 2 }));
     } catch (err) {
@@ -47,7 +48,18 @@ async function runBuyCore(opts, deps = {}) {
     quaiWei = parseAmount(opts.quai, { decimals: 18 }).amountWei;
   }
 
-  const quote = await quoteAs(BuyError, 'buy', () => quoteAndBuildBuy(provider, curveAddress, quaiWei, slippageBps));
+  let quote = await quoteAs(BuyError, 'buy', () => quoteAndBuildBuy(provider, curveAddress, quaiWei, slippageBps));
+  if (balanceWei !== undefined) {
+    // Amount derived from the balance (all / %): never leave less than the gas, estimated, from the real buy call; trim and re-quote when it would not fit.
+    let fee;
+    try { fee = await reserveFeeWei(provider, ctx.net.rpcUrl, [{ from: fromAddress, to: curveAddress, data: quote.data, value: quote.valueWei }], { fallbackGas: 600_000n }); }
+    catch (err) { throw new BuyError(`Could not reserve gas for the buy: ${err?.message || err}`); }
+    if (quote.valueWei + fee > balanceWei) {
+      quaiWei = balanceWei - fee;
+      if (quaiWei <= 0n) throw new BuyError('Balance is too low to cover gas for a buy.');
+      quote = await quoteAs(BuyError, 'buy', () => quoteAndBuildBuy(provider, curveAddress, quaiWei, slippageBps));
+    }
+  }
 
   const extraSummary = {
     feeBps: String(quote.meta.feeBps),

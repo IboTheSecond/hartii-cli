@@ -82,13 +82,15 @@ export function safeTerminalText(value) {
     .replace(/(?:\u001b[P^_X]|[\u0090\u0098\u009e\u009f])[\s\S]*?(?:\u001b\\|\u009c|$)/g, '')
     .replace(/(?:\u001b\[|\u009b)[0-?]*[ -/]*(?:[@-~]|$)/g, '')
     .replace(/\u001b[ -/]*[@-~]/g, '')
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
-    .replace(/[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff]/g, '');
+    // Category approach, not a hand list: control (Cc), format (Cf: bidi, zero-width, BOM, soft hyphen,
+    // Arabic letter mark, Mongolian separator, tag characters), line/paragraph separators (Zl/Zp), lone
+    // surrogates, plus the invisible fillers that are letters (Hangul/Khmer fillers) and the whole tag block.
+    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\u061c\u115f\u1160\u17b4\u17b5\u180e\u3164\uffa0\u{e0000}-\u{e007f}]/gu, '');
 }
 
 /**
  * The one and only shape every `--json` command prints: `JSON.stringify(payload, null, 2)` plus a
- * trailing newline, written straight to the given `write` sink (default `console.log`, injectable
+ * trailing newline, written straight to the given `write` sink (default process.stdout.write, injectable
  * for tests). BigInt values are rejected by JSON.stringify by default — commands must convert any
  * BigInt (wei amounts) to a decimal string *before* calling this, so a bug there fails loudly
  * instead of silently losing precision through Number conversion.
@@ -96,7 +98,7 @@ export function safeTerminalText(value) {
  * @param {{ write?: (s: string) => void }} [opts]
  */
 export function printJson(payload, opts = {}) {
-  const write = opts.write || ((s) => console.log(s));
+  const write = opts.write || ((s) => process.stdout.write(s + '\n'));
   write(JSON.stringify(payload, null, 2));
 }
 

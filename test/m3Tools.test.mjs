@@ -47,7 +47,7 @@ function harness(handlers = {}, { leaves = null, liveDoc = null, status = 200 } 
       return '0x';
     }),
     createAccessList: vi.fn(async () => []),
-    estimateGas: vi.fn(async () => 100000n),
+    estimateGas: vi.fn(async () => 100000n), getNetwork: vi.fn(async () => ({ chainId: 9n })),
     getFeeData: vi.fn(async () => ({ gasPrice: 1n })),
     getTransactionCount: vi.fn(async () => 0),
     getBalance: vi.fn(async () => 1000n * ONE),
@@ -163,7 +163,7 @@ describe('otc', () => {
     ...erc20Handlers(),
     offers: () => { const o = offer(over); return [o.maker, o.tokenOffered, o.amountOffered, o.amountWanted, o.takerOnly, o.expiry, o.active, o.filled]; },
     quoteFill: () => [10n * ONE + ONE / 20n, ONE / 20n, true],
-    offerCount: () => [3n], offersByMaker: () => [[1n, 2n]], minOfferNotional: () => [ONE], feeBps: () => [50n],
+    offerCount: () => [3n], offersByMaker: (a) => [[1n, 2n].slice(Number(a[1]))], minOfferNotional: () => [ONE], feeBps: () => [50n],
   });
 
   it('parses expiry strings within the contract cap', () => {
@@ -172,6 +172,26 @@ describe('otc', () => {
     expect(parseExpiry('none')).toBe(0);
     expect(() => parseExpiry('45d')).toThrow(/30 days/);
     expect(() => parseExpiry('soon')).toThrow();
+  });
+
+  it('list --mine pages through every offer, not just the first 500 (contract may clamp the page size)', async () => {
+    const all = Array.from({ length: 1200 }, (_, i) => BigInt(i + 1));
+    const page = (a, clamp) => [all.slice(Number(a[1]), Number(a[1]) + Math.min(Number(a[2]), clamp))];
+    for (const clamp of [500, 100, 37]) {
+      const { deps } = harness({ ...base(), offersByMaker: (a) => page(a, clamp) });
+      const r = await runOtc({ home, sub: 'list', mine: true, wallet: 'test', limit: '3', status: 'all' }, deps);
+      expect(r.items.map((i) => i.id)).toEqual(['1200', '1199', '1198']);
+      expect(r.truncated).toBeUndefined();
+    }
+  });
+
+  it('list --mine flags truncation at the 5000-id cap instead of silently dropping the rest', async () => {
+    const endless = (a) => [Array.from({ length: Number(a[2]) }, (_, i) => BigInt(Number(a[1]) + i + 1))];
+    const { deps } = harness({ ...base(), offersByMaker: endless });
+    const r = await runOtc({ home, sub: 'list', mine: true, wallet: 'test', limit: '1', status: 'all' }, deps);
+    expect(r.truncated).toBe(true);
+    expect(r.note).toMatch(/newest are missing/);
+    expect(r.items[0].id).toBe('5000');
   });
 
   it('fill dry-run sends exactly amountWanted + live fee as value', async () => {
@@ -271,8 +291,19 @@ describe('claim', () => {
     await expect(runClaim({ home, sub: 'claim', id: id.toString(), wallet: 'test', dryRun: true }, harness(handlers({ 6: 5n }), { leaves: file }).deps)).rejects.toThrow(/expired/);
   });
 
+  it('list --mine pages past 500 campaigns and flags the cap', async () => {
+    const many = Array.from({ length: 700 }, (_, i) => BigInt(i + 1));
+    const h = harness({ ...handlers(), campaignsByCreator: (a) => [many.slice(Number(a[1]), Number(a[1]) + Number(a[2]))] });
+    const r = await runClaim({ home, sub: 'list', mine: true, wallet: 'test', limit: '2' }, h.deps);
+    expect(r.items.map((i) => i.id)).toEqual(['700', '699']);
+    expect(r.truncated).toBeUndefined();
+    const endless = harness({ ...handlers(), campaignsByCreator: (a) => [Array.from({ length: Number(a[2]) }, (_, i) => BigInt(Number(a[1]) + i + 1))] });
+    const t = await runClaim({ home, sub: 'list', mine: true, wallet: 'test', limit: '1' }, endless.deps);
+    expect(t.truncated).toBe(true);
+  });
+
   it('list --mine decodes the creator campaigns', async () => {
-    const h = harness({ ...handlers(), campaignsByCreator: () => [[id]] });
+    const h = harness({ ...handlers(), campaignsByCreator: (a) => [[id].slice(Number(a[1]))] });
     const r = await runClaim({ home, sub: 'list', mine: true, wallet: 'test' }, h.deps);
     expect(r.items[0]).toMatchObject({ id: id.toString(), status: 'open', symbol: 'QUAI', total: '10.0' });
   });

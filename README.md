@@ -15,7 +15,7 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.2.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.2.1). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Install
@@ -245,6 +245,12 @@ agent spend.
   guarded-value-plus-gas reservation; check the transaction before retrying or reconciling allowance.
   Native QUAI value is capped directly; token-denominated writes are valued in QUAI from a live quote and
   **refused** if no QUAI valuation exists.
+- **Balance pre-check**: before the summary and again before any reservation, a write must satisfy `balance >= value + gasLimit x gasPrice`. `send all`, `buy all|N%` and QUAI-in `swap all|N%` hold back gas estimated from the real transaction shape (a first transfer to a never-seen account costs about twice a zero-value call). A node's JSON-RPC rejection (insufficient funds, nonce too low, underpriced, invalid sender) releases the reservation; ambiguous errors keep it.
+- **MCP review token**: a write tool's dry run returns a `reviewToken` (digest of tool, chain, from, to, value, calldata shape and every reviewed term). `confirm:true` needs that token, once, within 10 minutes; the real run is re-simulated and refused ("Terms changed since the review") if any reviewed term differs or gas/price drifted more than 20%. In an approve-then-trade flow the token binds the first transaction (the approval); the trade is re-quoted under the same caps.
+- **Clean stdout**: every `console.*` call is redirected to stderr for the process lifetime, so a dependency logging an error cannot corrupt `--json` output or MCP frames; results are written with `process.stdout.write`.
+- **Secret prompts need a TTY**: a password or secret is never read unmasked from a pipe. Use a terminal, `HARTII_PASSWORD` (automation), or the explicit `--stdin` flag (e.g. `wallet import key --stdin < keyfile`).
+- **RPC transport**: `--rpc` must be `https://`; plain `http://` is refused unless `--allow-insecure-rpc` is passed and the host is localhost. The chain-id check times out after 8 seconds.
+- **TUI confirm**: the confirm overlay shows every summary line (wrapped, scrollable); `y` is accepted only after the end is visible, and a terminal too small to review refuses it ("resize or use the CLI").
 - **No blind signing**: every write is simulated from your address, carries an access list, an explicit gas limit, and
   must return receipt status 1 before success is reported. Quai-ledger addresses only; mainnet requires checksummed
   addresses and the chain id is verified first.

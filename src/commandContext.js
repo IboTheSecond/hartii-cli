@@ -22,7 +22,7 @@ export async function withProviderCleanup(deps, operation) {
 export function readRuntime(opts = {}, deps = {}) {
   const home = opts.home || getHartiiHome(deps.env || deps.io?.env);
   const cfg = loadConfig(home);
-  const net = resolveRuntimeNetwork({ network: opts.network || cfg.network, rpc: opts.rpc });
+  const net = resolveRuntimeNetwork({ network: opts.network || cfg.network, rpc: opts.rpc, allowInsecureRpc: opts.allowInsecureRpc });
   // Callers (MCP) may tighten caps; they cannot raise the owner's configured limits.
   const limits = { ...cfg.limits };
   for (const k of ['perTxQuai', 'dailyQuai']) {
@@ -34,19 +34,30 @@ export function readRuntime(opts = {}, deps = {}) {
   return { home, cfg, net, limits };
 }
 
+/**
+ * The sender for this invocation, resolved IDENTICALLY for dry runs and real runs: a --key-env key
+ * wins (its address is derived from the env key, never the keystore default), else the named/current
+ * keystore wallet. A dry run that resolved a different sender than the real run would review the
+ * wrong transaction.
+ */
+export function resolveSender(home, opts = {}, deps = {}) {
+  if (opts.keyEnv) {
+    const env = deps.env || deps.io?.env || process.env;
+    const key = env[opts.keyEnv];
+    if (!key || !/^(0x)?[0-9a-fA-F]{64}$/.test(key)) throw new WalletError('--key-env must name an environment variable containing a private key.');
+    (deps.io?.writeErr || ((s) => process.stderr.write(s + '\n')))('WARNING: --key-env uses a raw environment key; prefer an encrypted keystore.');
+    try { const envWallet = new Wallet(key.startsWith('0x') ? key : `0x${key}`); return { name: undefined, address: envWallet.address, envWallet }; }
+    catch { throw new WalletError('Invalid --key-env private key.'); }
+  }
+  const { name, address } = resolveWalletAddress(home, opts.wallet);
+  return { name, address, envWallet: undefined };
+}
+
 export async function writeRuntime(opts = {}, deps = {}) {
   const runtime = readRuntime(opts, deps);
   await assertChainId(runtime.net.rpcUrl, runtime.net.chainId, { fetchFn: deps.fetchFn });
   const provider = (deps.providerFactory || createProvider)(runtime.net.rpcUrl);
-  let name, address, envWallet;
-  if (opts.keyEnv && !opts.dryRun) {
-    const env = deps.env || deps.io?.env || process.env;
-    const key = env[opts.keyEnv];
-    if (!key || !/^(0x)?[0-9a-fA-F]{64}$/.test(key)) throw new WalletError('--key-env must name an environment variable containing a private key.');
-    (deps.io?.writeErr || console.error)('WARNING: --key-env uses a raw environment key; prefer an encrypted keystore.');
-    try { envWallet = new Wallet(key.startsWith('0x') ? key : `0x${key}`); address = envWallet.address; }
-    catch { throw new WalletError('Invalid --key-env private key.'); }
-  } else ({ name, address } = resolveWalletAddress(runtime.home, opts.wallet));
+  const { name, address, envWallet } = resolveSender(runtime.home, opts, deps);
   const from = assertCyprus1QuaiAddress(address);
   let signer;
   async function prepareSigner() {

@@ -47,7 +47,7 @@ export async function runBalance(opts = {}, deps = {}) {
   // `address` reads ANY Cyprus-1 Quai address (no keystore needed) — used by `balance --address` and the MCP server.
   const { name, address } = opts.address ? { name: null, address: assertCyprus1QuaiAddress(opts.address) } : resolveWalletAddress(home, opts.wallet);
   const cfg = loadConfig(home);
-  const net = resolveRuntimeNetwork({ network: opts.network || cfg.network, rpc: opts.rpc });
+  const net = resolveRuntimeNetwork({ network: opts.network || cfg.network, rpc: opts.rpc, allowInsecureRpc: opts.allowInsecureRpc });
   const providerFactory = deps.providerFactory || createProvider;
   const provider = providerFactory(net.rpcUrl);
 

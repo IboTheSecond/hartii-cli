@@ -12,6 +12,7 @@ import { HARTIISWAP_ROUTER_ABI } from '../abi/hartiiSwapRouter.js';
 import { hartiiSwapAddresses } from '../liveAddresses.js';
 import { resolveToken, MarketError } from '../marketApi.js';
 import { parseSlippageBps } from '../trade.js';
+import { reserveFeeWei } from '../gasReserve.js';
 import { readErc20, ensureAllowance, approvalStop } from '../toolKit.js';
 import { DEMO_ADDRESS, DEMO_NETWORK } from '../demoFixtures.js';
 import { CliError, rethrowAs } from '../errors.js';
@@ -75,20 +76,33 @@ async function runSwapCore(opts, deps = {}, approvedCtx = null) {
   if (sideIn.kind === 'native' && sideOut.kind === 'native') throw new SwapError('Cannot swap QUAI for QUAI.');
 
   let amountInWei;
+  let nativeBalanceWei; // set when a QUAI input amount is derived from the balance (all / %)
   if (String(opts.amount).trim().toLowerCase() === 'all' || /%$/.test(String(opts.amount).trim())) {
     const balanceWei = await readBalance(sideIn, provider, fromAddress);
+    if (sideIn.kind === 'native') nativeBalanceWei = balanceWei;
     amountInWei = parseAmount(opts.amount, { balanceWei, decimals: sideIn.decimals }).amountWei;
   } else {
     amountInWei = parseAmount(opts.amount, { decimals: sideIn.decimals }).amountWei;
   }
 
   if (amountInWei <= 0n) throw new SwapError('Swap amount must be positive.');
+  // QUAI input taken from the balance must leave the gas: estimate the real call and re-run with the trimmed amount.
+  const trimForGas = async (tx) => {
+    if (nativeBalanceWei === undefined) return null;
+    let fee;
+    try { fee = await reserveFeeWei(provider, net.rpcUrl, [tx], { fallbackGas: 700_000n }); }
+    catch (err) { throw new SwapError(`Could not reserve gas for the swap: ${err?.message || err}`); }
+    if (amountInWei + fee <= nativeBalanceWei) return null;
+    if (nativeBalanceWei <= fee) throw new SwapError('Balance is too low to cover gas for a swap.');
+    return runSwapCore({ ...opts, amount: formatAmount(nativeBalanceWei - fee) }, deps, ctx);
+  };
   const path = [sideIn.kind === 'native' ? wquai : sideIn.address, sideOut.kind === 'native' ? wquai : sideOut.address];
 
   if (path[0].toLowerCase() === path[1].toLowerCase() && sideIn.kind !== sideOut.kind) {
     // IWETH in contracts/contracts/swap/HartiiSwapRouter.sol: standard 1:1 wrap/unwrap.
     const wrapped = new Interface(['function deposit() payable', 'function withdraw(uint256)']);
     const wrapping = sideIn.kind === 'native';
+    if (wrapping) { const trimmed = await trimForGas({ from: fromAddress, to: wquai, data: wrapped.encodeFunctionData('deposit', []), value: amountInWei }); if (trimmed) return trimmed; }
     return writeVia(ctx, {
       to: wquai, data: wrapped.encodeFunctionData(wrapping ? 'deposit' : 'withdraw', wrapping ? [] : [amountInWei]),
       value: wrapping ? amountInWei : 0n, spendWei: amountInWei,
@@ -127,6 +141,8 @@ async function runSwapCore(opts, deps = {}, approvedCtx = null) {
   }
 
 
+
+  if (sideIn.kind === 'native') { const trimmed = await trimForGas({ from: fromAddress, to, data, value }); if (trimmed) return trimmed; }
 
   // Native input is already QUAI; otherwise value the input using a fresh QUAI route.
   let spendWei = amountInWei;

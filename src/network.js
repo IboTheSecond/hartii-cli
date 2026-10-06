@@ -44,8 +44,24 @@ export function resolveNetwork(name) {
  */
 export function resolveRuntimeNetwork(globals = {}) {
   const net = resolveNetwork(globals.network || 'mainnet');
+  if (globals.rpc) assertRpcUrlSafe(globals.rpc, { allowInsecure: globals.allowInsecureRpc === true });
   return { ...net, rpcUrl: globals.rpc || net.rpcUrl };
 }
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+/** An RPC answers balance/nonce/chain-id reads that gate a signed send: https only. A plain http:// RPC is refused unless
+ *  --allow-insecure-rpc is passed AND it is a localhost node (development). */
+export function assertRpcUrlSafe(rpcUrl, { allowInsecure = false } = {}) {
+  let url;
+  try { url = new URL(rpcUrl); } catch { throw new NetworkError('--rpc is not a valid URL.'); }
+  if (url.protocol === 'https:') return;
+  if (url.protocol !== 'http:') throw new NetworkError('--rpc must be an https:// URL.');
+  if (!allowInsecure) throw new NetworkError('Refusing a plain http:// RPC: its answers (balance, nonce, chain id) could be forged in transit. Use https://, or for a LOCAL dev node pass --allow-insecure-rpc.');
+  if (!LOCAL_HOSTS.has(url.hostname)) throw new NetworkError('--allow-insecure-rpc only permits http:// to localhost; use https:// for any remote RPC.');
+  process.stderr.write('WARNING: using an INSECURE http:// RPC on localhost (--allow-insecure-rpc). Never do this for a remote node.\n');
+}
+
+const CHAIN_ID_TIMEOUT_MS = 8000;
 
 /** One raw JSON-RPC POST, no quais dependency — just enough to read a chain id for the boot-time guard. */
 async function rpcChainId(rpcUrl, method, fetchFn) {
@@ -53,6 +69,7 @@ async function rpcChainId(rpcUrl, method, fetchFn) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: [] }),
+    signal: AbortSignal.timeout(CHAIN_ID_TIMEOUT_MS),
   });
   const json = await res.json();
   if (!json || json.error || !json.result) throw new Error(json?.error?.message || `${method} returned no result`);

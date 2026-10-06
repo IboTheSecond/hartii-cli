@@ -57,7 +57,7 @@ export async function main(argv, deps = {}) {
 
   const { command, commandArgs: args } = routed;
   const io = {
-    env, writeErr, write, colors, passwordDeps: deps.passwordDeps, confirmTypedFn: deps.confirmTypedFn, promptFn: deps.promptFn,
+    env, writeErr, write, colors, passwordDeps: { allowPipedSecret: flags.stdin === true, ...deps.passwordDeps }, allowPipedSecret: flags.stdin === true, confirmTypedFn: deps.confirmTypedFn, promptFn: deps.promptFn,
     confirmFn: deps.confirmFn, stdin: deps.stdin, stdout: deps.stdout, now: deps.now,
   };
 

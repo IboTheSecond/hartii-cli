@@ -56,7 +56,7 @@ describe('non-interactive prompts', () => {
   it.each([readHiddenInput, readVisibleInput, confirm])('rejects empty EOF instead of hanging', async (prompt) => {
     const stdin = new PassThrough();
     const stdout = new PassThrough();
-    const result = prompt('Answer: ', { stdin, stdout });
+    const result = prompt('Answer: ', { stdin, stdout, allowPipedSecret: true });
     stdin.end();
     expect(await settled(result)).toEqual({ error: 'Input closed before an answer.' });
   });
@@ -66,7 +66,7 @@ describe('non-interactive prompts', () => {
     const err = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const out = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     try {
-      const result = prompt('Answer: ', { stdin });
+      const result = prompt('Answer: ', { stdin, allowPipedSecret: true });
       stdin.end('yes\n');
       await result;
       expect(err).toHaveBeenCalledWith(expect.stringContaining('Answer: '));

@@ -9,7 +9,7 @@ import {atomicPrivateWrite,secureDirectory} from '../secureFiles.js';
 import {DEMO_ADDRESS,DEMO_NETWORK} from '../demoFixtures.js';
 export async function runReceive(opts={}){
  const home=opts.home||getHartiiHome();const config=opts.demo?{network:DEMO_NETWORK}:loadConfig(home);
- const net=resolveRuntimeNetwork({network:opts.network||config.network,rpc:opts.rpc});
+ const net=resolveRuntimeNetwork({network:opts.network||config.network,rpc:opts.rpc,allowInsecureRpc:opts.allowInsecureRpc});
  if(net.chainId!==9&&!opts.addressQr)throw new Error('HPAY links target mainnet only. For Orchard use --address-qr and verify the payer selects Orchard.');
  if(opts.addressQr&&(opts.amount!==undefined||opts.memo))throw new Error('An address QR has no amount or memo. Use the default HPAY QR for a payment request.');
  const wallet=opts.demo?{name:'Demo',address:DEMO_ADDRESS}:walletAddress(home,opts.wallet);

@@ -24,6 +24,26 @@ export async function view(provider, iface, to, fn, args = [], from) {
   return iface.decodeFunctionResult(fn, hex);
 }
 
+export const PAGE_SIZE = 100;
+export const PAGE_CAP = 5000;
+
+/**
+ * Reads every id of an `fn(...args, offset, limit) -> uint256[]` index in pages. A contract may clamp
+ * `limit`, so a short page does not mean the end: only an empty page does, and the offset advances by what
+ * was actually returned. Stops at `cap` ids and reports `truncated: true` rather than silently dropping the
+ * rest (ids are oldest-first, so a truncated read is missing the NEWEST entries).
+ */
+export async function pagedIds(provider, iface, to, fn, args, { pageSize = PAGE_SIZE, cap = PAGE_CAP } = {}) {
+  const ids = [];
+  while (ids.length < cap) {
+    const page = (await view(provider, iface, to, fn, [...args, ids.length, Math.min(pageSize, cap - ids.length)]))[0].map(BigInt);
+    if (!page.length) return { ids, truncated: false };
+    ids.push(...page);
+  }
+  const more = (await view(provider, iface, to, fn, [...args, ids.length, 1]))[0].length > 0;
+  return { ids, truncated: more };
+}
+
 export async function readErc20(provider, token, owner) {
   const call = (fn, args = []) => view(provider, ERC20_IFACE, token, fn, args).then((r) => r[0]);
   const [symbol, decimals, balance] = await Promise.all([

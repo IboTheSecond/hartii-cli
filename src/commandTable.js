@@ -18,6 +18,7 @@ import { runSell } from './commands/sell.js';
 import { runSwap } from './commands/swap.js';
 import { runTx } from './commands/tx.js';
 import { runReceive } from './commands/receive.js';
+import { parseReceiveExpiry } from './paylinks.js';
 import { runWatch } from './commands/watch.js';
 import { runAirdrop } from './commands/airdrop.js';
 import { runOtc } from './commands/otc.js';
@@ -27,7 +28,7 @@ import { runExtra, EXTRA_COMMANDS, ExtraError } from './commands/extras.js';
 import { runMcp } from './mcp/server.js';
 
 /** ctx = { args, flags, g, deps, env, io, home, write } — see cli.js. */
-const readOpts = ({ home, g }) => ({ home, network: g.network, rpc: g.rpc, demo: g.demo });
+const readOpts = ({ home, g, flags }) => ({ home, network: g.network, rpc: g.rpc, demo: g.demo, allowInsecureRpc: flags?.['allow-insecure-rpc'] === true });
 const walletOpts = (c) => ({ ...readOpts(c), wallet: c.g.wallet, keyEnv: c.g.keyEnv });
 const writeOpts = (c) => ({ ...walletOpts(c), yes: c.g.yes, dryRun: c.g.dryRun, json: c.g.json });
 const readDeps = ({ deps }) => ({ fetchFn: deps.fetchFn, providerFactory: deps.providerFactory });
@@ -68,7 +69,7 @@ const extra = (command) => async (c) => {
 
 export const COMMAND_TABLE = {
   wallet: (c) => runWallet(c.args, c.flags, c),
-  receive: (c)=>runReceive({...walletOpts(c),amount:c.flags.amount,memo:c.flags.memo,addressQr:c.flags['address-qr']===true,out:c.flags.out,expiresAt:c.flags.expires===undefined?null:Number(c.flags.expires)}),
+  receive: (c)=>runReceive({...walletOpts(c),amount:c.flags.amount,memo:c.flags.memo,addressQr:c.flags['address-qr']===true,out:c.flags.out,expiresAt:c.flags.expires===undefined?null:parseReceiveExpiry(c.flags.expires,{now:c.deps.now?new Date(c.deps.now).getTime():Date.now()})}),
   config: (c) => runConfig(c.args, c.home),
   balance: (c) => runBalance({ ...walletOpts(c), tokens: Boolean(c.flags.tokens), address: typeof c.flags.address === 'string' ? c.flags.address : undefined }, readDeps(c)),
   doctor: (c) => runDoctor(readOpts(c), { fetchFn: c.deps.fetchFn, now: c.deps.now }),

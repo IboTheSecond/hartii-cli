@@ -158,7 +158,8 @@ describe('runSend — native QUAI', () => {
       { fetchFn: chainOkFetch(), providerFactory: () => provider, walletFactory: mockWalletFactory(account.address), passwordDeps: { env: { HARTII_PASSWORD: PASSWORD } } },
     );
     expect(result.ok).toBe(true);
-    const expectedFee = ((39_000n * 1200n) / 1000n) * 2_000000000n;
+    // reserve = estimate x1.2 buffer x1.1 margin (see src/gasReserve.js)
+    const expectedFee = ((((39_000n * 1200n) / 1000n) * 2_000000000n) * 110n) / 100n;
     const expectedValue = 10_000000000000000000n - expectedFee;
     expect(result.summary.valueQuai).toBe(formatAmount(expectedValue));
   });

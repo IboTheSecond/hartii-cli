@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-10-06
+
+Fixes from an adversarial review of the money-handling paths.
+
+- `send <fresh address> all`, `buy all|N%` and QUAI-in `swap all|N%` reserve gas from the highest estimate of the real transaction shape (x1.2 x1.1) instead of a value:0 estimate, so the node no longer refuses them and strands the spend reservation.
+- Every write checks `balance >= value + gasLimit x gasPrice` before the summary and again before reserving; a shortfall is a clear error with nothing reserved.
+- A JSON-RPC rejection response (insufficient funds, nonce too low, underpriced, invalid sender) is a proven pre-broadcast rejection and releases the reservation; bare error codes and transport errors still keep it.
+- `--key-env` dry runs, `claim --check`/`list` and `otc list --mine` resolve the sender exactly like the real run; dry runs also run the pending-authority and provider-chain checks.
+- A process-level guard sends every `console.*` call to stderr (bin and MCP), so a library logging to stdout can no longer corrupt `--json` output or MCP frames.
+- TUI confirm overlay wraps and scrolls the whole summary (`N more lines` marker); `y` is refused until the end is visible, or when the terminal is too small to review.
+- MCP: a dry run returns a `reviewToken`; `confirm:true` requires it (one use, 10 minutes) and the real run is refused with "Terms changed since the review" if any reviewed term moved or gas drifted more than 20%.
+- Terminal and MCP text share one category-based sanitizer (Cc, Cf, Zl, Zp, tag block U+E0000-E007F, invisible fillers).
+- A spend-lock cleanup problem never masks the operation's own result; `config set limits.*` rejects leading zeros; secret prompts refuse a non-TTY stdin unless `HARTII_PASSWORD` or an explicit `--stdin` is used; `receive --expires` needs `30m`/`2h`/`7d`; `otc`/`claim` lists page through every id (cap 5000, `truncated` flag); zero-balance `all`/tiny `%` say "nothing to spend"; the chain-id check times out after 8s; plain `http://` RPCs are refused unless `--allow-insecure-rpc` and localhost.
+
 ## [0.2.0] — 2026-10-06
 
 - Receive QUAI offline with a real terminal QR, SVG export and an HPAY payment link, including exact amounts and optional memos.

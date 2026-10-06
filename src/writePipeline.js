@@ -43,6 +43,16 @@ const GAS_LIMIT_BUFFER_DEN = 1000n;
 const RECEIPT_TIMEOUT_MS = 90_000;
 const RECEIPT_CONFIRMATIONS = 1;
 // RPC error codes/flags alone cannot prove a send was never broadcast.
+// The one exception: an actual JSON-RPC error RESPONSE from the node (quais attaches it as `info.error`)
+// to the send call, carrying a txpool admission rejection. The node answered and refused the raw tx, so
+// nothing was accepted. A bare error code, a timeout or a transport failure proves nothing and stays reserved.
+const NODE_REJECTION_CODES = new Set(['INSUFFICIENT_FUNDS', 'NONCE_EXPIRED', 'REPLACEMENT_UNDERPRICED']);
+const NODE_REJECTION_TEXT = /insufficient funds|nonce too low|replacement transaction underpriced|transaction underpriced|invalid sender/i;
+function isNodeRejection(err) {
+  const body = err?.info?.error;
+  if (!body || typeof body !== 'object' || typeof body.message !== 'string') return false;
+  return NODE_REJECTION_CODES.has(err.code) || NODE_REJECTION_TEXT.test(body.message);
+}
 const validHash = value => typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/.test(value);
 const dataDigest = data => '0x' + createHash('sha256').update(data.toLowerCase()).digest('hex');
 const clone = value => structuredClone(value);
@@ -159,12 +169,13 @@ export async function runWrite(ctx) {
 async function runWriteLocked(ctx, from) {
   const { wallet, provider, network, home, limits, action, extraSummary = {}, json = false, yes = false, dryRun = false } = ctx;
   const io = ctx.io || {};
-  const write = io.write || ((s) => console.log(s));
+  const write = io.write || ((s) => process.stdout.write(s + '\n'));
   const confirmFn = io.confirmFn || defaultConfirm;
   const now = io.now;
 
   if (!Object.hasOwn(NETWORKS, network.name) || BigInt(network.chainId) !== BigInt(NETWORKS[network.name].chainId)) throw new WriteError('Invalid selected network authority.');
-  if (!dryRun) assertNoPendingSpend(home, from, network.chainId);
+  // Dry runs enforce the same pending-authority and chain checks as a real run, so a dry run never reports success a real run would refuse.
+  assertNoPendingSpend(home, from, network.chainId);
   // Defense in depth: every command that reaches this pipeline SHOULD already have validated `to`
   // itself (send.js does), but this is the one gate every future write command shares, so the
   // checksum/Cyprus-1/Qi-rejection check lives here too, not only at each call site.
@@ -182,7 +193,7 @@ async function runWriteLocked(ctx, from) {
   // Spending guard — checked (never recorded) before anything touches the network, so a transaction
   // that would blow the cap never even gets simulated.
   checkSpend(home, from, spendWei, limits, { now });
-  if (!dryRun) await assertProviderChain(provider, network.chainId);
+  await assertProviderChain(provider, network.chainId);
 
   // Simulate.
   try {
@@ -243,6 +254,15 @@ async function runWriteLocked(ctx, from) {
   // The fee is real spend: count it toward the per-tx / daily guard.
   const guardWei = spendWei + feeWei;
   checkSpend(home, from, guardWei, limits, { now });
+  const assertFunds = async () => {
+    // A send the node will refuse for insufficient funds must never reach the reservation step.
+    if (typeof provider.getBalance !== 'function') return;
+    let balance;
+    try { balance = BigInt(await resilientRead(() => provider.getBalance(from), { primaryAttempts: 2 })); }
+    catch (err) { throw new WriteError(`Could not read the wallet balance: ${classifyError(err, { stage: 'read' })}`); }
+    if (balance < value + feeWei) throw new WriteError(`Insufficient QUAI for value plus gas: have ${formatAmount(balance)}, need ${formatAmount(value + feeWei)} (${formatAmount(value)} value + up to ${formatAmount(feeWei)} network fee). Nothing was sent and nothing was reserved.`);
+  };
+  await assertFunds();
   const summary = {
     ...extraSummary,
     action,
@@ -258,9 +278,11 @@ async function runWriteLocked(ctx, from) {
     estimatedFeeQuai: formatAmount(feeWei),
     nonce,
     dataDigest: dataDigest(data),
+    dataSelector: data.length >= 10 ? data.slice(0, 10).toLowerCase() : 'none',
+    dataBytes: (data.length - 2) / 2,
   };
 
-  printSummary(summary, { write: json ? (io.writeErr || console.error) : write, json, colors: io.colors });
+  printSummary(summary, { write: json ? (io.writeErr || ((s) => process.stderr.write(s + '\n'))) : write, json, colors: io.colors });
 
   if (dryRun) {
     return { ok: true, dryRun: true, summary: jsonSafe(summary) };
@@ -273,6 +295,10 @@ async function runWriteLocked(ctx, from) {
     }
   }
 
+  // Caller-supplied local pre-submit checks: the command's own (e.g. payment-link expiry) and the host's (the MCP
+  // review-token binding). All must pass, synchronously, before anything is reserved or signed.
+  const validators = [ctx.validateBeforeSubmit, io.validateBeforeSubmit].filter((v) => v !== undefined);
+  const submitValidator = validators.length ? (arg) => { for (const v of validators) { const r = v(arg); if (r && typeof r.then === 'function') throw new Error('Submit validation must be synchronous.'); } } : undefined;
   const chainId = BigInt(network.chainId);
   const sendTx = freeze(accessList ? { from, to, data, value, gasLimit, gasPrice, nonce, chainId, accessList } : { from, to, data, value, gasLimit, gasPrice, nonce, chainId });
   const actualSigner = typeof wallet.prepareSigner === 'function' ? await wallet.prepareSigner() : await wallet.getAddress();
@@ -281,20 +307,21 @@ async function runWriteLocked(ctx, from) {
   const finalNonce = await provider.getTransactionCount(from, 'pending');
   if (typeof finalNonce !== 'number' || !Number.isSafeInteger(finalNonce) || finalNonce !== nonce) throw new WriteError('Wallet nonce changed after review; no transaction was sent. Review fresh terms before retrying.');
   assertNoPendingSpend(home, from, chainId);
-  validateBeforeSubmit(ctx.validateBeforeSubmit, summary, sendTx);
+  validateBeforeSubmit(submitValidator, summary, sendTx);
   const intentDigest = transactionIntentDigest(sendTx);
+  await assertFunds();
   const reservation = reserveSpend(home, from, guardWei, limits, {now, authority: { chainId: String(chainId), nonce,
     to: to.toLowerCase(), valueWei: value.toString(), dataDigest: dataDigest(data), intentDigest,
     spendWei: spendWei.toString(), maxFeeWei: feeWei.toString(), createdAt: (now || new Date()).toISOString(),
   }});
   let sent;
   try {
-    validateBeforeSubmit(ctx.validateBeforeSubmit, summary, sendTx);
-    sent = await wallet.sendTransaction(sendTx, { validateBeforeSubmit: () => validateBeforeSubmit(ctx.validateBeforeSubmit, summary, sendTx) });
+    validateBeforeSubmit(submitValidator, summary, sendTx);
+    sent = await wallet.sendTransaction(sendTx, { validateBeforeSubmit: () => validateBeforeSubmit(submitValidator, summary, sendTx) });
   } catch (err) {
     // No successful SDK response means no locally returned signed hash. RPC
     // receipt/transaction fields in a submission error cannot establish it.
-    const rejected = localPreBroadcastFailures.has(err);
+    const rejected = localPreBroadcastFailures.has(err) || isNodeRejection(err);
     if (rejected) settleSpend(home, from, reservation, {confirmed:false,now});
     throw new WriteError(`Send failed (${rejected ? 'rejected before broadcast; nothing was sent and the spending allowance was released' : 'outcome unknown: the spending allowance stays reserved until you have checked quaiscan'}): ${classifyError(err, { stage: 'send' })}`);
   }

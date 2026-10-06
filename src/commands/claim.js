@@ -8,13 +8,12 @@
 // only ever make a claim fail, never mis-pay one. One claim call claims the caller's next unclaimed leaf.
 import { Interface, keccak256, solidityPacked } from 'quais';
 import { withAddr } from '../output.js';
-import { withProviderCleanup, writeRuntime, readRuntime, writeVia } from '../commandContext.js';
-import { resolveWalletAddress } from './balance.js';
+import { withProviderCleanup, writeRuntime, readRuntime, resolveSender, writeVia } from '../commandContext.js';
 import { assertCyprus1QuaiAddress } from '../address.js';
 import { formatAmount } from '../amount.js';
 import { biomeAddress, ToolError, assertToolsNetwork } from '../biomeAddresses.js';
 import { HARTII_CLAIM_ABI } from '../abi/hartiiTools.js';
-import { view, readErc20 } from '../toolKit.js';
+import { view, pagedIds, readErc20 } from '../toolKit.js';
 import { createProvider } from '../signer.js';
 import { DEMO_ADDRESS, DEMO_NETWORK } from '../demoFixtures.js';
 
@@ -152,11 +151,12 @@ async function runClaimCore(opts, deps = {}) {
     const { net, home } = readRuntime(opts, deps);
     const { address: contract, source } = await biomeAddress('claim', { ...deps, network: net.name });
     const provider = (deps.providerFactory || createProvider)(net.rpcUrl);
-    const creator = opts.creator ? assertCyprus1QuaiAddress(opts.creator) : assertCyprus1QuaiAddress(resolveWalletAddress(home, opts.wallet).address);
-    const ids = (await view(provider, IFACE, contract, 'campaignsByCreator', [creator, 0, 500]))[0].map(BigInt).reverse().slice(0, Math.min(Math.max(Number(opts.limit) || 25, 1), 100));
+    const creator = opts.creator ? assertCyprus1QuaiAddress(opts.creator) : assertCyprus1QuaiAddress(resolveSender(home, opts, deps).address);
+    const all = await pagedIds(provider, IFACE, contract, 'campaignsByCreator', [creator]);
+    const ids = all.ids.reverse().slice(0, Math.min(Math.max(Number(opts.limit) || 25, 1), 100));
     const items = [];
     for (const id of ids) { const c = await readCampaign(provider, contract, id); if (c) items.push(campaignJson(c, nowSec)); }
-    return { contract, addressSource: source, network: net.name, creator, items };
+    return { contract, addressSource: source, network: net.name, creator, ...(all.truncated ? { truncated: true, note: `Only the first ${all.ids.length} campaigns were read; the newest are missing.` } : {}), items };
   }
 
   const id = parseCampaignId(opts.id);
@@ -167,7 +167,7 @@ async function runClaimCore(opts, deps = {}) {
   const { net } = rt;
   const { address: contract, source } = await biomeAddress('claim', { ...deps, network: net.name });
   const provider = ctx ? ctx.provider : (deps.providerFactory || createProvider)(net.rpcUrl);
-  const account = ctx ? ctx.from : assertCyprus1QuaiAddress(resolveWalletAddress(rt.home, opts.wallet).address);
+  const account = ctx ? ctx.from : assertCyprus1QuaiAddress(resolveSender(rt.home, opts, deps).address);
 
   const campaign = await readCampaign(provider, contract, id);
   if (!campaign) throw new ClaimError(`Campaign ${id} not found.`);

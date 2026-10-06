@@ -14,6 +14,14 @@ export function buildReceiveLink({address,amount,memo='',expiresAt=null}){
  if(expiresAt!==null){if(!Number.isSafeInteger(expiresAt)||expiresAt<=0)throw new Error('Payment expiry must be a positive Unix timestamp.');url.searchParams.set('exp',String(expiresAt));}
  url.searchParams.set('chain','9');url.searchParams.set('v','1');return url.href;
 }
+/** `--expires 30m|2h|7d` -> absolute Unix seconds. Bare flags, bare numbers (ms vs s is ambiguous), zero and >365d are refused. */
+export function parseReceiveExpiry(input,{now=Date.now()}={}){
+ const m=typeof input==='string'?input.trim().toLowerCase().match(/^([1-9]\d{0,5})([mhd])$/):null;
+ if(!m)throw new Error('--expires needs an explicit duration like 30m, 2h or 7d (minutes, hours or days).');
+ const seconds=Number(m[1])*{m:60,h:3600,d:86400}[m[2]];
+ if(seconds>365*86400)throw new Error('--expires cannot exceed 365 days.');
+ return Math.floor(now/1000)+seconds;
+}
 export function parseNativePaylink(input,{now=Date.now()}={}){
  let url;try{url=new URL(input);}catch{throw new Error('Invalid HPAY payment link.');}
  const origins=new Set(['https://hartiibiome.com','https://www.hartiibiome.com','https://hartiigallery.com','https://www.hartiigallery.com']);

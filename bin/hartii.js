@@ -4,7 +4,11 @@
 // Real process entry point — kept to "parse real argv, call main(), set a real exit code" so
 // everything else in this package is testable without ever spawning a process. `hartii` (no
 // args, TTY) opens the full-screen UI; piped, it prints the help text (see src/router.js).
+import { installConsoleGuard } from '../src/stdoutGuard.js';
 import { main } from '../src/cli.js';
+
+// Third-party libraries (quais) print errors with console.log; keep stdout clean for --json and MCP.
+installConsoleGuard();
 
 main(process.argv.slice(2))
   .then((code) => {

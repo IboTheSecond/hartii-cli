@@ -1,5 +1,32 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`confirm overlay shows the WHOLE transaction (review finding: it used to truncate) > 80x24 snapshot of the scrollable confirm overlay 1`] = `
+" ∩∩ HARTII BETA mainnet  #10,412,877                 1,234.56 QUAI  0x0000…0d01
+ ▂╭─ CONFIRM ────────────────────────────────────────────────────────────────╮
+──│                                                                          │──
+  │  Swap TEST (0x0012340000000000000000000000000000000001) -> QUAI          │s
+  │    feeBps: 30                                                            │
+  │    feeIncludedInQuote: true                                              │
+  │    tokenIn: QUAI                                                         │
+  │    tokenOut: TEST (0x0012340000000000000000000000000000000001)           │
+  │    amountIn: 12.5                                                        │
+  │    expectedOut: 1043.221                                                 │
+  │    minOut: 1011.9                                                        │
+  │    slippageBps: 300                                                      │t
+  │    path: 0x0000000000000000000000000000000000000d01 -> 0x00123400000000  │
+  │    00000000000000000000000001                                            │
+  │    network: mainnet                                                      │
+  │    chainId: 9                                                            │
+  │    from: 0x0000000000000000000000000000000000000d01                      │
+  │    to: 0x00aa0000000000000000000000000000000000bb                        │
+  │    valueQuai: 12.5                                                       │
+  │    guardedQuai: 12.5                                                     │
+  │  ▼ 7 more lines                                                          │
+  │  ↑↓ PgUp PgDn scroll, y at the end · n cancel                            │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+ Tab pane · ←→ action · Enter open                       ? help · q quit   DEMO"
+`;
+
 exports[`frame snapshots (demo fixture, ANSI stripped) > 80x24 1`] = `
 " ∩∩ HARTII BETA mainnet  #10,412,877                 1,234.56 QUAI  0x0000…0d01
  ▂▂·▃·▃▂▂▂▃▅·▃▃▂·▂▄▃█▅▃▂··▃▆▆▄▁▁▁ 1s

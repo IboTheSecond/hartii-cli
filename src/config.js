@@ -26,6 +26,8 @@ export function configPath(home) {
 }
 
 const DECIMAL_LIMIT = /^\d{1,78}(\.\d{1,18})?$/;
+// What `config set` accepts: the spending guard's canonical form (no leading zeros), so a limit set here can never be refused later.
+const CANONICAL_LIMIT = /^(?:0|[1-9]\d{0,77})(?:\.\d{1,18})?$/;
 const plainObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 function validateConfig(value) {
   if (!plainObject(value) || Object.keys(value).some(key => !['network', 'currentWallet', 'limits'].includes(key)) || !['mainnet', 'orchard'].includes(value.network) || !plainObject(value.limits) || Object.keys(value.limits).some(key => !['perTxQuai', 'dailyQuai'].includes(key)) || !['perTxQuai', 'dailyQuai'].every(key => typeof value.limits[key] === 'string' && DECIMAL_LIMIT.test(value.limits[key]))) {
@@ -114,7 +116,8 @@ export function configSet(cfg, key, value) {
   } else if (key === 'limits.perTxQuai' || key === 'limits.dailyQuai') {
     // Same shape the spending guard accepts (<= 18 decimals): a limit the guard cannot parse would
     // otherwise refuse EVERY later write with a confusing error.
-    if (!DECIMAL_LIMIT.test(String(value))) throw new ConfigError(`${key} must be a plain decimal QUAI amount with at most 18 decimals and 78 whole digits.`);
+    if (/^0\d/.test(String(value))) throw new ConfigError(`${key} must not have leading zeros (use "50", not "050").`);
+    if (!CANONICAL_LIMIT.test(String(value))) throw new ConfigError(`${key} must be a plain decimal QUAI amount with at most 18 decimals and 78 whole digits.`);
     next.limits[key.split('.')[1]] = String(value);
   }
   return next;

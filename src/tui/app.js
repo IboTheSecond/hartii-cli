@@ -4,7 +4,7 @@
 // CLI makes. No terminal I/O here (see run.js) — keys go in via key(), frames come out via frame(), and
 // every side effect (commands, config, watchlist file) goes through injected `deps`, so the whole flow
 // is testable with a fake `exec`.
-import { renderFrame, defaultUi, FOCUS_ORDER, MENU } from './render.js';
+import { renderFrame, defaultUi, confirmLayout, FOCUS_ORDER, MENU } from './render.js';
 import { ACTIONS, fieldsFor, validateAll, commandFor } from './forms.js';
 import { S } from './theme.js';
 import { stripAnsi } from '../output.js';
@@ -102,7 +102,21 @@ export class TuiApp {
     }
     if (o.type === 'busy') return undefined; // cannot interrupt a running command; Ctrl-C quits
     if (o.type === 'confirm') {
-      if (k.str === 'y' || k.str === 'Y') { const p = this.pending; this.pending = null; this.ui.overlay = { type: 'busy', title: o.title, lines: ['Submitting…'] }; this.invalidate(); p?.resolve(true); return undefined; }
+      const L = confirmLayout(o, this.size.cols, this.size.rows);
+      const scroll = Math.min(Math.max(0, o.scroll || 0), L.maxScroll);
+      const scrollTo = (n) => { o.scroll = Math.min(Math.max(0, n), L.maxScroll); o.notice = ''; return this.invalidate(); };
+      if (name === 'up') return scrollTo(scroll - 1);
+      if (name === 'down') return scrollTo(scroll + 1);
+      if (name === 'pageup') return scrollTo(scroll - Math.max(1, L.cap - 1));
+      if (name === 'pagedown') return scrollTo(scroll + Math.max(1, L.cap - 1));
+      if (name === 'home') return scrollTo(0);
+      if (name === 'end') return scrollTo(L.maxScroll);
+      if (k.str === 'y' || k.str === 'Y') {
+        // The whole summary must have been visible: refuse when it cannot be shown, or the end was not reached.
+        if (L.tooSmall) { o.notice = 'Too small to review: resize, or press n and use the CLI.'; return this.invalidate(); }
+        if (scroll < L.maxScroll) { o.notice = 'Scroll to the end of the summary (↓ or End) before confirming.'; return this.invalidate(); }
+        const p = this.pending; this.pending = null; this.ui.overlay = { type: 'busy', title: o.title, lines: ['Submitting…'] }; this.invalidate(); p?.resolve(true); return undefined;
+      }
       if (k.str === 'n' || k.str === 'N' || name === 'escape') { const p = this.pending; this.pending = null; this.ui.overlay = { type: 'busy', title: o.title, lines: ['Cancelling…'] }; this.invalidate(); p?.resolve(false); return undefined; }
       return undefined;
     }

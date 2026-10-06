@@ -5,7 +5,7 @@ import { tokenValueQuai } from '../tokenValue.js';
 import { assertCyprus1QuaiAddress } from '../address.js';
 import { parseAmount, formatAmount } from '../amount.js';
 import { resilientRead } from '../../vendor/packages/agent-mcp/src/rpcClient.js';
-import { readGasPrice } from '../gasPrice.js';
+import { reserveFeeWei } from '../gasReserve.js';
 import { ERC20_IFACE, readErc20, tokenAddressOf } from '../toolKit.js';
 import { DEMO_ADDRESS, DEMO_NETWORK } from '../demoFixtures.js';
 import { CliError } from '../errors.js';
@@ -74,15 +74,14 @@ async function runSendCore(opts, deps = {}) {
     const amount = parseAmount(opts.amount, { balanceWei, decimals: 18 });
     value = amount.amountWei;
     if (amount.isAll) {
-      // Sending the literal full balance as `value` leaves nothing for gas — reserve it first with
-      // a zero-value gas estimate (a plain transfer's gas cost does not depend on the value moved).
+      // Sending the literal full balance as `value` leaves nothing for gas. Reserve it from estimates of the
+      // REAL transfer shape: a value transfer to a never-seen account costs about twice a value:0 call, so
+      // estimate both value 0 and value 1 and hold back the higher (plus the pipeline's 1.2x buffer and a margin).
       try {
-        const [estimate, gasPrice] = await Promise.all([
-          resilientRead(() => provider.estimateGas({ from: fromAddress, to, data: '0x', value: 0n }), { primaryAttempts: 2 }),
-          readGasPrice(provider, net.rpcUrl),
+        const fee = await reserveFeeWei(provider, net.rpcUrl, [
+          { from: fromAddress, to, data: '0x', value: 0n },
+          { from: fromAddress, to, data: '0x', value: 1n },
         ]);
-        const gasLimit = (BigInt(estimate) * 1200n) / 1000n;
-        const fee = gasLimit * gasPrice;
         value = balanceWei - fee;
       } catch (err) {
         throw new SendError(`Could not reserve gas for "all": ${err?.message || err}`);

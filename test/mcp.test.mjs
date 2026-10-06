@@ -37,6 +37,13 @@ beforeEach(() => {
 });
 afterEach(() => { rmSync(home, { recursive: true, force: true }); vi.unstubAllGlobals(); });
 
+/** dry-run, then confirm with the reviewToken it returned (an error at the dry-run stage is returned as-is). */
+async function confirmFlow(call, name, args) {
+  const dry = await call(name, args);
+  if (dry.isError) return dry;
+  return call(name, { ...args, confirm: true, reviewToken: dry.json.reviewToken });
+}
+
 function harness(over = {}) {
   const fetchFn = vi.fn(async (url, init) => {
     if (init?.method === 'POST') return { status: 200, ok: true, json: async () => ({ result: '0x9' }) };
@@ -68,7 +75,7 @@ function harness(over = {}) {
     }),
     createAccessList: vi.fn(async () => []), estimateGas: vi.fn(async () => 100000n),
     getFeeData: vi.fn(async () => ({ gasPrice: 1n })), getTransactionCount: vi.fn(async () => 0),
-    getBalance: vi.fn(async () => 5n * 10n ** 18n), destroy: vi.fn(),
+    getBalance: vi.fn(async () => 1000n * 10n ** 18n), destroy: vi.fn(),
   };
   const sendTransaction = vi.fn(async () => ({ hash: '0x' + 'cd'.repeat(32), wait: async () => ({ status: 1, hash: '0x' + 'cd'.repeat(32) }) }));
   return { fetchFn, provider, sendTransaction, ctx: { home, env: {}, fetchFn, providerFactory: () => provider, walletFactory: key => ({ getAddress: async () => new Wallet(key).address, sendTransaction }), limits: {}, ...over } };
@@ -110,7 +117,7 @@ describe('tool list and write gating', () => {
   it('a write tool cannot be called when writes are off (it is not registered)', async () => {
     const h = harness();
     const { call, close } = await connect(h.ctx);
-    const r = await call('hartii_buy', { token: TOKEN, quai: '1', confirm: true });
+    const r = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '1' });
     expect(r.isError).toBe(true);
     expect(h.sendTransaction).not.toHaveBeenCalled();
     await close();
@@ -124,7 +131,7 @@ describe('read tools', () => {
     const w = await call('hartii_wallet');
     expect(w.json).toMatchObject({ address: FROM, network: 'mainnet', writesEnabled: false, limits: { perTxQuai: '100', dailyQuai: '500' }, spentTodayQuai: '0.0' });
     const b = await call('hartii_balance');
-    expect(b.json).toMatchObject({ wallet: FROM, quai: '5.0' });
+    expect(b.json).toMatchObject({ wallet: FROM, quai: '1000.0' });
     const p = await call('hartii_portfolio', { address: addr(9) });
     expect(p.json.wallet).toBe(addr(9));
     expect(p.json.holdings[0].symbol).toBe('TST');
@@ -171,7 +178,7 @@ describe('write tools: dry-run default, caps, confirm', () => {
   it('confirm:true signs through the pipeline, requires status 1, and records the spend', async () => {
     const h = harness();
     const { call, close } = await connect(writeCtx(h));
-    const r = await call('hartii_buy', { token: TOKEN, quai: '5', confirm: true });
+    const r = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '5' });
     expect(r.json).toMatchObject({ mode: 'executed', ok: true, status: 'success' });
     expect(r.json.quaiscanUrl).toMatch(/quaiscan\.io\/tx\/0xcdcd/);
     expect(h.sendTransaction).toHaveBeenCalledTimes(1);
@@ -181,17 +188,104 @@ describe('write tools: dry-run default, caps, confirm', () => {
     await close();
   });
 
+  describe('reviewToken: confirm is bound to the dry run', () => {
+    const buy = { token: TOKEN, quai: '5' };
+    it('a dry run returns a token; confirm without one (or with a made-up one) signs nothing', async () => {
+      const h = harness();
+      const { call, close } = await connect(writeCtx(h));
+      const dry = await call('hartii_buy', buy);
+      expect(dry.json.reviewToken).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(dry.json.reviewExpiresInMinutes).toBe(10);
+      for (const args of [{ ...buy, confirm: true }, { ...buy, confirm: true, reviewToken: '0x' + '11'.repeat(32) }]) {
+        const r = await call('hartii_buy', args);
+        expect(r.isError).toBe(true);
+        expect(r.text).toMatch(/reviewToken/);
+      }
+      expect(h.sendTransaction).not.toHaveBeenCalled();
+      await close();
+    });
+
+    it('the token is one-use: a replay is refused', async () => {
+      const h = harness();
+      const { call, close } = await connect(writeCtx(h));
+      const dry = await call('hartii_buy', buy);
+      const first = await call('hartii_buy', { ...buy, confirm: true, reviewToken: dry.json.reviewToken });
+      expect(first.json.ok).toBe(true);
+      const replay = await call('hartii_buy', { ...buy, confirm: true, reviewToken: dry.json.reviewToken });
+      expect(replay.isError).toBe(true);
+      expect(h.sendTransaction).toHaveBeenCalledTimes(1);
+      await close();
+    });
+
+    it('a token cannot be reused for different arguments or a different tool: "terms changed", nothing signed, nothing reserved', async () => {
+      const h = harness();
+      const { call, close } = await connect(writeCtx(h));
+      const dry = await call('hartii_buy', buy);
+      const other = await call('hartii_buy', { token: TOKEN, quai: '6', confirm: true, reviewToken: dry.json.reviewToken });
+      expect(other.isError).toBe(true);
+      expect(other.text).toMatch(/Terms changed since the review/);
+      const dry2 = await call('hartii_buy', buy);
+      const wrongTool = await call('hartii_sell', { token: TOKEN, amount: '1', confirm: true, reviewToken: dry2.json.reviewToken });
+      expect(wrongTool.isError).toBe(true);
+      expect(h.sendTransaction).not.toHaveBeenCalled();
+      expect(getSpentToday(home, getAddress(new Wallet(THROWAWAY).address)).reservedWei).toBe(0n);
+      await close();
+    });
+
+    it('re-simulation: gas drift within 20% still confirms; beyond it (or a moved quote) is refused', async () => {
+      const h = harness();
+      const { call, close } = await connect(writeCtx(h));
+      let dry = await call('hartii_buy', buy);
+      h.provider.estimateGas.mockResolvedValue(110000n);
+      expect((await call('hartii_buy', { ...buy, confirm: true, reviewToken: dry.json.reviewToken })).json.ok).toBe(true);
+      h.provider.estimateGas.mockResolvedValue(100000n);
+      dry = await call('hartii_buy', buy);
+      h.provider.estimateGas.mockResolvedValue(160000n);
+      const refused = await call('hartii_buy', { ...buy, confirm: true, reviewToken: dry.json.reviewToken });
+      expect(refused.isError).toBe(true);
+      expect(refused.text).toMatch(/Terms changed since the review/);
+      expect(h.sendTransaction).toHaveBeenCalledTimes(1);
+      await close();
+    });
+
+    it('a review expires after 10 minutes', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        const h = harness();
+        const { call, close } = await connect(writeCtx(h));
+        const dry = await call('hartii_buy', buy);
+        vi.setSystemTime(Date.now() + 11 * 60_000);
+        const r = await call('hartii_buy', { ...buy, confirm: true, reviewToken: dry.json.reviewToken });
+        expect(r.isError).toBe(true);
+        expect(r.text).toMatch(/review expired/);
+        expect(h.sendTransaction).not.toHaveBeenCalled();
+        await close();
+      } finally { vi.useRealTimers(); }
+    });
+  });
+
+  it('buy "all" holds back gas (estimated from the real call) instead of spending the whole balance', async () => {
+    const h = harness();
+    h.provider.getBalance = vi.fn(async () => 3n * 10n ** 18n);
+    const { call, close } = await connect(writeCtx(h));
+    const r = await call('hartii_buy', { token: TOKEN, quai: 'all' });
+    expect(r.json.mode).toBe('dry-run');
+    // fee reserve = 100000 gas x1.2 x1.1 x 1 wei
+    expect(r.json.summary.valueQuai).toBe('2.999999999999868');
+    await close();
+  });
+
   it('--max-per-tx refuses an oversize call before anything is signed; the config limit can only be tightened', async () => {
     const h = harness();
     const { call, close } = await connect(writeCtx(h, { limits: { perTxQuai: '2' } }));
-    const r = await call('hartii_buy', { token: TOKEN, quai: '5', confirm: true });
+    const r = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '5' });
     expect(r.isError).toBe(true);
     expect(r.text).toMatch(/per-transaction limit of 2 QUAI/);
     expect(h.sendTransaction).not.toHaveBeenCalled();
     await close();
     const h2 = harness();
     const c2 = await connect(writeCtx(h2, { limits: { perTxQuai: '1000', dailyQuai: '5000' } })); // looser than config: ignored
-    const r2 = await c2.call('hartii_buy', { token: TOKEN, quai: '150', confirm: true });
+    const r2 = await confirmFlow(c2.call, 'hartii_buy', { token: TOKEN, quai: '150' });
     expect(r2.isError).toBe(true);
     expect(r2.text).toMatch(/per-transaction limit of 100 QUAI/);
     await c2.close();
@@ -200,8 +294,8 @@ describe('write tools: dry-run default, caps, confirm', () => {
   it('--max-per-day stops the second confirmed buy', async () => {
     const h = harness();
     const { call, close } = await connect(writeCtx(h, { limits: { dailyQuai: '8' } }));
-    expect((await call('hartii_buy', { token: TOKEN, quai: '5', confirm: true })).json.ok).toBe(true);
-    const second = await call('hartii_buy', { token: TOKEN, quai: '5', confirm: true });
+    expect((await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '5' })).json.ok).toBe(true);
+    const second = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '5' });
     expect(second.isError).toBe(true);
     expect(second.text).toMatch(/daily limit of 8 QUAI/);
     expect(h.sendTransaction).toHaveBeenCalledTimes(1);
@@ -212,7 +306,7 @@ describe('write tools: dry-run default, caps, confirm', () => {
     const h = harness();
     const { call, close } = await connect({ ...h.ctx, allowWrites: true, env: {} });
     expect((await call('hartii_buy', { token: TOKEN, quai: '1' })).json.mode).toBe('dry-run');
-    const r = await call('hartii_buy', { token: TOKEN, quai: '1', confirm: true });
+    const r = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '1' });
     expect(r.isError).toBe(true);
     expect(r.text).toMatch(/HARTII_PASSWORD/);
     expect(h.sendTransaction).not.toHaveBeenCalled();
@@ -298,7 +392,7 @@ describe('security review regressions (M1, M2, M3, M6)', () => {
     const h = harness();
     h.provider.getFeeData = vi.fn(async () => ({ gasPrice: 3n * 10n ** 14n })); // 120000 gas * 3e14 = 36 QUAI
     const { call, close } = await connect(wctx(h));
-    const r = await call('hartii_buy', { token: TOKEN, quai: '1', confirm: true, maxFee: '100' });
+    const r = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '1', maxFee: '100' });
     expect(r.isError).toBe(true);
     expect(r.text).toMatch(/fee ceiling/);
     expect(h.sendTransaction).not.toHaveBeenCalled();
