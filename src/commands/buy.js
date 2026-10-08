@@ -50,11 +50,14 @@ async function runBuyCore(opts, deps = {}) {
 
   let quote = await quoteAs(BuyError, 'buy', () => quoteAndBuildBuy(provider, curveAddress, quaiWei, slippageBps));
   if (balanceWei !== undefined) {
-    // Amount derived from the balance (all / %): never leave less than the gas, estimated, from the real buy call; trim and re-quote when it would not fit.
-    let fee;
-    try { fee = await reserveFeeWei(provider, ctx.net.rpcUrl, [{ from: fromAddress, to: curveAddress, data: quote.data, value: quote.valueWei }], { fallbackGas: 600_000n }); }
-    catch (err) { throw new BuyError(`Could not reserve gas for the buy: ${err?.message || err}`); }
-    if (quote.valueWei + fee > balanceWei) {
+    // Trimming changes both value and calldata; re-estimate the requoted transaction as well.
+    // Bound preparation work and only reduce the spend. The write pipeline still checks actual funds.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let fee;
+      try { fee = await reserveFeeWei(provider, ctx.net.rpcUrl, [{ from: fromAddress, to: curveAddress, data: quote.data, value: quote.valueWei }], { fallbackGas: 600_000n }); }
+      catch (err) { throw new BuyError(`Could not reserve gas for the buy: ${err?.message || err}`); }
+      if (quote.valueWei + fee <= balanceWei) break;
+      if (attempt === 2) throw new BuyError('Buy gas terms kept changing while reserving the balance. Review a fresh quote; nothing was sent.');
       quaiWei = balanceWei - fee;
       if (quaiWei <= 0n) throw new BuyError('Balance is too low to cover gas for a buy.');
       quote = await quoteAs(BuyError, 'buy', () => quoteAndBuildBuy(provider, curveAddress, quaiWei, slippageBps));

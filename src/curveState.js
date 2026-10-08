@@ -10,6 +10,7 @@ import { Interface } from 'quais';
 import { resilientRead } from '../vendor/packages/agent-mcp/src/rpcClient.js';
 import { launchFactories } from './liveAddresses.js';
 import { BONDING_CURVE_ABI, BONDING_CURVE_V3_ABI, BONDING_CURVE_V3_TRADE_ABI } from './abi/bondingCurve.js';
+import { isEmptyCurveSelectorRevert } from '../vendor/src/utils/curveProbe.js';
 
 const CURVE_IFACE = new Interface([...BONDING_CURVE_ABI, ...BONDING_CURVE_V3_ABI]);
 const TRADE_V1_IFACE = new Interface(BONDING_CURVE_ABI);
@@ -45,9 +46,7 @@ export async function readCurveMeta(provider, curveAddress) {
     call(provider, curveAddress, 'virtualTokenReserve'),
     call(provider, curveAddress, 'realQuaiReserve'),
     call(provider, curveAddress, 'creatorPayout').then(() => true).catch((err) => {
-      // Only a definite selector revert identifies a legacy curve. A transport error cannot.
-      // quais reports a selector revert with empty return data as data '0x' OR (zone-pinned URL, verified live on the V1 QAXE curve) data null + "missing revert data".
-      if (err?.code === 'CALL_EXCEPTION' && !(err?.revert || err?.reason) && (err?.data == null || err?.data === '0x' || err?.info?.error?.data === '0x')) return false;
+      if (isEmptyCurveSelectorRevert(err)) return false;
       throw err;
     }),
   ]);

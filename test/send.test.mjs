@@ -13,6 +13,7 @@ import { NetworkError } from '../src/network.js';
 import { getSpentToday } from '../src/spendingGuard.js';
 import { formatAmount } from '../src/amount.js';
 import { buildReceiveLink } from '../src/paylinks.js';
+import { offlineWallet } from './fakeBroadcast.mjs';
 
 const TOKEN = getAddress('0x00' + Buffer.from('token', 'utf8').toString('hex').padEnd(38, '0').slice(0, 38));
 const TO = getAddress('0x00' + Buffer.from('recipient', 'utf8').toString('hex').padEnd(38, '0').slice(0, 38));
@@ -54,20 +55,13 @@ function nativeProvider({ balance = 100_000000000000000000n, estimate = 39_000n,
   };
 }
 
-// Real quais Wallet.sendTransaction needs a provider implementing its full internal
-// zone/broadcast surface — a plain mocked provider (as every test here uses) cannot support that.
-// `send.js`'s `deps.walletFactory` seam exists exactly so tests can swap in this simple mocked
-// signer instead, the same shape writePipeline.test.mjs / packages/agent-mcp/test/execute.test.mjs
-// already use, while production always builds the real quais Wallet.
+// Exercise real offline signing and replace only the in-memory node's broadcast/receipt boundary.
 function mockWalletFactory(address, { receiptStatus = 1 } = {}) {
-  return (_privateKey, _provider) => ({
-    getAddress: vi.fn(async () => address),
-    sendTransaction: vi.fn(async (tx) => ({
+  return (key, provider) => offlineWallet(key, provider, vi.fn(async (tx) => ({
       hash: '0x' + 'ab'.repeat(32),
       wait: vi.fn(async () => ({ status: receiptStatus, hash: '0x' + 'ab'.repeat(32) })),
       ...tx,
-    })),
-  });
+  })));
 }
 
 function erc20Provider({ symbol = 'TEST', decimals = 18, balance = 1_000_000000000000000000n, estimate = 60_000n, gasPrice = 2_000000000n, nonce = 0 } = {}) {
@@ -114,9 +108,10 @@ describe('runSend — network guard', () => {
 
 describe('runSend — native QUAI', () => {
   it('sends the exact amount and recipient from an HPAY link through the guarded pipeline', async () => {
+    const provider = nativeProvider();
     const sendTransaction = vi.fn(async tx => ({ hash: '0x' + 'ab'.repeat(32), wait: async () => ({status:1,hash:'0x'+'ab'.repeat(32)}), ...tx }));
     const result = await runSend({home,to:buildReceiveLink({address:TO,amount:'0.000000000000000001',memo:'Invoice 12'}),yes:true}, {
-      fetchFn:chainOkFetch(),providerFactory:()=>nativeProvider(),walletFactory:()=>({getAddress:async()=>account.address,sendTransaction}),passwordDeps:{env:{HARTII_PASSWORD:PASSWORD}},
+      fetchFn:chainOkFetch(),providerFactory:()=>provider,walletFactory:key=>offlineWallet(key,provider,sendTransaction),passwordDeps:{env:{HARTII_PASSWORD:PASSWORD}},
     });
     expect(result.ok).toBe(true);
     expect(sendTransaction.mock.calls[0][0]).toMatchObject({to:TO,value:1n});

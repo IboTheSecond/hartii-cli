@@ -167,13 +167,13 @@ describe('live-RPC regressions (zone-pinned URL)', () => {
     } finally { global.fetch = orig; logs.mockRestore(); }
   });
   it('a V1 curve (no creatorPayout) answers CALL_EXCEPTION with null data and is read as legacy, not an error', async () => {
-    const { Interface } = await import('quais');
+    const { Interface, JsonRpcApiProvider } = await import('quais');
     const { BONDING_CURVE_ABI, BONDING_CURVE_V3_ABI } = await import('../src/abi/bondingCurve.js');
     const iface = new Interface([...BONDING_CURVE_ABI, ...BONDING_CURVE_V3_ABI]);
     const provider = {
       call: async (tx) => {
         const p = iface.parseTransaction({ data: tx.data });
-        if (p.name === 'creatorPayout') throw Object.assign(new Error('missing revert data'), { code: 'CALL_EXCEPTION', data: null });
+        if (p.name === 'creatorPayout') throw JsonRpcApiProvider.prototype.getRpcError.call({}, { method: 'quai_call', params: [tx, 'latest'] }, { error: { code: -32000, message: 'execution reverted' } }, '0x00');
         const v = { feeBps: 100n, graduated: true, tokensRemaining: 0n, tokensSold: 1n, virtualQuaiReserve: 1n, virtualTokenReserve: 2n, realQuaiReserve: 3n, poolQuaiReserve: 4n, poolTokenReserve: 5n }[p.name];
         return iface.encodeFunctionResult(p.name, [v]);
       },

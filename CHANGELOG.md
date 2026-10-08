@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-10-08
+
+- Sign the complete reviewed transaction offline and verify its canonical bytes and sender. Preserve an explicit nonce of zero; recheck chain, pending nonce and local expiry after signing, then broadcast once.
+- Release allowance for proven local signing failures; retain the locally computed transaction hash and allowance for ambiguous broadcasts. Node rejection must be bound to the exact submitted raw transaction.
+- Require valid contract access lists for gas preparation and query Cyprus-1 fee data explicitly.
+- Requote and re-estimate gas after reducing `buy all` / percentage values, with bounded decreasing preparation passes. Final gas, balance, spending and slippage checks remain mandatory.
+- Regression verification uses isolated synthetic wallets and in-memory providers; no funded-chain success claim is made.
+
 ## [0.2.1] — 2026-10-06
 
 Fixes from an adversarial review of the money-handling paths.

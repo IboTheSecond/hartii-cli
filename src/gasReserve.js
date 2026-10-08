@@ -4,6 +4,7 @@
 // apply the pipeline's 1.2x gas buffer, then a further 10% margin for gas-price drift, so the reserved
 // amount still covers the pipeline's own estimate. runWrite's balance check is the backstop.
 import { resilientRead } from '../vendor/packages/agent-mcp/src/rpcClient.js';
+import { accessListify } from 'quais';
 import { readGasPrice } from './gasPrice.js';
 
 const BUFFER_NUM = 1200n, BUFFER_DEN = 1000n; // same 1.2x as writePipeline's gas limit
@@ -20,7 +21,15 @@ export async function reserveFeeWei(provider, rpcUrl, txs, opts = {}) {
   const estimates = [];
   let lastError;
   for (const tx of txs) {
-    try { estimates.push(BigInt(await resilientRead(() => provider.estimateGas(tx), { primaryAttempts: 2 }))); }
+    try {
+      let estimateTx = structuredClone(tx);
+      if (tx.data && tx.data !== '0x') {
+        const list = await resilientRead(() => provider.createAccessList(structuredClone(tx)), { primaryAttempts: 2 });
+        if (!Array.isArray(list)) throw new Error('RPC returned an invalid access list.');
+        estimateTx.accessList = accessListify(list);
+      }
+      estimates.push(BigInt(await resilientRead(() => provider.estimateGas(estimateTx), { primaryAttempts: 2 })));
+    }
     catch (err) { lastError = err; }
   }
   let gas = estimates.length ? estimates.reduce((a, b) => (a > b ? a : b)) : opts.fallbackGas;

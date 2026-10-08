@@ -12,7 +12,7 @@ import { safeTerminalText, redactUrls } from './output.js';
 // needed. What IS reused: the resilient-read helper for idempotent chain reads (see
 // `resilientRead` import below) and the revert-reason classifier (`classifyError`), both pure and
 // generic enough to serve both packages without coupling this one to agent-mcp's vault semantics.
-import { getAddress } from 'quais';
+import { accessListify } from 'quais';
 import { createHash } from 'node:crypto';
 import { resilientRead } from '../vendor/packages/agent-mcp/src/rpcClient.js';
 import { readGasPrice } from './gasPrice.js';
@@ -29,9 +29,18 @@ export class WriteError extends CliError {
   constructor(message, extra) { super(redactUrls(message), extra); }
 }
 const localPreBroadcastFailures = new WeakSet();
+const localBroadcasts = new WeakMap();
 /** Native-only phase evidence; JSON-RPC flags cannot manufacture this membership. */
 export class PreBroadcastError extends WriteError {
   constructor(message) { super(message); localPreBroadcastFailures.add(this); }
+}
+/** A locally signed hash survives an ambiguous broadcast; RPC error fields cannot manufacture it. */
+export class BroadcastError extends WriteError {
+  constructor(error, signedHash, signedRaw) {
+    super(classifyError(error, { stage: 'send' }));
+    if (!validHash(signedHash)) throw new Error('Invalid locally signed transaction hash.');
+    localBroadcasts.set(this, { signedHash, signedRaw, error });
+  }
 }
 
 // Live Cyprus-1 gas is ~58,000 gwei (2026-10-05): a transfer costs ~2 QUAI and a curve trade ~8-15 QUAI, so the
@@ -43,15 +52,18 @@ const GAS_LIMIT_BUFFER_DEN = 1000n;
 const RECEIPT_TIMEOUT_MS = 90_000;
 const RECEIPT_CONFIRMATIONS = 1;
 // RPC error codes/flags alone cannot prove a send was never broadcast.
-// The one exception: an actual JSON-RPC error RESPONSE from the node (quais attaches it as `info.error`)
-// to the send call, carrying a txpool admission rejection. The node answered and refused the raw tx, so
-// nothing was accepted. A bare error code, a timeout or a transport failure proves nothing and stays reserved.
+// The one exception: an SDK admission rejection bound to the exact locally signed raw transaction.
+// broadcastTransaction also runs chain/head reads in parallel; their errors cannot prove send rejection.
 const NODE_REJECTION_CODES = new Set(['INSUFFICIENT_FUNDS', 'NONCE_EXPIRED', 'REPLACEMENT_UNDERPRICED']);
 const NODE_REJECTION_TEXT = /insufficient funds|nonce too low|replacement transaction underpriced|transaction underpriced|invalid sender/i;
-function isNodeRejection(err) {
+function isNodeRejection(err, signedRaw) {
+  if (typeof signedRaw !== 'string') return false;
   const body = err?.info?.error;
-  if (!body || typeof body !== 'object' || typeof body.message !== 'string') return false;
-  return NODE_REJECTION_CODES.has(err.code) || NODE_REJECTION_TEXT.test(body.message);
+  if (body && typeof body.message === 'string' && NODE_REJECTION_CODES.has(err.code) && err.transaction === signedRaw) return true;
+  // Unclassified node admission errors carry the SDK's local RPC payload instead.
+  const payload = err?.payload;
+  return payload?.method === 'quai_sendRawTransaction' && payload.params?.[0] === signedRaw
+    && typeof err?.error?.message === 'string' && NODE_REJECTION_TEXT.test(err.error.message);
 }
 const validHash = value => typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/.test(value);
 const dataDigest = data => '0x' + createHash('sha256').update(data.toLowerCase()).digest('hex');
@@ -216,7 +228,9 @@ async function runWriteLocked(ctx, from) {
   let accessList;
   if (data && data !== '0x') {
     try {
-      accessList = clone(await resilientRead(() => provider.createAccessList(clone(tx)), { primaryAttempts: 2 }));
+      const list = await resilientRead(() => provider.createAccessList(clone(tx)), { primaryAttempts: 2 });
+      if (!Array.isArray(list)) throw new Error('RPC returned an invalid access list.');
+      accessList = accessListify(list);
     } catch (err) {
       throw new WriteError(`Could not build the access list: ${classifyError(err, { stage: 'read' })}`);
     }
@@ -321,9 +335,13 @@ async function runWriteLocked(ctx, from) {
   } catch (err) {
     // No successful SDK response means no locally returned signed hash. RPC
     // receipt/transaction fields in a submission error cannot establish it.
-    const rejected = localPreBroadcastFailures.has(err) || isNodeRejection(err);
+    const broadcast = localBroadcasts.get(err);
+    const failure = broadcast?.error || err;
+    const rejected = localPreBroadcastFailures.has(err) || isNodeRejection(failure, broadcast?.signedRaw);
+    if (broadcast && !rejected) markSpendHash(home, from, reservation, broadcast.signedHash);
     if (rejected) settleSpend(home, from, reservation, {confirmed:false,now});
-    throw new WriteError(`Send failed (${rejected ? 'rejected before broadcast; nothing was sent and the spending allowance was released' : 'outcome unknown: the spending allowance stays reserved until you have checked quaiscan'}): ${classifyError(err, { stage: 'send' })}`);
+    throw new WriteError(`Send failed (${rejected ? 'rejected before broadcast; nothing was sent and the spending allowance was released' : `outcome unknown: the spending allowance stays reserved until you have checked quaiscan${broadcast ? ` (tx ${broadcast.signedHash})` : ''}`}): ${classifyError(failure, { stage: 'send' })}`,
+      broadcast && !rejected ? { txHash: broadcast.signedHash, status: 'unconfirmed' } : undefined);
   }
   if (!sent || !validHash(sent.hash)) {
     throw new WriteError('Send returned no transaction hash — treat as UNCONFIRMED, not failed: check on-chain before retrying.');

@@ -13,6 +13,7 @@ import { assertChainId } from '../src/network.js';
 import { main } from '../src/cli.js';
 import { generateMnemonicAccount } from '../src/keystore.js';
 import { saveConfig } from '../src/config.js';
+import { offlineWallet } from './fakeBroadcast.mjs';
 import { assertCyprus1QuaiAddress } from '../src/address.js';
 import * as walletCommands from '../src/commands/walletCmd.js';
 import { DEMO_ADDRESS, DEMO_TOKEN, DEMO_CURVE_ADDRESS, DEMO_TOKENS_LIST, DEMO_TOKEN_HOLDINGS } from '../src/demoFixtures.js';
@@ -71,9 +72,9 @@ describe('M4 chain pin', () => {
     writeFileSync(join(home, 'keystore', 'w.json'), JSON.stringify({ address: FROM.slice(2) }));
     saveConfig(home, { network: 'mainnet', currentWallet: 'w', limits: { perTxQuai: '100', dailyQuai: '500' } });
     const provider = { getNetwork: async () => ({ chainId: providerChain }), getTransactionCount: async () => 0, destroy() {} };
-    const signerSend = vi.fn(async () => ({ hash: '0x1' }));
+    const signerSend = vi.fn(async () => ({ wait: async () => ({ status: 1 }) }));
     const fetchFn = async () => ({ status: 200, json: async () => ({ result: '0x9' }) });
-    return { signerSend, deps: { fetchFn, providerFactory: () => provider, walletFactory: key => ({ getAddress: async () => new Wallet(key).address, sendTransaction: signerSend }), env: { K: THROWAWAY }, io: { writeErr: () => {} } } };
+    return { signerSend, deps: { fetchFn, providerFactory: () => provider, walletFactory: key => offlineWallet(key,provider,signerSend), env: { K: THROWAWAY }, io: { writeErr: () => {} } } };
   }
   it('refuses to sign a tx whose chain id is not the expected one', async () => {
     const { deps, signerSend } = runtimeRig(9n);

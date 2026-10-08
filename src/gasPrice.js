@@ -1,9 +1,8 @@
 // packages/hartii-cli/src/gasPrice.js
 //
-// quais' provider.getFeeData() FAILS against the zone-pinned Cyprus-1 URL ("Invalid shard" / "could not determine
-// gasPrice"; verified live 2026-10-05) and logs a stack trace to stderr while doing so. So: ask the provider once
-// (quiet), and on failure fall back to a raw quai_gasPrice JSON-RPC read against the SAME configured RPC URL (an
-// idempotent read; packages/agent-mcp/src/execute.js relies on the same fallback). Used by every write and `hartii gas`.
+// quais requires a zone even for a zone-pinned URL. Ask for Cyprus-1 explicitly; on a transport failure,
+// fall back to the same configured RPC's raw quai_gasPrice read. Used by every write and `hartii gas`.
+import { Zone } from 'quais';
 
 async function rawGasPrice(rpcUrl, timeoutMs = 8000) {
   const res = await fetch(rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'quai_gasPrice', params: [] }), signal: AbortSignal.timeout(timeoutMs), redirect: 'error' });
@@ -27,7 +26,7 @@ async function quietly(fn) {
 export async function readGasPrice(provider, rpcUrl) {
   let n = null;
   let providerError;
-  try { n = BigInt((await quietly(() => provider.getFeeData())).gasPrice); } catch (err) { providerError = err; }
+  try { n = BigInt((await quietly(() => provider.getFeeData(Zone.Cyprus1))).gasPrice); } catch (err) { providerError = err; }
   if (n === null) {
     if (!rpcUrl) throw providerError;
     try { n = await rawGasPrice(rpcUrl); } catch { throw providerError; }

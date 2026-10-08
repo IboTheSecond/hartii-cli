@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getAddress } from 'quais';
-import { runWrite, WriteError } from '../src/writePipeline.js';
+import { runWrite, WriteError, BroadcastError } from '../src/writePipeline.js';
 import { runSend } from '../src/commands/send.js';
 import { generateMnemonicAccount, encryptAccount, writeKeystoreFile } from '../src/keystore.js';
 import { saveConfig, loadConfig } from '../src/config.js';
@@ -15,6 +15,7 @@ import { getSpentToday } from '../src/spendingGuard.js';
 import { installConsoleGuard } from '../src/stdoutGuard.js';
 import { safeTerminalText } from '../src/output.js';
 import { clean } from '../src/mcp/tools.js';
+import { offlineWallet } from './fakeBroadcast.mjs';
 
 const mkAddr = (label) => getAddress('0x00' + Buffer.from(label, 'utf8').toString('hex').padEnd(38, '0').slice(0, 38));
 const FROM = mkAddr('sender');
@@ -49,7 +50,8 @@ function fakeNode({ balance, gasPrice = 2_000_000_000n, nodeBalance = balance, f
       sends.push(tx);
       const needed = BigInt(tx.value) + BigInt(tx.gasLimit) * BigInt(tx.gasPrice);
       if (needed > nodeBalance) {
-        throw Object.assign(new Error('insufficient funds for intrinsic transaction cost'), { code: 'INSUFFICIENT_FUNDS', info: { error: { code: -32000, message: 'insufficient funds for gas * price + value' } } });
+        const raw = '0x0102'; // local synthetic broadcast proof, never submitted
+        throw new BroadcastError(Object.assign(new Error('insufficient funds for intrinsic transaction cost'), { code: 'INSUFFICIENT_FUNDS', transaction: raw, info: { error: { code: -32000, message: 'insufficient funds for gas * price + value' } } }), HASH, raw);
       }
       return { hash: HASH, wait: async () => ({ status: 1, hash: HASH }) };
     }),
@@ -71,7 +73,7 @@ describe('P1: send all to a fresh address must not brick the wallet', () => {
       return { hash: HASH, wait: async () => ({ status: 1, hash: HASH }) };
     });
     const chainFetch = vi.fn(async () => ({ json: async () => ({ result: '0x9' }) }));
-    const result = await runSend({ home, to: FRESH, amount: 'all', yes: true }, { fetchFn: chainFetch, providerFactory: () => node.provider, walletFactory: () => wallet, passwordDeps: { env: { HARTII_PASSWORD: PASSWORD } } });
+    const result = await runSend({ home, to: FRESH, amount: 'all', yes: true }, { fetchFn: chainFetch, providerFactory: () => node.provider, walletFactory: key => offlineWallet(key,node.provider,wallet.sendTransaction), passwordDeps: { env: { HARTII_PASSWORD: PASSWORD } } });
     expect(result.ok).toBe(true);
     expect(wallet.sendTransaction).toHaveBeenCalledTimes(1);
     expect(getSpentToday(home, account.address).reservedWei).toBe(0n);
@@ -102,7 +104,12 @@ describe('P1: pre-broadcast balance check and node-rejection classification', ()
     ['UNKNOWN_ERROR', 'invalid sender'],
   ])('node response %s / "%s" releases the reservation', async (code, message) => {
     const node = fakeNode({ balance: 100n * ONE });
-    node.wallet.sendTransaction = vi.fn(async () => { throw Object.assign(new Error('x'), { code, info: { error: { code: -32000, message } } }); });
+    node.wallet.sendTransaction = vi.fn(async () => {
+      const raw = '0x0102';
+      const fields = code === 'UNKNOWN_ERROR' ? { error: { message }, payload: { method: 'quai_sendRawTransaction', params: [raw] } }
+        : { transaction: raw, info: { error: { code: -32000, message } } };
+      throw new BroadcastError(Object.assign(new Error('x'), { code, ...fields }), HASH, raw);
+    });
     await expect(runWrite({ wallet: node.wallet, provider: node.provider, network: NETWORK, home, limits: LIMITS, to: TO, value: ONE, action: 'x', yes: true, io })).rejects.toThrow(WriteError);
     expect(getSpentToday(home, FROM).reservedWei).toBe(0n);
   });
@@ -125,7 +132,7 @@ describe('--key-env: dry run resolves the same sender as the real run', () => {
     const env = { HARTII_TEST_KEY: envAccount.privateKey };
     const node = fakeNode({ balance: 50n * ONE });
     const signed = [];
-    const walletFactory = (key) => ({ getAddress: async () => envAccount.address, sendTransaction: async (tx) => { signed.push(tx); return { hash: HASH, wait: async () => ({ status: 1, hash: HASH }), ...tx }; } });
+    const walletFactory = key => offlineWallet(key,node.provider,async tx => { signed.push(tx); return { hash: HASH, wait: async () => ({ status: 1, hash: HASH }), ...tx }; });
     const deps = { fetchFn: async () => ({ json: async () => ({ result: '0x9' }) }), providerFactory: () => node.provider, walletFactory, env, io: { write: () => {}, writeErr: () => {}, env } };
     const base = { home, to: TO, amount: '1', keyEnv: 'HARTII_TEST_KEY', yes: true, json: true };
     const dry = await runSend({ ...base, dryRun: true }, deps);

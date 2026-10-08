@@ -1,5 +1,5 @@
 // Shared EOA runtime. Dry runs use the public keystore address, never its password/key.
-import { Wallet } from 'quais';
+import { Wallet, QuaiTransaction, getZoneForAddress } from 'quais';
 import { getHartiiHome, loadConfig } from './config.js';
 import { resolveRuntimeNetwork, assertChainId } from './network.js';
 import { resolveWalletAddress } from './commands/balance.js';
@@ -9,8 +9,7 @@ import { assertCyprus1QuaiAddress } from './address.js';
 import { createProvider } from './signer.js';
 import { assertMarketNetwork } from './marketApi.js';
 import { assertToolsNetwork } from './biomeAddresses.js';
-import { runWrite, WriteError, PreBroadcastError, transactionIntentDigest } from './writePipeline.js';
-import { rethrowAs } from './errors.js';
+import { runWrite, WriteError, PreBroadcastError, BroadcastError, transactionIntentDigest } from './writePipeline.js';
 
 export async function withProviderCleanup(deps, operation) {
   const providers = new Set();
@@ -90,12 +89,22 @@ export async function writeRuntime(opts = {}, deps = {}) {
       if (opts.dryRun) throw new WalletError('A dry run cannot sign.');
       const request = structuredClone(tx);
       const intent = transactionIntentDigest(request);
+      let signed, signedHash;
       try {
         if (request.chainId === undefined || BigInt(request.chainId) !== BigInt(runtime.net.chainId)) throw new WalletError('Refusing to sign: transaction chain id does not match the selected network.');
         if (!['from','to','data','value','gasLimit','gasPrice','nonce'].every(field => request[field] !== undefined)) throw new WalletError('Refusing to sign: complete reviewed transaction authority is required.');
         if (assertCyprus1QuaiAddress(request.from).toLowerCase() !== from.toLowerCase()) throw new WalletError('Refusing to sign: sender does not match the reviewed account.');
         assertCyprus1QuaiAddress(request.to);
         await prepareSigner();
+        if (typeof signer.signTransaction !== 'function' || typeof provider.broadcastTransaction !== 'function') throw new WalletError('Refusing to sign: offline signing and explicit broadcast are required.');
+        // SDK sendTransaction repopulates an explicit nonce of zero and performs hidden RPC reads.
+        // Sign the fully reviewed authority offline, then verify the exact canonical bytes before dispatch.
+        const reviewed = QuaiTransaction.from({ ...request, type: 0 });
+        signed = await signer.signTransaction(structuredClone(request));
+        const decoded = QuaiTransaction.from(signed);
+        if (!decoded.isSigned() || decoded.type !== 0 || decoded.from?.toLowerCase() !== from.toLowerCase()
+          || decoded.unsignedSerialized !== reviewed.unsignedSerialized) throw new WalletError('Refusing to broadcast: signed transaction differs from reviewed authority.');
+        signedHash = decoded.hash;
         if (typeof provider.getNetwork !== 'function') throw new WalletError('Refusing to sign: RPC chain cannot be verified.');
         const live = BigInt((await provider.getNetwork()).chainId);
         if (live !== BigInt(runtime.net.chainId)) throw new WalletError(`Refusing to sign: RPC reports chain ${live}, expected ${runtime.net.chainId}.`);
@@ -106,8 +115,13 @@ export async function writeRuntime(opts = {}, deps = {}) {
       } catch (error) {
         throw new PreBroadcastError(error instanceof WalletError ? error.message : 'Local authority verification failed before sending.');
       }
-      // Never label an SDK send/broadcast error as locally not submitted.
-      return signer.sendTransaction(request);
+      // broadcastTransaction may submit before its own network/head reads finish. Every error here is
+      // ambiguous unless the write pipeline recognizes a node admission rejection; never retry it.
+      try {
+        const sent = await provider.broadcastTransaction(getZoneForAddress(from), signed);
+        if (typeof sent?.hash !== 'string' || sent.hash.toLowerCase() !== signedHash.toLowerCase()) throw new Error('Broadcast response does not match the locally signed transaction hash.');
+        return sent;
+      } catch (error) { throw new BroadcastError(error, signedHash, signed); }
     },
   };
   return { ...runtime, provider, from, wallet, json: opts.json, yes: opts.yes, dryRun: opts.dryRun, io: deps.io };
@@ -129,5 +143,12 @@ export function toolsRuntime(opts, deps) {
 /** runWrite with the runtime's wallet/provider/limits/flags; a WriteError is rethrown as `ErrorClass` (message prefixed) when given. */
 export function writeVia(ctx, params, ErrorClass, prefix) {
   const run = () => runWrite({ wallet: ctx.wallet, provider: ctx.provider, network: ctx.net, home: ctx.home, limits: ctx.limits, json: ctx.json, yes: ctx.yes, dryRun: ctx.dryRun, io: ctx.io, ...params });
-  return ErrorClass ? rethrowAs(WriteError, ErrorClass, run, prefix) : run();
+  return ErrorClass ? run().catch(error => {
+    if (!(error instanceof WriteError)) throw error;
+    // Preserve only public transaction outcome fields, so callers can inspect an ambiguous send.
+    const extra = {};
+    if (typeof error.txHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(error.txHash)) extra.txHash = error.txHash;
+    if (['unconfirmed','reverted'].includes(error.status)) extra.status = error.status;
+    throw new ErrorClass((prefix || '') + error.message, extra);
+  }) : run();
 }

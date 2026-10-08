@@ -16,6 +16,7 @@ import { saveConfig } from '../src/config.js';
 import { generateMnemonicAccount } from '../src/keystore.js';
 import { getSpentToday } from '../src/spendingGuard.js';
 import { main } from '../src/cli.js';
+import { offlineWallet } from './fakeBroadcast.mjs';
 
 const addr = (n) => getAddress(`0x001${String(n).padStart(37, '0')}`);
 const FROM = addr(1), TOKEN = addr(2), CURVE = addr(3);
@@ -78,7 +79,7 @@ function harness(over = {}) {
     getBalance: vi.fn(async () => 1000n * 10n ** 18n), destroy: vi.fn(),
   };
   const sendTransaction = vi.fn(async () => ({ hash: '0x' + 'cd'.repeat(32), wait: async () => ({ status: 1, hash: '0x' + 'cd'.repeat(32) }) }));
-  return { fetchFn, provider, sendTransaction, ctx: { home, env: {}, fetchFn, providerFactory: () => provider, walletFactory: key => ({ getAddress: async () => new Wallet(key).address, sendTransaction }), limits: {}, ...over } };
+  return { fetchFn, provider, sendTransaction, ctx: { home, env: {}, fetchFn, providerFactory: () => provider, walletFactory: key => offlineWallet(key,provider,sendTransaction), limits: {}, ...over } };
 }
 
 async function connect(ctx) {
@@ -180,7 +181,7 @@ describe('write tools: dry-run default, caps, confirm', () => {
     const { call, close } = await connect(writeCtx(h));
     const r = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '5' });
     expect(r.json).toMatchObject({ mode: 'executed', ok: true, status: 'success' });
-    expect(r.json.quaiscanUrl).toMatch(/quaiscan\.io\/tx\/0xcdcd/);
+    expect(r.json.quaiscanUrl).toMatch(/quaiscan\.io\/tx\/0x[0-9a-f]{64}$/);
     expect(h.sendTransaction).toHaveBeenCalledTimes(1);
     const sent = h.sendTransaction.mock.calls[0][0];
     expect(sent.gasLimit).toBe(120000n); // estimate x 1.2
