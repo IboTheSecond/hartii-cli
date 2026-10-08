@@ -58,8 +58,8 @@ const watch = async (c) => {
 const extra = (command) => async (c) => {
   try {
     return await runExtra(command, c.args, {
-      opts: { ...readOpts(c), wallet: c.g.wallet },
-      deps: { env: c.env, fetchFn: c.deps.fetchFn, providerFactory: c.deps.providerFactory, noSpawn: c.deps.noSpawn },
+      opts: { ...readOpts(c), wallet: c.g.wallet, json: c.g.json, yes: c.g.yes },
+      deps: { env: c.env, fetchFn: c.deps.fetchFn, providerFactory: c.deps.providerFactory, noSpawn: c.deps.noSpawn, spawnFn: c.deps.spawnFn, confirmFn: c.deps.confirmFn, interactive: c.deps.interactive, writeErr: c.io.writeErr, updateBase: c.deps.updateBase, tmp: c.deps.tmp },
       extraFlags: c.flags,
     });
   } catch (e) {

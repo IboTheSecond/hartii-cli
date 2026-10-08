@@ -119,10 +119,8 @@ describe('everyday commands', () => {
     expect(JSON.parse((await run(['open', hash, '--json'])).out).url).toContain(hash);
     expect(JSON.parse((await run(['open', FROM, '--json'])).out).url).toContain(FROM);
     expect((await run(['open', 'nope'])).code).toBe(1);
-    const sha = 'f'.repeat(64);
-    const upd = JSON.parse((await run(['update', '--json'], { fetchFn: async () => ({ text: async () => `${sha}  hartii-cli.tgz\n` }) })).out);
-    expect(upd.latestSha256).toBe(sha);
-    expect(upd.upgrade).toMatch(/npm install -g https:\/\/hartiilabs\.com/);
+    const upd = JSON.parse((await run(['update', '--check', '--json'], { fetchFn: async (u) => String(u).endsWith('.json') ? { ok: true, status: 200, json: async () => ({ version: '99.0.0', sha256: 'f'.repeat(64), url: 'https://hartiilabs.com/downloads/hartii-cli.tgz' }) } : { ok: false, status: 404 } })).out);
+    expect(upd).toMatchObject({ updateAvailable: true, latest: '99.0.0' });
   });
   it('price and holders use the public API; unknown extras errors are clean (no stack)', async () => {
     const TOKEN = '0x0035187a7660f595d93cd53a4d16c635d6cffc8f';

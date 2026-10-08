@@ -21,6 +21,7 @@ import { PKG_VERSION } from '../version.js';
 import { readGasPrice } from '../gasPrice.js';
 import { fmtPrice } from '../tui/format.js';
 import { CliError, rethrowAs } from '../errors.js';
+import { runUpdate } from './update.js';
 
 export class ExtraError extends CliError {}
 
@@ -132,11 +133,8 @@ export async function runExtra(command, args, ctx) {
       steps.push('hartii ui --demo              tour the full-screen UI on fixture data', 'hartii help                  every command (also: hartii ?)');
       return { status: 'BETA — the Hartii terminal wallet is beta software and has not been independently audited; start with small amounts.', node: process.versions.node, nodeOk: Number(process.versions.node.split('.')[0]) >= 20, home: r.home, homeExists: existsSync(r.home), network: r.net.name, wallets: wallets.length, currentWallet: current?.name ?? null, address: current?.address ?? null, nextSteps: steps };
     }
-    case 'update': {
-      let latest = null;
-      try { latest = String((await (await (deps.fetchFn || fetch)('https://hartiilabs.com/downloads/hartii-cli.tgz.sha256', { signal: AbortSignal.timeout(12000), redirect: 'error' })).text()).trim().split(/\s+/)[0]); } catch { /* offline */ }
-      return { installed: PKG_VERSION, latestSha256: latest && /^[0-9a-f]{64}$/.test(latest) ? latest : null, upgrade: 'npm install -g https://hartiilabs.com/downloads/hartii-cli.tgz', verify: 'https://hartiilabs.com/downloads/hartii-cli.tgz.sha256', note: 'The CLI never updates itself. Compare the sha256 of the file you download with the published one.' };
-    }
+    case 'update':
+      return runUpdate({ check: extraFlags.check === true, json: opts.json === true, yes: opts.yes === true }, { fetchFn: deps.fetchFn, spawnFn: deps.spawnFn, confirmFn: deps.confirmFn, interactive: deps.interactive, writeErr: deps.writeErr, base: deps.updateBase, tmp: deps.tmp });
     case 'about':
     case 'version':
       return { name: '@hartii/cli', version: PKG_VERSION, status: 'BETA — not audited', node: process.versions.node, home: rt().home, site: 'https://hartiilabs.com/cli', docs: 'https://docs.hartiilabs.com', download: 'https://hartiilabs.com/downloads/hartii-cli.tgz' };

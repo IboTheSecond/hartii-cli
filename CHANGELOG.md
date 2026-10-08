@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-10-08
+
+- `hartii update` (alias `upgrade`) now really updates. It reads the new `hartii-cli.json` manifest (`version`, `sha256`, `url`; falls back to the `.sha256` file and the version inside the tarball), compares versions with semver, and says "You're on the latest version" or "Update available: a → b". `--check` only reports; a confirmation is asked on a terminal, and non-terminal or `--json` runs need `--yes`.
+- The tarball is downloaded to a temp file (same-origin HTTPS, `redirect: error`, timeout, size cap), refused unless its sha256 equals the published one and its inner version matches, installed with `npm install -g <local file>` (`npm.cmd` on Windows, no shell interpolation of downloaded content), then verified with `hartii --version`. Failures print the exact manual command, with an EACCES sudo / npm-prefix hint on macOS and Linux. The MCP server has no update tool and stays read-only.
+- The tarball build now also writes `hartii-cli.json` next to `hartii-cli.tgz` and `.sha256`.
+- Installs up to 0.2.2 cannot self-update: run `npm install -g https://hartiilabs.com/downloads/hartii-cli.tgz` once.
+
 ## [0.2.2] — 2026-10-08
 
 - Sign the complete reviewed transaction offline and verify its canonical bytes and sender. Preserve an explicit nonce of zero; recheck chain, pending nonce and local expiry after signing, then broadcast once.

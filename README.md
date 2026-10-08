@@ -15,7 +15,7 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.2.2). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.2.3). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Install
@@ -27,7 +27,15 @@ hartii --version
 hartii ?          # every command
 ```
 
-Update the same way (`hartii update` prints the newest checksum and this command). One-off without installing: `npx -y https://hartiilabs.com/downloads/hartii-cli.tgz --help`.
+Update with `hartii update` (alias `upgrade`):
+
+```
+hartii update --check       # only report: "Update available: 0.2.2 → 0.2.3" or "You're on the latest version"
+hartii update               # ask, download, verify, install
+hartii update --yes         # no prompt (required when not on a terminal or with --json)
+```
+
+It reads `https://hartiilabs.com/downloads/hartii-cli.json` (`{version, sha256, url}`; falls back to the `.sha256` file), downloads the tarball over same-origin HTTPS with no redirects, refuses unless its sha256 equals the published one, then runs `npm install -g <the verified local file>` and confirms with `hartii --version`. If npm fails it prints the exact manual command (`npm install -g https://hartiilabs.com/downloads/hartii-cli.tgz`; on macOS/Linux with EACCES use `sudo` or an npm prefix in your home). The MCP server never updates anything. Versions up to 0.2.2 only print a hint: run the manual command above once to reach 0.2.3. One-off without installing: `npx -y https://hartiilabs.com/downloads/hartii-cli.tgz --help`.
 
 The download's checksum is published next to it: `https://hartiilabs.com/downloads/hartii-cli.tgz.sha256`.
 
@@ -88,7 +96,7 @@ No transaction is sent by receiving, `--demo` or `--dry-run`. Review the full re
 | `claim list [--mine\|--creator <addr>]` · `claim <campaignId> [--check]` | HartiiClaim: list a creator's campaigns; check or claim your allocation (Merkle leaves are re-verified against the on-chain root). |
 | `wall engrave "<message>" [--color #hex] [--token <addr\|ticker>]` · `wall stats` · `wall recent [n]` | Wall of Blocks (Global Wall). Price read live. |
 | `help` · `?` · `commands` · `completion <shell>` | Help for everything (`hartii ?`, `hartii buy ?`), a flat command list, shell completion. |
-| `init` · `whoami` · `limits` · `networks` · `about` · `update` | First-run checklist, who you are, your spending caps and today's spend, networks, version/links, newest download + sha256. |
+| `init` · `whoami` · `limits` · `networks` · `about` · `update` | First-run checklist, who you are, your spending caps and today's spend, networks, version/links, whether a newer CLI exists (`update`: `--check`, `--yes`). |
 | `price` · `quote <buy\|sell>` · `holders` · `trades` · `gas` · `block` · `open` | Read-only lookups; no wallet needed. |
 | shortcuts | `bal`, `pf`/`portfolio`, `ls`, `use`, `addr`, `top`, `new`, `search`, `me`. |
 | `config get <key>` · `config set <key> <value>` | Keys: `network`, `currentWallet`, `limits.perTxQuai`, `limits.dailyQuai`. |
