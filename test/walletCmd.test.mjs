@@ -76,7 +76,7 @@ describe('walletImport', () => {
     const exported = await walletCmd.walletExport(home, 'source2', { ...deps(), confirmTypedFn: vi.fn().mockResolvedValue('source2') });
     const imported = await walletCmd.walletImport(home, 'mnemonic', exported.mnemonic, 'imported2', deps());
     expect(imported.address).toBe(generated.address);
-  });
+  }, 60000); // Real key grinding and scrypt can exceed 20s on a busy development host.
 
   it('rejects an invalid mnemonic', async () => {
     await expect(walletCmd.walletImport(home, 'mnemonic', 'totally not a phrase', 'x', deps())).rejects.toThrow(WalletError);

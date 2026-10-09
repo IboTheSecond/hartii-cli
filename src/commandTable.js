@@ -26,6 +26,8 @@ import { runClaim } from './commands/claim.js';
 import { runWall } from './commands/wall.js';
 import { runExtra, EXTRA_COMMANDS, ExtraError } from './commands/extras.js';
 import { runMcp } from './mcp/server.js';
+import { runTrader } from './commands/trader.js';
+import { createTraderReader } from './trader/readers.js';
 
 /** ctx = { args, flags, g, deps, env, io, home, write } — see cli.js. */
 const readOpts = ({ home, g, flags }) => ({ home, network: g.network, rpc: g.rpc, demo: g.demo, allowInsecureRpc: flags?.['allow-insecure-rpc'] === true });
@@ -44,6 +46,7 @@ const mcp = (c) => (c.deps.runMcp || runMcp)({
   allowWrites: c.flags['allow-writes'] === true,
   maxPerTx: c.flags['max-per-tx'], maxPerDay: c.flags['max-per-day'],
   fetchFn: c.deps.fetchFn, providerFactory: c.deps.providerFactory, walletFactory: c.deps.walletFactory, now: c.deps.now, transport: c.deps.mcpTransport,
+  traderReader: createTraderReader({home:c.home,profile:'default'}),
 });
 
 const watch = async (c) => {
@@ -68,6 +71,12 @@ const extra = (command) => async (c) => {
 };
 
 export const COMMAND_TABLE = {
+  trader: c => runTrader({sub:c.args[0] || 'status',...readOpts(c),wallet:c.g.wallet,keyEnv:c.g.keyEnv,json:c.g.json,
+    flags:c.flags,profile:c.flags.profile,once:c.flags.once===true,observe:c.flags.observe===true,policyFile:c.flags['policy-file'],fundingTx:c.flags['funding-tx'],
+    owner:c.flags.owner,tradingAddress:c.flags['trading-address'],createWallet:c.flags['create-wallet']===true,
+    capital:c.flags.capital,maxPerTx:c.flags['max-per-tx'],maxPerDay:c.flags['max-per-day'],maxFee:c.flags['max-fee'],
+    provider:c.flags.provider,model:c.flags.model,modelKeyEnv:c.flags['model-key-env'],pricingFile:c.flags['pricing-file'],pair:c.flags.pair===true,out:c.flags.out},
+    {...c.deps,env:c.env,io:c.io,write:c.write,passwordDeps:c.io.passwordDeps}),
   wallet: (c) => runWallet(c.args, c.flags, c),
   receive: (c)=>runReceive({...walletOpts(c),amount:c.flags.amount,memo:c.flags.memo,addressQr:c.flags['address-qr']===true,out:c.flags.out,expiresAt:c.flags.expires===undefined?null:parseReceiveExpiry(c.flags.expires,{now:c.deps.now?new Date(c.deps.now).getTime():Date.now()})}),
   config: (c) => runConfig(c.args, c.home),

@@ -18,6 +18,12 @@ The CLI has no application analytics. RPC/API/WebSocket providers and any agent 
 > Status: beta (0.2.3). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
+## Holder trader candidate
+
+This feature branch adds the BETA personal holder trader and keyless MCP profiles. It is an unreleased candidate; the existing published 0.2.3 wallet package is unchanged. Live trading stays blocked until the registry, seven-day Paper observation, rehearsal and reviewed canary evidence are complete.
+
+See [local trader setup and limits](src/trader/README.md). Try the offline, transaction-keyless demo with `hartii trader paper --demo --once --json`. The CLI never enables Live through MCP or bypasses the owner's signed policy and local typed `ARM`.
+
 ## Install
 
 ```bash

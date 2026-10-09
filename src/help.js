@@ -16,6 +16,18 @@ export const GROUPS = [
 // name, group, one-line summary, usage lines, examples, aliases (alias tokens that expand to this command),
 // to (optional: a shortcut for another command — { command, args: prefix, flags, dropArgs: ignore the user's own args })
 export const COMMANDS = [
+  { name: 'trader', group: 'agents', summary: 'BETA holder trader: keyless Observe/Paper, locally gated Live', usage: [
+    'hartii trader init --owner <address> --trading-address <address> --capital <QUAI> --max-per-tx <QUAI> --max-per-day <QUAI> --max-fee <QUAI>',
+    'hartii trader init --pair   # hidden pairing code; confirm fingerprint in dashboard',
+    'hartii trader paper [--once] [--demo]', 'hartii trader run --observe [--once]',
+    'hartii trader arm [--wallet <dedicated-name>]   # propose, sign in browser, repeat for local typed ARM',
+    'hartii trader arm --policy-file <reviewed-owner-signed.json>   # local typed ARM, max 24 hours',
+    'hartii trader run [--wallet <dedicated-name>] [--once]',
+    'hartii trader reconcile [--funding-tx <hash>]   # verified direct native transfer, 20 confirmations',
+    'hartii trader watch|status|pause [--profile <name>] [--json]',
+    'hartii trader export [--mode all|observe|paper|live] [--out <history.jsonl>] # stop writers first',
+    'hartii trader init ... --provider openai|anthropic --model <name> --pricing-file <file> [--model-key-env <NAME>]',
+  ], examples: ['hartii trader paper --demo --once --json', 'hartii trader watch --once', 'hartii trader export --mode all --out trader-history.jsonl'] },
   { name: 'ui', group: 'start', summary: 'full-screen terminal UI (also: just run `hartii`)', usage: ['hartii ui [--demo]'], examples: ['hartii ui --demo   # fixture data, never signs', 'hartii'] },
   { name: 'init', group: 'start', summary: 'guided first-run checklist (wallet, network, next steps)', usage: ['hartii init'], examples: ['hartii init'] },
   { name: 'help', group: 'start', summary: 'this help; `hartii help <command>` for one command', usage: ['hartii help [command]', 'hartii ?', 'hartii <command> ?'], examples: ['hartii help buy', 'hartii buy ?'] },

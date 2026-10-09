@@ -1,7 +1,7 @@
 // Direct HartiiSwap routes use live router quotes; QUAI/WQUAI wrap 1:1.
 import { Interface } from 'quais';
 import { withAddr } from '../output.js';
-import { withProviderCleanup, marketRuntime, writeVia } from '../commandContext.js';
+import { withProviderCleanup, marketRuntime, writeVia, managedExitSpend } from '../commandContext.js';
 import { assertCyprus1QuaiAddress, checksumAddress } from '../address.js';
 import { checkSpend } from '../spendingGuard.js';
 import { parseAmount, formatAmount } from '../amount.js';
@@ -154,6 +154,8 @@ async function runSwapCore(opts, deps = {}, approvedCtx = null) {
     spendWei = BigInt(valuation[valuation.length - 1]);
     if (spendWei <= 0n) throw new SwapError('Token input has no positive QUAI valuation.');
   }
+  const managedSpend=managedExitSpend(ctx,{action:sideIn.kind==='erc20' && sideOut.kind==='native'?'sell':'swap',token:sideIn.address,spender:router,units:amountInWei.toString()});
+  if(managedSpend!==null)spendWei=managedSpend;
   checkSpend(home, fromAddress, spendWei, limits, {now:deps.io?.now});
   const plannedTrade = { action: `Swap ${withAddr(sideIn.symbol, sideIn.address)} -> ${withAddr(sideOut.symbol, sideOut.address)}`, amountIn:formatAmount(amountInWei,sideIn.decimals), expectedOut:formatAmount(expectedOut,sideOut.decimals), minOut:formatAmount(minOut,sideOut.decimals), guardedQuai:formatAmount(spendWei), path:path.join(' -> '), feeBps:'30' };
   // Approval, through the SAME write pipeline, whenever the input side is an ERC-20.

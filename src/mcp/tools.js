@@ -36,8 +36,9 @@ import { parseAmount, formatAmount } from '../amount.js';
 import { assertCyprus1QuaiAddress } from '../address.js';
 import { getSpentToday } from '../spendingGuard.js';
 import { createProvider } from '../signer.js';
-import { safeTerminalText, redactUrls } from '../output.js';
+import { sanitizeMcpText } from '../../vendor/packages/agent-mcp/src/capabilities.js';
 import { WalletError } from '../keystore.js';
+import { buildTraderTools } from './trader.js';
 
 const AMOUNT = z.string().min(1).max(100).describe('Plain decimal, a percentage like "50%", or "all".');
 const TOKEN = z.string().min(1).max(128).describe('Token ticker or 0x Cyprus-1 Quai address.');
@@ -105,10 +106,12 @@ const CONFIRM = z.boolean().optional().describe('Omit or false = dry run (simula
 
 /** Strips control characters from every string in a JSON-able value (third-party text is untrusted). */
 export function clean(value) {
-  if (typeof value === 'string') return redactUrls(safeTerminalText(value));
+  // Redact complete URL tokens first. The legacy terminal URL formatter can
+  // truncate at credential punctuation and leave an unrecognizable secret tail.
+  if (typeof value === 'string') return sanitizeMcpText(value);
   if (typeof value === 'bigint') return value.toString();
   if (Array.isArray(value)) return value.map(clean);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clean(v)]));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [sanitizeMcpText(k), clean(v)]));
   return value;
 }
 
@@ -126,14 +129,14 @@ export function makeMutex() {
 function context(ctx) {
   const env = ctx.env || process.env;
   const readAddress = () => {
-    if (ctx.keyEnv) {
+    if (ctx.allowWrites === true && ctx.keyEnv) {
       const key = env[ctx.keyEnv];
       if (!key || !/^(0x)?[0-9a-fA-F]{64}$/.test(key)) throw new WalletError('--key-env must name an environment variable containing a private key.');
       try { return new Wallet(key.startsWith('0x') ? key : `0x${key}`).address; } catch { throw new WalletError('Invalid --key-env private key. No secret was returned.'); }
     }
     return resolveWalletAddress(readRuntime({ home: ctx.home, network: ctx.network, rpc: ctx.rpc }, {}).home, ctx.wallet).address;
   };
-  const base = (extra = {}) => ({ home: ctx.home, network: ctx.network || undefined, rpc: ctx.rpc || undefined, wallet: ctx.wallet || undefined, keyEnv: ctx.keyEnv || undefined, ...extra });
+  const base = (extra = {}) => ({ home: ctx.home, network: ctx.network || undefined, rpc: ctx.rpc || undefined, wallet: ctx.wallet || undefined, keyEnv: ctx.allowWrites === true ? ctx.keyEnv || undefined : undefined, ...extra });
   const deps = (validateBeforeSubmit) => ({
     fetchFn: ctx.fetchFn,
     providerFactory: ctx.providerFactory,
@@ -220,10 +223,11 @@ export function buildTools(ctx) {
   });
 
   const tools = [
+    ...buildTraderTools(ctx.traderReader),
     {
       name: 'hartii_wallet',
       description: 'The configured wallet: address, network, whether writes are enabled, the effective spending caps and how much has been spent today.',
-      inputSchema: {}, write: false,
+      inputSchema: {}, write: false, openWorld: false,
       handler: async () => {
         const address = c.readAddress();
         const rt = readRuntime(c.base(), { limits: ctx.limits });
@@ -313,7 +317,8 @@ export function buildTools(ctx) {
     return { ...t, handler: async (args = {}) => {
       const parsed = schema.safeParse(args);
       if (!parsed.success) throw new WalletError('Invalid tool arguments: unsupported parameters, types, or bounds.');
-      return annotateTokens(await t.handler(parsed.data));
+      const result = await t.handler(parsed.data);
+      return t.local ? result : annotateTokens(result);
     } };
   });
 }

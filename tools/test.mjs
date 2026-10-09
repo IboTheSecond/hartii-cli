@@ -13,9 +13,10 @@ const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const monorepo = existsSync(join(repoRoot, 'scripts', 'build-hartii-cli-tarball.mjs'));
 const cwd = monorepo ? repoRoot : packageRoot;
-const args=process.argv.slice(2);
+const all = monorepo && process.argv.slice(2).includes('--all');
+const args=process.argv.slice(2).filter(arg => arg !== '--all');
 const hasFiles=args.some(arg=>!arg.startsWith('-')&&arg.endsWith('.mjs'));
-const filters=monorepo?hasFiles?args.map(arg=>existsSync(join(packageRoot,arg))?'packages/hartii-cli/'+arg:arg):['packages/hartii-cli',...args]:args;
+const filters=all?args:monorepo?hasFiles?args.map(arg=>existsSync(join(packageRoot,arg))?'packages/hartii-cli/'+arg:arg):['packages/hartii-cli',...args]:args;
 const result = spawnSync(process.execPath, [cli, 'run', ...filters], {
   cwd, env: { ...process.env, HARTII_HOME: home, HARTII_PASSWORD: '', HARTII_KEY: '' },
   stdio: 'inherit', windowsHide: true,

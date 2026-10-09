@@ -25,7 +25,7 @@ beforeAll(() => { THROWAWAY = generateMnemonicAccount().privateKey; }, 120_000);
 const erc = new Interface(ERC20_ABI), curve = new Interface([...BONDING_CURVE_ABI, ...BONDING_CURVE_V3_ABI]);
 
 const factoryI = new Interface(['function curveOf(address) view returns (address)']);
-const READ_TOOLS = ['hartii_wallet', 'hartii_balance', 'hartii_portfolio', 'hartii_trending', 'hartii_token', 'hartii_quote', 'hartii_tx_status', 'hartii_otc_list', 'hartii_claim_eligibility', 'hartii_wall_stats'];
+const READ_TOOLS = ['hartii_wallet', 'hartii_balance', 'hartii_portfolio', 'hartii_trending', 'hartii_token', 'hartii_quote', 'hartii_tx_status', 'hartii_otc_list', 'hartii_claim_eligibility', 'hartii_wall_stats', 'hartii_trader_status', 'hartii_trader_limits', 'hartii_trader_activity'];
 const WRITE_TOOLS = ['hartii_send', 'hartii_buy', 'hartii_sell', 'hartii_swap', 'hartii_otc_fill', 'hartii_otc_cancel', 'hartii_claim'];
 
 let home;
@@ -393,7 +393,10 @@ describe('security review regressions (M1, M2, M3, M6)', () => {
     const h = harness();
     h.provider.getFeeData = vi.fn(async () => ({ gasPrice: 3n * 10n ** 14n })); // 120000 gas * 3e14 = 36 QUAI
     const { call, close } = await connect(wctx(h));
-    const r = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '1', maxFee: '100' });
+    const extra = await call('hartii_buy', { token: TOKEN, quai: '1', maxFee: '100' });
+    expect(extra.isError).toBe(true);
+    expect(extra.text).toMatch(/Invalid arguments|Invalid tool arguments/);
+    const r = await confirmFlow(call, 'hartii_buy', { token: TOKEN, quai: '1' });
     expect(r.isError).toBe(true);
     expect(r.text).toMatch(/fee ceiling/);
     expect(h.sendTransaction).not.toHaveBeenCalled();
