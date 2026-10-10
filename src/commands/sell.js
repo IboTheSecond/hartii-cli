@@ -1,7 +1,7 @@
 // Sell through the token-bound curve. Exact approvals use the shared write pipeline.
 // Amounts use the wallet balance; final simulation enforces vesting and curve inventory limits.
 import { withAddr } from '../output.js';
-import { withProviderCleanup, marketRuntime, writeVia } from '../commandContext.js';
+import { withProviderCleanup, marketRuntime, writeVia, managedExitSpend } from '../commandContext.js';
 import { checkSpend } from '../spendingGuard.js';
 import { parseAmount, formatAmount } from '../amount.js';
 import { readErc20, ensureAllowance, approvalStop } from '../toolKit.js';
@@ -43,7 +43,8 @@ async function runSellCore(opts, deps = {}) {
 
   let quote = await quoteAs(SellError, 'sell', () => quoteAndBuildSell(provider, curveAddress, amount, slippageBps));
 
-  checkSpend(home, fromAddress, quote.grossOnChain, limits, { now: deps.io?.now });
+  const managedSpend=managedExitSpend(ctx,{action:'sell',token:tokenAddress,spender:curveAddress,units:amount.toString()});
+  checkSpend(home, fromAddress, managedSpend ?? quote.grossOnChain, limits, { now: deps.io?.now });
   const plannedTrade = { action: `Sell ${label}`, tokensIn: formatAmount(amount, token.decimals), expectedQuaiOut: formatAmount(quote.expectedOut), minQuaiOut: formatAmount(quote.minQuaiOut), feeQuai: formatAmount(quote.grossOnChain - quote.expectedOut), feeBps: String(quote.meta.feeBps), curveAddress };
   // Approval, through the SAME write pipeline, as its own confirmed tx — only when short. A dry run
   // can't actually raise the allowance, so it reports the approval's own summary and stops there.
@@ -76,7 +77,7 @@ async function runSellCore(opts, deps = {}) {
     to: curveAddress,
     data: quote.data,
     value: 0n,
-    spendWei: quote.grossOnChain,
+    spendWei: managedSpend ?? quote.grossOnChain,
     action: `Sell ${label}`,
     extraSummary,
   }, SellError);

@@ -313,7 +313,7 @@ describe('M2 pipeline safety', () => {
     expect(getSpentToday(home, FROM)).toMatchObject({ spentWei: 20n * 10n ** 18n, reservedWei: 0n });
     await expect(runWrite(ctx)).rejects.toThrow(/daily limit/);
     expect(wallet.sendTransaction).toHaveBeenCalledTimes(20);
-  });
+  }, 120000); // Twenty encrypted-wallet/durable-journal operations can exceed 30s on Windows.
   it.each([
     [{ status: 1, fee: 7n, hash: HASH }, 17n],
     [{ status: 0, hash: HASH, gasUsed: 2n, gasPrice: 4n }, 8n],

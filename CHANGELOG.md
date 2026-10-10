@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-10
+
+Adds the BETA personal holder trader (Observe and Paper only; Live is gated and not enabled) and keyless MCP trader reads. Requires Node 22 or newer.
+
+- New `hartii trader` command group: `init` (public owner and dedicated trading addresses, four absolute QUAI budgets, optional `--pair`), `paper` (`--demo` is an offline proof on labeled empty data), `run --observe`, `watch`, `status`, `pause` and `export`, plus the gated `arm`, `run` and `reconcile`. Observe and Paper need no transaction key. A profile is stored under `HARTII_HOME/trader/<profile>`; pairing uses a hidden one-use code and an Ed25519 device key kept in an encrypted envelope.
+- `hartii mcp` gains three keyless local reads: `hartii_trader_status`, `hartii_trader_limits` and `hartii_trader_activity`. Every MCP tool now has a strict input schema, an output schema, annotations and `structuredContent` with a `_hartii` capability block (authority, mode, chain); the text content stays the same JSON.
+- Shared write path: internal hooks let the trader's in-process adapter persist the signed transaction hash before broadcast and account a managed exit's gas instead of its proceeds. No CLI flag or MCP input installs them, and the ordinary per-transaction and daily limits are unchanged.
+- New bare boolean flags `--once`, `--observe`, `--pair` and `--create-wallet`.
+- `hartii update` accepts Windows 8.3 short-name temp paths (a literal `~`) and still rejects `&`, `%` and `!` before npm runs.
+- Output redaction keeps a complete explorer transaction or address URL readable and masks any other path segment of 16 or more characters.
+- Node 22 or newer (`engines`); `@modelcontextprotocol/sdk` 1.32.1 and `zod` 4.6.5.
+- Installs on 0.2.2 or older still cannot self-update (run the install command once); 0.2.3 and newer are offered 0.3.0 by `hartii update`.
+
 ## [0.2.3] — 2026-10-08
 
 - `hartii update` (alias `upgrade`) now really updates. It reads the new `hartii-cli.json` manifest (`version`, `sha256`, `url`; falls back to the `.sha256` file and the version inside the tarball), compares versions with semver, and says "You're on the latest version" or "Update available: a → b". `--check` only reports; a confirmation is asked on a terminal, and non-terminal or `--json` runs need `--yes`.

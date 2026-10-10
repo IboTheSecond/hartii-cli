@@ -92,7 +92,8 @@ function sameOriginUrl(u, base) {
 const wrap = (platform, bin, args, env) => (platform === 'win32'
   ? [env?.ComSpec || 'cmd.exe', ['/d', '/s', '/c', bin === 'npm' ? 'npm.cmd' : bin, ...args]]
   : [bin, args]);
-const SAFE_WIN_PATH = /^[\w :\\./()-]+$/;
+// Windows 8.3 profile paths contain a literal tilde; shell-expansion metacharacters remain excluded.
+const SAFE_WIN_PATH = /^[\w :\\./()~-]+$/;
 
 /** Published manifest first; the .sha256 file is the fallback (version then comes from the tarball itself). */
 async function discover(fetchFn, base) {

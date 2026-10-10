@@ -15,13 +15,13 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.2.3). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.3.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Install
 
 ```bash
-# Node 20+. Install once, then just type `hartii`.
+# Node 22+. Install once, then just type `hartii`.
 npm install -g https://hartiilabs.com/downloads/hartii-cli.tgz
 hartii --version
 hartii ?          # every command
@@ -101,6 +101,7 @@ No transaction is sent by receiving, `--demo` or `--dry-run`. Review the full re
 | shortcuts | `bal`, `pf`/`portfolio`, `ls`, `use`, `addr`, `top`, `new`, `search`, `me`. |
 | `config get <key>` · `config set <key> <value>` | Keys: `network`, `currentWallet`, `limits.perTxQuai`, `limits.dailyQuai`. |
 | `doctor` | Health checklist. |
+| `trader init\|paper\|run --observe\|watch\|status\|pause\|export` (BETA) | Personal holder trader: Observe and Paper, no transaction key needed (see below). |
 | `mcp [--allow-writes --max-per-tx <q> --max-per-day <q>]` | stdio MCP server (see below). |
 
 Airdrop / OTC / Claim / Wall and the market commands (tokens, token, buy, sell, swap, watch) are **mainnet only**;
@@ -198,6 +199,27 @@ Keys: `↑↓←→` move · `Tab` / `Shift-Tab` switch pane · `Enter` open / c
 waits for `y` (or `n`); the keystore password is asked in a masked prompt. Create and import wallets in the shell, so
 a recovery phrase is never drawn on screen. `hartii ui --demo` runs the whole thing on fixtures and can never sign.
 
+## Personal holder trader (BETA)
+
+`hartii trader` is a local, owner-approved spot trader for HBOME holders. **Today it is Observe and Paper only: it signs nothing, needs no transaction key, and Live trading is not enabled.** It is beta software and has not been independently audited.
+
+```bash
+hartii trader paper --demo --once --json            # offline proof on labeled demo data: no wallet, no network
+hartii trader init --owner <your address> --trading-address <dedicated address> \
+  --capital 100 --max-per-tx 10 --max-per-day 30 --max-fee 1    # four absolute QUAI budgets
+hartii trader paper --once                           # one Paper cycle
+hartii trader run --observe --once                   # one Observe cycle
+hartii trader watch --once --json                    # public activity view
+hartii trader status --json
+hartii trader pause
+hartii trader export --mode all --out trader-history.jsonl      # stop the runner first
+```
+
+- A profile lives under `HARTII_HOME/trader/<profile>` (default profile `default`). `--wallet <name>` picks an existing encrypted dedicated wallet and `--create-wallet` creates one; without either, Observe and Paper need no transaction key.
+- A model is optional (`--provider openai|anthropic --model <name> --pricing-file <file>`). Keys stay local and nothing calls a model unless you configure one; with no model the trader holds.
+- `arm`, `run` and `reconcile` are the gated Live path. They need HBOME Member access, a release that completed seven days of Observe/Paper evidence, an owner-signed policy of at most 24 hours and a locally typed `ARM`. None of that is switched on yet.
+- `hartii trader init --pair` pairs this device with the private cockpit at https://hartiilabs.com/trader once the hosted service is enabled.
+
 ## MCP server for AI agents
 
 ```bash
@@ -206,7 +228,8 @@ hartii mcp --allow-writes --max-per-tx 5 --max-per-day 20
 ```
 
 **Read tools** (always): `hartii_wallet`, `hartii_balance`, `hartii_portfolio`, `hartii_trending`, `hartii_token`,
-`hartii_quote`, `hartii_tx_status`, `hartii_otc_list`, `hartii_claim_eligibility`, `hartii_wall_stats`.
+`hartii_quote`, `hartii_tx_status`, `hartii_otc_list`, `hartii_claim_eligibility`, `hartii_wall_stats`, plus the keyless
+local trader reads `hartii_trader_status`, `hartii_trader_limits` and `hartii_trader_activity` (no unlock, arm or signing).
 **Write tools** — registered **only** with `--allow-writes`: `hartii_send`, `hartii_buy`, `hartii_sell`,
 `hartii_swap`, `hartii_otc_fill`, `hartii_otc_cancel`, `hartii_claim`. Every write is a **dry run** (the simulated
 confirmation summary, nothing signed) unless the call passes `confirm: true`, and a real send returns the summary plus

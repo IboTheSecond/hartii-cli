@@ -23,6 +23,10 @@ import { fmtPrice } from '../tui/format.js';
 import { CliError, rethrowAs } from '../errors.js';
 import { runUpdate } from './update.js';
 
+// Same major as package.json "engines.node" (>=22); test/everyday.test.mjs keeps the two in step.
+export const MIN_NODE_MAJOR = 22;
+export const nodeMeetsEngines = (version) => Number(String(version).split('.')[0]) >= MIN_NODE_MAJOR;
+
 export class ExtraError extends CliError {}
 
 const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
@@ -131,7 +135,7 @@ export async function runExtra(command, args, ctx) {
       steps.push('hartii doctor                check RPC, chain id and API');
       if (current) steps.push('hartii balance --tokens     see what you hold');
       steps.push('hartii ui --demo              tour the full-screen UI on fixture data', 'hartii help                  every command (also: hartii ?)');
-      return { status: 'BETA — the Hartii terminal wallet is beta software and has not been independently audited; start with small amounts.', node: process.versions.node, nodeOk: Number(process.versions.node.split('.')[0]) >= 20, home: r.home, homeExists: existsSync(r.home), network: r.net.name, wallets: wallets.length, currentWallet: current?.name ?? null, address: current?.address ?? null, nextSteps: steps };
+      return { status: 'BETA — the Hartii terminal wallet is beta software and has not been independently audited; start with small amounts.', node: process.versions.node, nodeOk: nodeMeetsEngines(process.versions.node), home: r.home, homeExists: existsSync(r.home), network: r.net.name, wallets: wallets.length, currentWallet: current?.name ?? null, address: current?.address ?? null, nextSteps: steps };
     }
     case 'update':
       return runUpdate({ check: extraFlags.check === true, json: opts.json === true, yes: opts.yes === true }, { fetchFn: deps.fetchFn, spawnFn: deps.spawnFn, confirmFn: deps.confirmFn, interactive: deps.interactive, writeErr: deps.writeErr, base: deps.updateBase, tmp: deps.tmp });

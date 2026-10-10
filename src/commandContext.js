@@ -105,6 +105,19 @@ export async function writeRuntime(opts = {}, deps = {}) {
         if (!decoded.isSigned() || decoded.type !== 0 || decoded.from?.toLowerCase() !== from.toLowerCase()
           || decoded.unsignedSerialized !== reviewed.unsignedSerialized) throw new WalletError('Refusing to broadcast: signed transaction differs from reviewed authority.');
         signedHash = decoded.hash;
+        // The native pipeline owns this synchronous durable reservation hook. A process
+        // crash after dispatch must still leave the exact locally verified signed hash.
+        if(controls.onSignedTransaction!==undefined) {
+          if(typeof controls.onSignedTransaction!=='function')throw new WalletError('Invalid native signed-hash persistence hook.');
+          const result=controls.onSignedTransaction({txHash:signedHash});
+          if(result && typeof result.then==='function')throw new WalletError('Native signed-hash persistence must be synchronous.');
+        }
+        // Trusted in-process hosts may persist the public hash before permitting dispatch.
+        // Never supply signed bytes or keys. CLI argv and MCP input cannot install this hook.
+        if (deps.io?.onSignedTransaction !== undefined) {
+          if (typeof deps.io.onSignedTransaction !== 'function') throw new WalletError('Invalid local signing continuation.');
+          await deps.io.onSignedTransaction({ txHash: signedHash, transaction: structuredClone(request) });
+        }
         if (typeof provider.getNetwork !== 'function') throw new WalletError('Refusing to sign: RPC chain cannot be verified.');
         const live = BigInt((await provider.getNetwork()).chainId);
         if (live !== BigInt(runtime.net.chainId)) throw new WalletError(`Refusing to sign: RPC reports chain ${live}, expected ${runtime.net.chainId}.`);
@@ -112,6 +125,11 @@ export async function writeRuntime(opts = {}, deps = {}) {
         if (!Number.isSafeInteger(pendingNonce) || pendingNonce !== request.nonce) throw new WalletError('Refusing to sign: wallet nonce changed; review fresh transaction terms.');
         if (intent !== transactionIntentDigest(request)) throw new WalletError('Refusing to sign: reviewed transaction authority changed.');
         controls.validateBeforeSubmit?.();
+        if(deps.io?.onBroadcastStarted!==undefined) {
+          if(typeof deps.io.onBroadcastStarted!=='function')throw new WalletError('Invalid local broadcast marker.');
+          const result=deps.io.onBroadcastStarted({txHash:signedHash});
+          if(result && typeof result.then==='function')throw new WalletError('Local broadcast marker must be synchronous.');
+        }
       } catch (error) {
         throw new PreBroadcastError(error instanceof WalletError ? error.message : 'Local authority verification failed before sending.');
       }
@@ -138,6 +156,15 @@ export async function marketRuntime(opts, deps) {
 export function toolsRuntime(opts, deps) {
   assertToolsNetwork(readRuntime(opts, deps).net.name);
   return writeRuntime(opts, deps);
+}
+
+/** Trusted managed-exit hosts may account native outflow instead of sale proceeds.
+ * No CLI flag or MCP input installs this callback; all ordinary turnover guards remain. */
+export function managedExitSpend(ctx, details) {
+  const callback=ctx.io?.managedExitBudget;
+  if(callback===undefined)return null;
+  if(typeof callback!=='function' || callback({...details,from:ctx.from,chainId:ctx.net.chainId})!==0n)throw new WalletError('Managed exit budget authority did not verify.');
+  return 0n;
 }
 
 /** runWrite with the runtime's wallet/provider/limits/flags; a WriteError is rethrown as `ErrorClass` (message prefixed) when given. */

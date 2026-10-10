@@ -85,6 +85,7 @@ export function safeTerminalText(value) {
     // Category approach, not a hand list: control (Cc), format (Cf: bidi, zero-width, BOM, soft hyphen,
     // Arabic letter mark, Mongolian separator, tag characters), line/paragraph separators (Zl/Zp), lone
     // surrogates, plus the invisible fillers that are letters (Hangul/Khmer fillers) and the whole tag block.
+    // eslint-disable-next-line no-misleading-character-class -- remove each invisible filler independently
     .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\p{Cs}\u061c\u115f\u1160\u17b4\u17b5\u180e\u3164\uffa0\u{e0000}-\u{e007f}]/gu, '');
 }
 
@@ -124,10 +125,17 @@ export function withAddr(symbol, address) {
 
 /** Strips credentials, query strings and key-like path segments from every URL inside `text`. */
 export function redactUrls(text) {
-  return String(text).replace(/https?:\/\/[^\s"'<>)]+/gi, (raw) => {
+  return String(text).replace(/https?:\/\/[^\s]+/gi, (raw) => {
     try {
+      // Closing punctuation is valid userinfo; only known complete explorer paths
+      // may be split from surrounding prose before parsing the whole URL token.
+      const explorer=raw.match(/^(https:\/\/(?:quaiscan\.io|orchard\.quaiscan\.io)\/(?:tx\/0x[0-9a-f]{64}|address\/0x[0-9a-f]{40})\/?)([)\]}.,;!:'"<>]*)$/i);
+      if(explorer)return explorer[1]+explorer[2];
       const u = new URL(raw);
-      const path = u.pathname.split('/').map((seg) => {let decoded;try{decoded=decodeURIComponent(seg);}catch{return '***';}return /^[A-Za-z0-9_-]{16,}$/.test(decoded)&&!/^0x[0-9a-fA-F]+$/.test(decoded)?'***':seg;}).join('/');
+      const path = u.pathname.split('/').map(seg => {
+        let decoded;try {decoded=decodeURIComponent(seg);}catch{return '***';}
+        return decoded.length>=16 ? '***' : seg;
+      }).join('/');
       return `${u.protocol}//${u.host}${path}${u.search || u.hash ? '?***' : ''}`;
     } catch { return '[redacted-url]'; }
   });

@@ -6,11 +6,13 @@
 // this module never writes to it, and all diagnostics go to stderr.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
 import { buildTools, clean } from './tools.js';
 import { PKG_VERSION } from '../version.js';
 import { getHartiiHome, loadConfig } from '../config.js';
 import { readRuntime } from '../commandContext.js';
 import { installConsoleGuard } from '../stdoutGuard.js';
+import { OUTPUT_SCHEMA, resultMetadata, toolAnnotations, toolResult } from '../../vendor/packages/agent-mcp/src/capabilities.js';
 
 const DECIMAL = /^\d{1,78}(\.\d{1,18})?$/;
 
@@ -29,14 +31,20 @@ export const INSTRUCTIONS = [
  */
 export function buildMcpServer(ctx, makeServer = () => new McpServer({ name: 'hartii-cli', version: PKG_VERSION }, { instructions: INSTRUCTIONS })) {
   const server = makeServer();
-  const tools = buildTools(ctx);
+  const { net } = readRuntime({ home: ctx.home, network: ctx.network, rpc: ctx.rpc }, { env: ctx.env });
+  const tools = buildTools({ ...ctx, network: net.name });
   for (const tool of tools) {
-    server.registerTool(tool.name, { description: tool.description, inputSchema: tool.inputSchema }, async (args) => {
+    const metadata = (args = {}) => resultMetadata({
+      authority: ctx.allowWrites === true && !tool.local ? 'reviewed-wallet' : 'read-only',
+      mode: tool.write ? args.confirm === true ? 'live' : 'dry-run' : 'read-only',
+      chainId: tool.local ? 9 : net.chainId, network: tool.local ? 'mainnet' : net.name,
+    });
+    server.registerTool(tool.name, { description: tool.description, inputSchema: z.strictObject(tool.inputSchema, { error: 'Invalid tool arguments: unsupported parameters, types, or bounds.' }), outputSchema: OUTPUT_SCHEMA, annotations: toolAnnotations(tool) }, async (args) => {
       try {
         const result = await tool.handler(args || {});
-        return { content: [{ type: 'text', text: JSON.stringify(clean(result)) }] };
+        return toolResult(clean(result), metadata(args));
       } catch (err) {
-        return { content: [{ type: 'text', text: `Error: ${clean(String(err?.message || 'unknown error'))}` }], isError: true };
+        return toolResult({ error: { code: 'TOOL_ERROR', message: clean(String(err?.message || 'unknown error')) }, retryable: false }, metadata(args), { isError: true });
       }
     });
   }
@@ -62,6 +70,7 @@ export function resolveMcpContext(opts = {}) {
     home, env, limits,
     network: opts.network || undefined, rpc: opts.rpc || undefined, wallet: opts.wallet || undefined, keyEnv: opts.keyEnv || undefined,
     allowWrites: opts.allowWrites === true,
+    traderReader: opts.traderReader,
     fetchFn: opts.fetchFn, providerFactory: opts.providerFactory, walletFactory: opts.walletFactory, now: opts.now,
   };
 }

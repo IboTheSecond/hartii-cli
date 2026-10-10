@@ -2,6 +2,13 @@
 import { describe, it, expect } from 'vitest';
 import { colorEnabled, makeColors, stripAnsi, printJson, formatTable } from '../src/output.js';
 import * as output from '../src/output.js';
+it('redacts complete diagnostic URLs including punctuation in credentials and dotted/padded paths',()=>{
+  for(const url of ['https://user:prefix)fixture-password@rpc.invalid/path','https://rpc.invalid/v3/fixture.path.secret.long','https://rpc.invalid/v3/fixture_path_secret_long==']) {
+    expect(output.redactUrls(url)).not.toMatch(/fixture-password|fixture.path.secret.long|fixture_path_secret_long/);
+  }
+  const link='https://quaiscan.io/tx/0x'+'a'.repeat(64);
+  expect(output.redactUrls(link+')')).toBe(link+')');
+});
 
 describe('safeTerminalText', () => {
   it('removes cursor commands and OSC clipboard/link/title payloads', () => {

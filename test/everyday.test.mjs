@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { main } from '../src/cli.js';
+import { nodeMeetsEngines, MIN_NODE_MAJOR } from '../src/commands/extras.js';
 import { COMMANDS, ALIASES, fullHelp, commandHelp, suggest, completionScript, lookup } from '../src/help.js';
 import { readGasPrice } from '../src/gasPrice.js';
 import { readCurveMeta } from '../src/curveState.js';
@@ -180,5 +182,15 @@ describe('live-RPC regressions (zone-pinned URL)', () => {
     expect(meta.isV3).toBe(false);
     const net = { call: async () => { throw Object.assign(new Error('timeout'), { code: 'TIMEOUT' }); } };
     await expect(readCurveMeta(net, '0x004Bc407903A51506bcF0b1aB423958c5991c237')).rejects.toThrow();
+  });
+});
+
+describe('hartii init Node check', () => {
+  it('requires the same Node major as package.json engines (22), not the old 20', () => {
+    const engines = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).engines.node;
+    expect(engines).toBe('>=' + MIN_NODE_MAJOR);
+    expect(MIN_NODE_MAJOR).toBe(22);
+    for (const v of ['18.20.4', '20.11.0', '21.7.3']) expect(nodeMeetsEngines(v)).toBe(false);
+    for (const v of ['22.0.0', '22.12.1', '24.15.0']) expect(nodeMeetsEngines(v)).toBe(true);
   });
 });

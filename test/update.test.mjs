@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
-import { compareSemver, versionFromTarball } from '../src/commands/update.js';
+import { compareSemver, versionFromTarball, runUpdate } from '../src/commands/update.js';
 
 const BASE = 'https://hartiilabs.com/downloads/';
 const sha = (b) => createHash('sha256').update(b).digest('hex');
@@ -88,6 +88,23 @@ describe('hartii update', () => {
     expect(seen[1][1].at(-1)).toBe('--version');
     for (const c of calls) { expect(c.init.redirect).toBe('error'); expect(c.url.startsWith(BASE)).toBe(true); }
     expect(existsSync(args.at(-1))).toBe(false); // temp file cleaned up
+  });
+
+  it('accepts a Windows short-name temp path while verifying the downloaded bytes', async () => {
+    const parent=mkdtempSync(join(tmpdir(),'hartii-short-path-')),temp=join(parent,'RUNNER~1');mkdirSync(temp);
+    const {fetchFn,tar}=world({version:'99.1.0'});let installedBytes;
+    const spawnFn=vi.fn((cmd,args)=>{if(args.includes('install'))installedBytes=readFileSync(args.at(-1));return {status:0,stdout:'99.1.0\n'};});
+    const result=await runUpdate({yes:true},{tmp:temp,platform:'win32',fetchFn,spawnFn,writeErr:()=>{}});
+    expect(result.updated).toBe(true);expect(installedBytes).toEqual(tar);
+    expect(spawnFn).toHaveBeenCalledTimes(2);
+    expect(spawnFn.mock.calls[0][1].slice(0,4)).toEqual(['/d','/s','/c','npm.cmd']);
+  });
+
+  it.each(['unsafe&path','unsafe%path','unsafe!path'])('rejects Windows shell metacharacters in temp path %s before invoking npm', async name => {
+    const parent=mkdtempSync(join(tmpdir(),'hartii-unsafe-path-')),temp=join(parent,name);mkdirSync(temp);
+    const {fetchFn}=world({version:'99.1.0'}),spawnFn=vi.fn();
+    await expect(runUpdate({yes:true},{tmp:temp,platform:'win32',fetchFn,spawnFn,writeErr:()=>{}})).rejects.toThrow(/cannot take safely/);
+    expect(spawnFn).not.toHaveBeenCalled();
   });
 
   it('refuses a download whose sha256 does not match the published one', async () => {

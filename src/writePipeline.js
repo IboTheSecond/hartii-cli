@@ -331,7 +331,8 @@ async function runWriteLocked(ctx, from) {
   let sent;
   try {
     validateBeforeSubmit(submitValidator, summary, sendTx);
-    sent = await wallet.sendTransaction(sendTx, { validateBeforeSubmit: () => validateBeforeSubmit(submitValidator, summary, sendTx) });
+    sent = await wallet.sendTransaction(sendTx, { validateBeforeSubmit: () => validateBeforeSubmit(submitValidator, summary, sendTx),
+      onSignedTransaction: ({txHash}) => markSpendHash(home,from,reservation,txHash) });
   } catch (err) {
     // No successful SDK response means no locally returned signed hash. RPC
     // receipt/transaction fields in a submission error cannot establish it.
