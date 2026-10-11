@@ -135,13 +135,13 @@ export async function runExtra(command, args, ctx) {
       steps.push('hartii doctor                check RPC, chain id and API');
       if (current) steps.push('hartii balance --tokens     see what you hold');
       steps.push('hartii ui --demo              tour the full-screen UI on fixture data', 'hartii help                  every command (also: hartii ?)');
-      return { status: 'BETA — the Hartii terminal wallet is beta software and has not been independently audited; start with small amounts.', node: process.versions.node, nodeOk: nodeMeetsEngines(process.versions.node), home: r.home, homeExists: existsSync(r.home), network: r.net.name, wallets: wallets.length, currentWallet: current?.name ?? null, address: current?.address ?? null, nextSteps: steps };
+      return { status: 'BETA — the Hartii terminal wallet is beta software; start with small amounts.', node: process.versions.node, nodeOk: nodeMeetsEngines(process.versions.node), home: r.home, homeExists: existsSync(r.home), network: r.net.name, wallets: wallets.length, currentWallet: current?.name ?? null, address: current?.address ?? null, nextSteps: steps };
     }
     case 'update':
       return runUpdate({ check: extraFlags.check === true, json: opts.json === true, yes: opts.yes === true }, { fetchFn: deps.fetchFn, spawnFn: deps.spawnFn, confirmFn: deps.confirmFn, interactive: deps.interactive, writeErr: deps.writeErr, base: deps.updateBase, tmp: deps.tmp });
     case 'about':
     case 'version':
-      return { name: '@hartii/cli', version: PKG_VERSION, status: 'BETA — not audited', node: process.versions.node, home: rt().home, site: 'https://hartiilabs.com/cli', docs: 'https://docs.hartiilabs.com', download: 'https://hartiilabs.com/downloads/hartii-cli.tgz' };
+      return { name: '@hartii/cli', version: PKG_VERSION, status: 'BETA', node: process.versions.node, home: rt().home, site: 'https://hartiilabs.com/cli', docs: 'https://docs.hartiilabs.com', download: 'https://hartiilabs.com/downloads/hartii-cli.tgz' };
     default:
       throw new ExtraError(`Unknown command "${command}".`);
   }

@@ -77,7 +77,7 @@ export async function walletNew(home, name, deps = {}) {
   if (walletExists(home, resolvedName)) throw new WalletError(`Wallet "${resolvedName}" already exists.`);
   const account = generateMnemonicAccount();
   const result = await persistAccount(home, resolvedName, account, deps);
-  return { ...result, reminder: `Back up the recovery phrase now: run \`hartii wallet export ${result.name}\`. It is never shown automatically. Hartii CLI is BETA (not independently audited): start with small amounts.` };
+  return { ...result, reminder: `Back up the recovery phrase now: run \`hartii wallet export ${result.name}\`. It is never shown automatically. Hartii CLI is BETA: start with small amounts.` };
 }
 
 /**
@@ -93,7 +93,7 @@ export async function walletImport(home, kind, value, name, deps = {}) {
   if (walletExists(home, resolvedName)) throw new WalletError(`Wallet "${resolvedName}" already exists.`);
   const account = kind === 'mnemonic' ? accountFromMnemonic(value) : accountFromPrivateKey(value);
   const result = await persistAccount(home, resolvedName, account, deps);
-  return { ...result, reminder: kind === 'mnemonic' ? `Back up the recovery phrase now: run \`hartii wallet export ${result.name}\`. It is never shown automatically. Hartii CLI is BETA (not independently audited): start with small amounts.` : undefined };
+  return { ...result, reminder: kind === 'mnemonic' ? `Back up the recovery phrase now: run \`hartii wallet export ${result.name}\`. It is never shown automatically. Hartii CLI is BETA: start with small amounts.` : undefined };
 }
 
 /** `wallet list` */

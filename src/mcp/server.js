@@ -17,7 +17,7 @@ import { OUTPUT_SCHEMA, resultMetadata, toolAnnotations, toolResult } from '../.
 const DECIMAL = /^\d{1,78}(\.\d{1,18})?$/;
 
 export const INSTRUCTIONS = [
-  'Hartii CLI MCP server (BETA, not independently audited): a personal Quai wallet and Hartii market tools.',
+  'Hartii CLI MCP server (BETA): a personal Quai wallet and Hartii market tools.',
   'Read tools are always available. Write tools exist only when the operator started the server with --allow-writes,',
   'and every write is a DRY RUN (simulated summary plus a reviewToken, nothing signed) unless you pass confirm:true together with that reviewToken.',
   'Always dry-run first, show the user the summary, and only then re-call with confirm:true and the reviewToken after they agree; if the terms moved since the review the call is refused and you must review again.',

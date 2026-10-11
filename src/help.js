@@ -127,7 +127,7 @@ export function suggest(input) {
 
 export function fullHelp() {
   const out = [
-    'hartii — Hartii terminal wallet + trading terminal for Quai Network (BETA, not audited)',
+    'hartii — Hartii terminal wallet + trading terminal for Quai Network (BETA)',
     '',
     'Just type `hartii` for the full-screen UI. Ask for help anywhere:  hartii ?   hartii help <command>   hartii <command> ?',
     'Usage: hartii <command> [args] [--json] [--network mainnet|orchard] [--rpc <url>] [--wallet <name>] [--yes] [--dry-run] [--demo]',
@@ -142,7 +142,7 @@ export function fullHelp() {
   }
   out.push('Shortcuts: bal · pf · ls · top · me · addr · gas · block — see `hartii commands` for all aliases.');
   out.push('First time?  hartii init     Look around without a wallet:  hartii ui --demo');
-  out.push('BETA: the Hartii terminal wallet is beta software and has not been independently audited. Start small.');
+  out.push('BETA: the Hartii terminal wallet is beta software. Start small.');
   out.push('Safety: every write is simulated, fee-capped and spending-guarded (100 QUAI/tx, 500/day by default), then');
   out.push('confirmed with y/N and only reported as done on receipt status 1. Keys live only in the encrypted keystore.');
   return out.join('\n');
@@ -154,7 +154,7 @@ export function commandHelp(name) {
   const out = [`hartii ${c.name} — ${c.summary}`, '', 'Usage:', ...c.usage.map((u) => `  ${u}`)];
   if (c.aliases?.length) out.push('', `Aliases: ${c.aliases.join(', ')}`);
   if (c.examples?.length) out.push('', 'Examples:', ...c.examples.map((e) => `  ${e}`));
-  out.push('', 'Global flags: --json  --network mainnet|orchard  --rpc <url>  --wallet <name>  --yes  --dry-run  --demo', 'Hartii CLI is BETA software and has not been audited: start with small amounts.');
+  out.push('', 'Global flags: --json  --network mainnet|orchard  --rpc <url>  --wallet <name>  --yes  --dry-run  --demo', 'Hartii CLI is BETA software: start with small amounts.');
   return out.join('\n');
 }
 

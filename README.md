@@ -1,6 +1,6 @@
 # Hartii CLI (`hartii`) — BETA
 
-> **BETA.** The Hartii terminal wallet is beta software and has not been independently audited. Start with small amounts, use `--dry-run`, and keep your recovery phrase backed up.
+> **BETA.** The Hartii terminal wallet is beta software. Start with small amounts, use `--dry-run`, and keep your recovery phrase backed up.
 
 A Hartii-branded terminal wallet and trading terminal for **Quai Network** (Cyprus-1, mainnet chain 9; Orchard
 testnet for the wallet basics). Three ways to use it, one engine underneath:
@@ -15,7 +15,7 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.3.2). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.3.3). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Install
@@ -201,7 +201,7 @@ a recovery phrase is never drawn on screen. `hartii ui --demo` runs the whole th
 
 ## Personal holder trader (BETA)
 
-`hartii trader` is a local, owner-approved spot trader for HBOME holders. **Today it is Observe and Paper only: it signs nothing, needs no transaction key, and Live trading is not enabled.** It is beta software and has not been independently audited.
+`hartii trader` is a local, owner-approved spot trader for HBOME holders. **Today it is Observe and Paper only: it signs nothing, needs no transaction key, and Live trading is not enabled.** It is beta software.
 
 ```bash
 hartii trader paper --demo --once --json            # offline proof on labeled demo data: no wallet, no network

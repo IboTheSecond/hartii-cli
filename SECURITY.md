@@ -1,6 +1,6 @@
 # Security
 
-Hartii CLI is **beta** software that handles private keys and can move funds. It has not been independently audited.
+Hartii CLI is **beta** software that handles private keys and can move funds.
 
 ## Reporting a vulnerability
 

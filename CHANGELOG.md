@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-10-11
+
+- Copy-only patch: drop the audit-status disclaimer wording from `hartii help`, `hartii doctor`, `hartii version` status output, wallet reminders, the MCP server description, the README and the public SECURITY text. No command, flag, signing or limit behaviour changes.
+
 ## [0.3.2] — 2026-10-11
 
 - Fix every confirmed remaining wallet audit defect: mutable selected-wallet/network context with stale-response fencing; Orchard feed isolation; ticker watch removal; visible menu/list/form selection; complete result arrays; stale-feed indication; terminal exception cleanup.
