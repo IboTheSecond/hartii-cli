@@ -302,7 +302,7 @@ describe('M2 pipeline safety', () => {
   });
   it.each(['returned', 'thrown'])('charges mined revert gas (%s receipt) until the daily ceiling stops signing', async (shape) => {
     const { wallet, provider } = makeWalletAndProvider({ estimate: 1n, gasPrice: 10n ** 18n });
-    const receipt = { status: 0, hash: HASH, gasUsed: 1n, fee: 10n ** 18n, hash: HASH };
+    const receipt = { status: 0, hash: HASH, gasUsed: 1n, fee: 10n ** 18n };
     wallet.sendTransaction.mockResolvedValue({ hash: HASH, wait: async () => {
       if (shape === 'thrown') throw Object.assign(Error('reverted'), { code: 'CALL_EXCEPTION', receipt });
       return receipt;

@@ -7,6 +7,6 @@ import { JsonRpcProvider } from 'quais';
 
 /** @param {string} rpcUrl */
 export function createProvider(rpcUrl) {
-  return new JsonRpcProvider(rpcUrl, undefined, { usePathing: false });
+  return new JsonRpcProvider(rpcUrl, undefined, { usePathing: false, batchMaxCount: 20 });
 }
 

@@ -8,6 +8,7 @@ import { renderFrame, defaultUi, confirmLayout, FOCUS_ORDER, MENU } from './rend
 import { ACTIONS, fieldsFor, validateAll, commandFor } from './forms.js';
 import { S } from './theme.js';
 import { stripAnsi } from '../output.js';
+import { assertCyprus1QuaiAddress } from '../address.js';
 
 const SENSITIVE_NOTE = 'Keys stay in the encrypted keystore. Create or import wallets with the CLI so recovery phrases are never drawn on this screen.';
 
@@ -33,7 +34,12 @@ export class TuiApp {
   now() { return this.deps.now ? this.deps.now() : Date.now(); }
   invalidate() { this.dirty = true; this.onChange?.(); }
 
-  setData(patch) { Object.assign(this.data, patch); this.invalidate(); }
+  setData(patch) {
+    Object.assign(this.data, patch);
+    const o = this.ui.overlay;
+    if (o?.type === 'receive' && !this.sameReceiveWallet(o)) this.closeOverlay();
+    this.invalidate();
+  }
   resize(cols, rows) { this.size = { cols, rows }; this.invalidate(); }
   status(text, kind = 'info') { this.ui.status = text ? { text, kind } : null; this.invalidate(); }
 
@@ -64,8 +70,8 @@ export class TuiApp {
       else if (name === 'down') this.ui.watchSel = Math.min(Math.max(0, n - 1), this.ui.watchSel + 1);
       else if (k.str === 'a') return this.promptWatchAdd();
       else if (k.str === 'd') return this.removeWatch();
-      else if (name === 'return' && n) return this.openAction('Buy', { token: this.data.watch[this.ui.watchSel].symbol });
-      else if (k.str === 's' && n) return this.openAction('Sell', { token: this.data.watch[this.ui.watchSel].symbol });
+      else if (name === 'return' && n) return this.openAction('Buy', { token: this.data.watch[this.ui.watchSel].address || this.data.watch[this.ui.watchSel].symbol });
+      else if (k.str === 's' && n) return this.openAction('Sell', { token: this.data.watch[this.ui.watchSel].address || this.data.watch[this.ui.watchSel].symbol });
     } else if (focus === 'trades') {
       const n = (this.data.trades || []).length;
       if (name === 'up') this.ui.tradeScroll = Math.max(0, this.ui.tradeScroll - 1);
@@ -86,18 +92,34 @@ export class TuiApp {
 
   quit() {
     this.quitRequested = true;
+    if (this.ui.overlay?.type === 'receive') this.closeOverlay();
     if (this.pending) { this.pending.reject?.(new Error('Aborted.')); this.pending = null; }
     this.deps.quit?.();
     this.invalidate();
   }
 
   // ---------------------------------------------------------------- overlays
-  closeOverlay() { this.ui.overlay = null; this.ui.focus = 'actions'; this.invalidate(); }
+  closeOverlay() {
+    this.ui.overlay?.copyController?.abort();
+    this.ui.overlay = null; this.ui.focus = 'actions'; this.invalidate();
+  }
 
   overlayKey(o, k) {
     const name = k.name;
+    if (o.type === 'receive') {
+      if (name === 'escape' || k.str === 'q') return this.closeOverlay();
+      if (k.str?.toLowerCase() === 'a') return this.copyReceive(o, 'address');
+      if (k.str?.toLowerCase() === 'l') return this.copyReceive(o, 'paylink');
+      return undefined;
+    }
     if (o.type === 'help' || o.type === 'result') {
       if (name === 'escape' || name === 'return' || k.str === 'q') return this.closeOverlay();
+      if (o.type === 'result') {
+        const L = confirmLayout(o, this.size.cols, this.size.rows);
+        const scroll = Math.min(Math.max(0, o.scroll || 0), L.maxScroll);
+        const targets = { up: scroll - 1, down: scroll + 1, pageup: scroll - Math.max(1, L.cap - 1), pagedown: scroll + Math.max(1, L.cap - 1), home: 0, end: L.maxScroll };
+        if (Object.hasOwn(targets, name)) { o.scroll = Math.min(Math.max(0, targets[name]), L.maxScroll); return this.invalidate(); }
+      }
       return undefined;
     }
     if (o.type === 'busy') return undefined; // cannot interrupt a running command; Ctrl-C quits
@@ -154,6 +176,7 @@ export class TuiApp {
 
   // ---------------------------------------------------------------- forms
   openAction(name, prefill = {}) {
+    if (name === 'Receive') return this.openReceive();
     if (name === 'Wallets') return this.openWallets();
     const def = ACTIONS[name];
     if (!def) return undefined;
@@ -165,6 +188,56 @@ export class TuiApp {
     if (init) Object.assign(values, init);
     this.rebuildForm(o, true);
     return this.invalidate();
+  }
+
+  sameReceiveWallet(o) {
+    return this.data.wallet?.name === o.walletName
+      && String(this.data.wallet?.address || '').toLowerCase() === o.address?.toLowerCase()
+      && this.data.network === o.network;
+  }
+
+  async openReceive() {
+    this.closeOverlay();
+    const wallet = this.data.wallet;
+    const o = { type: 'receive', title: 'Receive QUAI', status: 'loading', walletName: wallet?.name, network: this.data.network, details: null, message: '' };
+    this.ui.overlay = o;
+    if (!wallet) { o.status = 'error'; o.message = 'No wallet selected. Open Wallets or create one in the CLI.'; return this.invalidate(); }
+    try { o.address = assertCyprus1QuaiAddress(wallet.address); }
+    catch { o.status = 'error'; o.message = 'A valid Cyprus-1 Quai wallet is required to receive.'; return this.invalidate(); }
+    this.invalidate();
+    try {
+      const details = await this.deps.runCommand('receive', { wallet: o.walletName, network: o.network, addressQr: true }, {
+        io: { write: () => {}, writeErr: () => {} },
+        passwordDeps: { promptFn: () => { throw new Error('Receiving must not unlock a wallet.'); } },
+      });
+      if (this.ui.overlay !== o || !this.sameReceiveWallet(o)) return;
+      if (details?.readOnly !== true || assertCyprus1QuaiAddress(details.address) !== o.address || details.qr?.payload !== o.address) throw new Error('Wallet changed. Reopen Receive for the selected wallet.');
+      o.details = details; o.status = 'ready';
+      if (this.demo || details.demo) o.message = 'DEMO - test address. Do not send funds.';
+      else void this.copyReceive(o, 'address');
+      this.invalidate();
+    } catch (e) {
+      if (this.ui.overlay !== o) return;
+      o.status = 'error'; o.message = String(e?.message || 'Could not prepare receiving details.');
+      this.invalidate();
+    }
+  }
+
+  async copyReceive(o, kind) {
+    if (this.ui.overlay !== o || o.status !== 'ready' || !this.sameReceiveWallet(o)) return;
+    if (this.demo || o.details.demo) { o.message = 'DEMO - test address. Do not send funds.'; return this.invalidate(); }
+    const text = o.details[kind];
+    if (!text) { o.message = 'Paylinks require mainnet. Copy the address for this network.'; return this.invalidate(); }
+    o.copyController?.abort();
+    const controller = new AbortController(); o.copyController = controller;
+    const noun = kind === 'address' ? 'address' : 'paylink';
+    o.message = `Copying ${noun}...`; o.messageKind = 'info'; this.invalidate();
+    let ok = false;
+    try { ok = (await this.deps.copyText?.(text, { signal: controller.signal }))?.ok === true; }
+    catch { /* availability failure must never be shown as success */ }
+    if (this.ui.overlay !== o || controller.signal.aborted || !this.sameReceiveWallet(o)) return;
+    o.message = ok ? `${kind === 'address' ? 'Address' : 'Paylink'} copied to clipboard` : `Could not copy ${noun}. Press ${kind === 'address' ? 'A' : 'L'} to retry.`;
+    o.messageKind = ok ? 'ok' : 'error'; this.invalidate();
   }
 
   rebuildForm(o, seed = false) {
@@ -279,7 +352,12 @@ export class TuiApp {
       this.deps.refresh?.();
     } catch (e) {
       const msg = String(e?.message || e);
-      this.ui.overlay = { type: 'result', title: `${title} — failed`, lines: msg.split(/(?<=.{70})\s/).map((text) => ({ text, st: S.down })), footer: 'Esc close' };
+      const txHash = typeof e?.txHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(e.txHash) ? e.txHash : null;
+      const status = e?.status === 'reverted' ? 'reverted' : e?.status === 'unconfirmed' || txHash ? 'unconfirmed' : 'failed';
+      const lines = msg.split('\n').map(text => ({ text, st: status === 'unconfirmed' ? S.warn : S.down }));
+      if (status === 'unconfirmed') lines.push({ text: 'Outcome unknown — do not resend. Check the transaction first.', st: S.warn });
+      if (txHash) lines.push({ text: `tx ${txHash}`, st: S.ink }, { text: `Check status: hartii tx ${txHash}`, st: S.muted });
+      this.ui.overlay = { type: 'result', title: `${title} — ${status}`, lines, footer: 'Esc close' };
       this.invalidate();
     }
   }
@@ -291,7 +369,7 @@ export class TuiApp {
     else if (result?.dryRun) lines.push({ text: 'Simulated only — not sent', st: S.warn });
     else if (result?.status === 'success') lines.push({ text: 'Confirmed on-chain', st: S.up });
     const flat = result?.qr ? [`Address: ${result.address}`,`Network: ${result.network} · chain ${result.chainId}`,`QR SVG: ${result.savedTo||'not saved'}`,...(result.paylink?[`HPAY: ${result.paylink}`]:[]),'Open the SVG to scan or share these exact request terms.'] : result?.summary ? flatten(result.summary) : flatten(result || {});
-    for (const row of flat.slice(0, 18)) lines.push({ text: row, st: S.ink });
+    for (const row of flat) lines.push({ text: row, st: S.ink });
     if (result?.txHash) lines.push({ text: `tx ${result.txHash}`, st: S.muted });
     if (result?.quaiscanUrl) lines.push({ text: result.quaiscanUrl, st: S.muted });
     this.ui.overlay = { type: 'result', title, lines, footer: 'Esc close' };
@@ -334,7 +412,7 @@ export class TuiApp {
   async removeWatch() {
     const t = (this.data.watch || [])[this.ui.watchSel];
     if (!t) return undefined;
-    try { await this.deps.removeWatch?.(t.address || t.symbol); this.ui.watchSel = Math.max(0, this.ui.watchSel - 1); this.status(`Removed ${t.symbol}`, 'ok'); } catch (e) { this.status(String(e.message || e), 'error'); }
+    try { await this.deps.removeWatch?.(t.ref || t.address || t.symbol); this.ui.watchSel = Math.max(0, this.ui.watchSel - 1); this.status(`Removed ${t.symbol}`, 'ok'); } catch (e) { this.status(String(e.message || e), 'error'); }
     return undefined;
   }
 }
@@ -344,7 +422,7 @@ export function flatten(obj, prefix = '') {
   const out = [];
   for (const [k, v] of Object.entries(obj || {})) {
     if (v === undefined || v === null || k === 'action' || k === 'ok' || k === 'demo') continue;
-    if (Array.isArray(v)) { out.push(`${prefix}${k}: ${v.length} item(s)`); for (const it of v.slice(0, 6)) out.push(...flatten(typeof it === 'object' ? it : { value: it }, '  ')); }
+    if (Array.isArray(v)) { out.push(`${prefix}${k}: ${v.length} item(s)`); for (const it of v) out.push(...flatten(typeof it === 'object' ? it : { value: it }, '  ')); }
     else if (typeof v === 'object') { out.push(`${prefix}${k}:`); out.push(...flatten(v, `${prefix}  `)); }
     else out.push(`${prefix}${k}: ${v}`);
   }

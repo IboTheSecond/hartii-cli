@@ -18,17 +18,18 @@ async function importWallet(home, rest, flags, io) {
 }
 
 /** `hartii wallet <sub> ...` — the one place the wallet subcommands are routed. */
-export async function runWallet([sub, ...rest], flags, { home, io }) {
+export async function runWallet([sub, ...rest], flags, { home, io, g = {} }) {
+  const selected = rest[0] || g.wallet;
   switch (sub) {
     case 'new': return walletCmd.walletNew(home, rest[0], io);
     case 'import': return importWallet(home, rest, flags, io);
     case 'list': return { wallets: walletCmd.walletList(home) };
     case 'use': return walletCmd.walletUse(home, rest[0]);
-    case 'address': return walletCmd.walletAddress(home, rest[0], { qr: Boolean(flags.qr) });
-    case 'export': return walletCmd.walletExport(home, rest[0], io);
+    case 'address': return walletCmd.walletAddress(home, selected, { qr: Boolean(flags.qr) });
+    case 'export': return walletCmd.walletExport(home, selected, io);
     case 'rename': return walletCmd.walletRename(home, rest[0], rest[1]);
     case 'remove': return walletCmd.walletRemove(home, rest[0], io);
-    case 'lock-check': return walletCmd.walletLockCheck(home, rest[0]);
+    case 'lock-check': return walletCmd.walletLockCheck(home, selected);
     default:
       throw new WalletError(`Unknown \`wallet\` subcommand "${sub || ''}". Try: new, import, list, use, address, export, rename, remove, lock-check.`);
   }

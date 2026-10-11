@@ -50,7 +50,7 @@ exports[`frame snapshots (demo fixture, ANSI stripped) > 80x24 1`] = `
   14:01:59  ▲ BUY  DEMO       28.2 QUAI    132.1K DEMO  0x0000…0d12
   14:01:56  ▲ BUY  HRTI       10.2 QUAI    107.7K HRTI  0x0000…0d13
 
-  Send   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
+  Send   Receive   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets
  Tab pane · ←→ action · Enter open                       ? help · q quit   DEMO"
 `;
 
@@ -93,7 +93,7 @@ exports[`frame snapshots (demo fixture, ANSI stripped) > 120x40 1`] = `
                                                 │  14:01:05  ▲ BUY  HRTI        6.1 QUAI     67.6K HRTI  0x0000…0d12
                                                 │  ── block 10,412,867 ───────────────────────────────────────────────
 
-  Send   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
+  Send   Receive   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
  Tab pane · ←→ action · Enter open                                                               ? help · q quit   DEMO"
 `;
 
@@ -120,7 +120,7 @@ exports[`frame snapshots (demo fixture, ANSI stripped) > help overlay at 80x24 1
   14:01:59  ▲ BUY  DEMO       28.2 QUAI    132.1K DEMO  0x0000…0d12
   14:01:56  ▲ BUY  HRTI       10.2 QUAI    107.7K HRTI  0x0000…0d13
 
-  Send   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
+  Send   Receive   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets
  Tab pane · ←→ action · Enter open                       ? help · q quit   DEMO"
 `;
 
@@ -163,6 +163,6 @@ exports[`frame snapshots (demo fixture, ANSI stripped) > send form with an inlin
                                                 │  14:01:05  ▲ BUY  HRTI        6.1 QUAI     67.6K HRTI  0x0000…0d12
                                                 │  ── block 10,412,867 ───────────────────────────────────────────────
 
-  Send   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
+  Send   Receive   Buy   Sell   Swap   Airdrop   OTC   Claim   Wall   Wallets   Settings
  Tab pane · ←→ action · Enter open                                                               ? help · q quit   DEMO"
 `;

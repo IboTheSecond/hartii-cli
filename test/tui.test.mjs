@@ -25,6 +25,38 @@ const NOW = Date.UTC(2026, 9, 5, 14, 2, 11);
 const data = () => demoState(NOW);
 const frame = (cols, rows, ui) => renderFrame({ ...data(), ui, now: NOW }, cols, rows);
 
+describe('transaction outcomes remain inspectable', () => {
+  const hash = '0x' + 'ab'.repeat(32);
+  it.each(['unconfirmed', undefined])('shows uncertain broadcast status %s and its public hash', async status => {
+    const error = Object.assign(Error('Submitted transaction identity disagrees with reviewed authority.'), { txHash: hash, status });
+    const app = new TuiApp({ data: data(), size: { cols: 80, rows: 24 }, deps: { runCommand: async () => { throw error; } } });
+    await app.execute('Buy', { fn: 'buy', opts: {} });
+    expect(app.ui.overlay.title).toBe('Buy — unconfirmed');
+    const text = app.ui.overlay.lines.map(line => line.text).join('\n');
+    expect(text).toContain(hash);
+    expect(text).toMatch(/do not resend/i);
+    expect(text).toContain('hartii tx');
+  });
+  it('distinguishes a confirmed revert from an unknown broadcast and ordinary failure', async () => {
+    for (const status of ['reverted', undefined]) {
+      const error = Object.assign(Error('Synthetic failure'), status ? { txHash: hash, status } : {});
+      const app = new TuiApp({ data: data(), size: { cols: 80, rows: 24 }, deps: { runCommand: async () => { throw error; } } });
+      await app.execute('Buy', { fn: 'buy', opts: {} });
+      expect(app.ui.overlay.title).toBe(status ? 'Buy — reverted' : 'Buy — failed');
+    }
+  });
+  it('wraps and scrolls long results so the hash and final terms can be inspected at 80x24', () => {
+    const app = new TuiApp({ data: data(), size: { cols: 80, rows: 24 } });
+    app.showResult('Buy', { status: 'success', txHash: hash, summary: Object.fromEntries(Array.from({ length: 25 }, (_, i) => [`term${i}`, `value${i}`])) });
+    expect(app.ui.overlay.lines.map(line => line.text).join('\n')).toContain('term24');
+    app.key({ name: 'end' });
+    expect(app.frame().toPlain()).toContain(hash);
+    expect(app.ui.overlay.scroll).toBeGreaterThan(0);
+    app.key({ name: 'home' });
+    expect(app.ui.overlay.scroll).toBe(0);
+  });
+});
+
 describe('frame snapshots (demo fixture, ANSI stripped)', () => {
   it('80x24', () => { expect(frame(80, 24).toPlain()).toMatchSnapshot(); });
   it('120x40', () => { expect(frame(120, 40).toPlain()).toMatchSnapshot(); });
@@ -155,7 +187,7 @@ describe('keyboard navigation', () => {
     press(app, 'return');
     expect(app.ui.overlay.type).toBe('form');
     expect(app.ui.overlay.action).toBe('Buy');
-    expect(app.ui.overlay.fields[0].value).toBe('HRTI');
+    expect(app.ui.overlay.fields[0].value).toBe(data().watch[1].address);
     press(app, 'escape');
     app.ui.focus = 'watch';
     press(app, 'd');

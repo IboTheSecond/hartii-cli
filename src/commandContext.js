@@ -138,6 +138,12 @@ export async function writeRuntime(opts = {}, deps = {}) {
       try {
         const sent = await provider.broadcastTransaction(getZoneForAddress(from), signed);
         if (typeof sent?.hash !== 'string' || sent.hash.toLowerCase() !== signedHash.toLowerCase()) throw new Error('Broadcast response does not match the locally signed transaction hash.');
+        // quais alpha.54 formats the numeric zero nonce in its local broadcast
+        // response as null. Restore only that SDK representation from the reviewed,
+        // byte-verified transaction after its signed hash has matched. Keep actual
+        // conflicting metadata for the pipeline to reject, and repair the original
+        // response so SDK receipt/replacement tracking also sees the correct nonce.
+        if (sent.nonce === null && request.nonce === 0) sent.nonce = 0;
         return sent;
       } catch (error) { throw new BroadcastError(error, signedHash, signed); }
     },

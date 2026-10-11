@@ -15,7 +15,7 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.3.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.3.2). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Install
@@ -48,8 +48,8 @@ hartii wallet address          # your Cyprus-1 Quai address
 hartii doctor                  # RPC, chain id, keystore perms, address ledger, API, clock skew
 hartii balance --tokens        # QUAI + HartiiLabs-indexed holdings
 hartii tokens trending
-hartii buy DEMO 5 --dry-run    # simulate and show the exact summary, sign nothing
-hartii buy DEMO 5              # same summary, then y/N, then send
+hartii buy DEMO 5 --demo --dry-run  # labelled fixture simulation, no network or signing
+hartii buy <token-address> 5 --dry-run  # replace the token address and review live terms
 ```
 
 Global flags work anywhere on the line: `--json`, `--network mainnet|orchard`, `--rpc <url>`,
@@ -242,8 +242,8 @@ Claude Code:
 
 ```bash
 claude mcp add hartii -- hartii mcp
-# with writes (caps are yours to choose; password via env, never on the command line):
-claude mcp add hartii -e HARTII_PASSWORD=… -- hartii mcp --allow-writes --max-per-tx 5 --max-per-day 20
+# optional reviewed writes (caps are yours to choose):
+claude mcp add hartii -- hartii mcp --allow-writes --max-per-tx 5 --max-per-day 20
 ```
 
 Cursor (`~/.cursor/mcp.json`):
@@ -253,8 +253,7 @@ Cursor (`~/.cursor/mcp.json`):
   "mcpServers": {
     "hartii": {
       "command": "hartii",
-      "args": ["mcp", "--max-per-tx", "5", "--max-per-day", "20"],
-      "env": { "HARTII_HOME": "~/.hartii" }
+      "args": ["mcp", "--max-per-tx", "5", "--max-per-day", "20"]
     }
   }
 }
@@ -263,6 +262,16 @@ Cursor (`~/.cursor/mcp.json`):
 Token names, symbols, metadata and wall messages are third-party text: the server strips control characters and tells
 the model to treat them as data, but keep write access to a wallet that holds only what you are willing to let an
 agent spend.
+
+Configure `HARTII_PASSWORD` through your MCP client's protected environment settings for reviewed writes, never in chat or command-line arguments. Omit `HARTII_HOME` to use the normal profile; a custom profile must use an absolute path, since MCP environment values are not expanded by a shell.
+
+### Terminal and scripting behavior in 0.3.2
+
+Receive opens a complete public-address QR and separate address/paylink copy actions; a too-small terminal shows the address and required size rather than cropping the QR. Arrow navigation keeps the selected action, wallet, watch item and form field visible. Result pages wrap and scroll, including every returned array entry. Watch Buy/Sell shortcuts pin the resolved token address.
+
+Changing wallet or network discards old balances and obsolete responses. Orchard uses its own RPC reads and does not display the mainnet market feed. A custom startup RPC cannot be reused across a network switch. A silent connected feed shows a stale indicator; an unavailable clock timestamp is unverified.
+
+`--json` keeps the result on stdout; installer progress goes to stderr. `watch --json` is a documented NDJSON stream. Prefix and suffix boolean flag forms work consistently. RPC reads use batches of at most 20. Automatic signing scoped to tokens is proposed, not available in this release; ordinary writes retain their existing review and spending checks.
 
 ## Security model
 
@@ -304,6 +313,7 @@ agent spend.
 - **RPC URLs are redacted** (credentials, query strings, key-like path segments) in every error and output.
 - **Pending authority**: a locally unresolved send blocks new signing by the same sender on that chain, even when a daily budget has room. Legacy unbound reservations conservatively block all chains for that sender. The profile-wide file lock also serializes active writes. State is scoped to the configured `HARTII_HOME`; it cannot coordinate other wallets or deliberately separate profiles.
 - **Read-only recovery view**: run `hartii tx pending`, then `hartii tx <hash>` for recorded hashes. A missing hash or stale process is not proof of cancellation. Never delete reservations or blindly resend; reconcile the exact chain, sender, nonce, destination, value, receipt and gas first. The CLI never automatically expires or unlocks uncertain authority.
+- **Transaction outcomes in the TUI**: an uncertain broadcast is labelled UNCONFIRMED and retains its public hash and status-check command. A confirmed revert is labelled REVERTED. Result pages wrap and scroll with arrows, Page Up/Down, Home/End so long summaries cannot hide the hash. A displayed error after submission does not establish that the transaction failed on-chain.
 - **Private storage**: new/renamed wallet files publish without overwriting another destination; linked and hardlinked paths are refused. Malformed config does not restore broader default limits. Recovery metadata must derive the same key/address before an exported phrase is returned. Windows ACLs remain explicitly unverified rather than certified from POSIX bits.
 - **Privacy**: the CLI keeps encrypted wallets, config, watchlists and spending/transaction metadata in the selected local profile. RPC, Hartii APIs, WebSocket providers and browsers opened to explorer links can process network metadata. MCP clients may send or retain tool output under their own policies. Receiving QR codes and HPAY links is offline and exposes only the public address and optional payment request; memo text in a shared link is public.
 

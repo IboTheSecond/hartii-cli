@@ -1,6 +1,6 @@
 {
   "name": "@hartii/cli",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "description": "BETA — Hartii-branded terminal wallet + trading terminal for Quai Network (hartii): interactive TUI, scriptable --json subcommands, and a native MCP server for AI coding agents.",
   "type": "module",
   "bin": {
@@ -27,9 +27,6 @@
     "zod": "4.6.5",
     "quais": "1.0.0-alpha.54"
   },
-  "devDependencies": {
-    "vitest": "^5.0.0"
-  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"
@@ -50,5 +47,8 @@
     "tui",
     "mcp",
     "hartii"
-  ]
+  ],
+  "devDependencies": {
+    "vitest": "^5.0.0"
+  }
 }

@@ -28,7 +28,7 @@ async function rpcCall(fetchFn, rpcUrl, method, params = []) {
 
 function fetch_(fetchFn, url, options) {
   const f = fetchFn || fetch;
-  return f(url, options);
+  return f(url, { ...options, signal: options?.signal || AbortSignal.timeout(8000) });
 }
 
 /**
@@ -114,11 +114,18 @@ export async function runDoctor(opts = {}, deps = {}) {
       const block = await rpcCall(fetchFn, net.rpcUrl, 'quai_getBlockByNumber', ['latest', false]);
       // Quai's block shape nests the timestamp under woHeader (work-object header); same
       // 3-way fallback as src/utils/externalVenueTrades.js / wallProvenance.js in the main repo.
-      const rawTs = block?.woHeader?.timestamp ?? block?.header?.timestamp ?? block?.timestamp ?? 0;
+      const rawTs = block?.woHeader?.timestamp ?? block?.header?.timestamp ?? block?.timestamp;
+      const valid = typeof rawTs === 'bigint' ? rawTs > 0n : typeof rawTs === 'number' ? Number.isSafeInteger(rawTs) && rawTs > 0
+        : typeof rawTs === 'string' && /^(?:\d+|0x[0-9a-fA-F]+)$/.test(rawTs) && BigInt(rawTs) > 0n;
+      if (!valid) {
+        checks.push({ name: 'clockSkew', ok: null, status: 'unverified', detail: 'could not read a valid positive block timestamp' });
+      } else {
       const blockMs = Number(BigInt(rawTs)) * 1000;
+      if (!Number.isSafeInteger(blockMs)) throw new Error('Block timestamp is outside the supported range.');
       const skewMs = Math.abs(now.getTime() - blockMs);
-      const ok = skewMs <= CLOCK_SKEW_WARN_MS || blockMs === 0;
-      checks.push({ name: 'clockSkew', ok, detail: blockMs === 0 ? 'could not read a block timestamp' : `${Math.round(skewMs / 1000)}s between local clock and latest block` });
+      const ok = skewMs <= CLOCK_SKEW_WARN_MS;
+      checks.push({ name: 'clockSkew', ok, detail: `${Math.round(skewMs / 1000)}s between local clock and latest block` });
+      }
     } catch (err) {
       checks.push({ name: 'clockSkew', ok: false, detail: `could not read latest block: ${redactUrls(err?.message || err)}` });
     }

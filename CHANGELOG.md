@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-10-11
+
+- Fix every confirmed remaining wallet audit defect: mutable selected-wallet/network context with stale-response fencing; Orchard feed isolation; ticker watch removal; visible menu/list/form selection; complete result arrays; stale-feed indication; terminal exception cleanup.
+- Integrate the reviewed Receive pane with complete QR geometry and bounded, cancellable public-text clipboard writes. Clipboard success is shown only after a successful setter exit; demo never copies or signs.
+- Honor global wallet selection for public-address/export-review/lock-check routes, preserving positional precedence and typed export confirmation. Correct browser/address-QR boolean parsing and unknown clock verification; bound doctor reads.
+- Route actual installer output to stderr for clean JSON, correct the Cursor profile example and omit missing development scripts from runtime packages while keeping source-export tooling.
+- Keep bulk RPC batches at 20, verified through the real SDK against a bounded local RPC fixture. Preserve the 0.3.1 signing/receipt safeguards. No auto-signing grant, key cache or activation is added.
+
+## [0.3.1] — 2026-10-11
+
+- Correct the pinned Quai SDK's nonce-zero broadcast response: after locally verified signed bytes and matching hash, restore its null nonce to the reviewed zero. Actual transaction/receipt identity mismatches remain unconfirmed and keep their reservations.
+- Show uncertain broadcasts as UNCONFIRMED with the public hash and status-check command; distinguish confirmed reverts from ordinary failures. Never suggest resending an uncertain transaction.
+- Wrap and scroll TUI result pages and retain every scalar summary row, including the transaction hash on long results.
+- Added regressions through the real SDK broadcast formatter at nonce 0, 1 and 17, conflicting nonce guards, and TUI outcome/result navigation. Receipt I/O in these tests is synthetic; these tests do not establish every funded operation on a live network.
+
 ## [0.3.0] — 2026-10-10
 
 Adds the BETA personal holder trader (Observe and Paper only; Live is gated and not enabled) and keyless MCP trader reads. Requires Node 22 or newer.

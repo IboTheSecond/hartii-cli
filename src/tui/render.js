@@ -13,7 +13,7 @@ import { group, fmtUnits, fmtPrice, fmtPct, shortAddr, clock, clip, padR } from 
 
 export const MIN_COLS = 60;
 export const MIN_ROWS = 18;
-export const MENU = ['Send', 'Buy', 'Sell', 'Swap', 'Airdrop', 'OTC', 'Claim', 'Wall', 'Wallets', 'Settings'];
+export const MENU = ['Send', 'Receive', 'Buy', 'Sell', 'Swap', 'Airdrop', 'OTC', 'Claim', 'Wall', 'Wallets', 'Settings'];
 export const FOCUS_ORDER = ['actions', 'balances', 'watch', 'trades'];
 const LEVELS = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const PULSE_MS = 2600;
@@ -57,7 +57,11 @@ function ribbon(s, x, y, w, history, now, blockAt, align = 'right') {
 function liveBadge(state) {
   const l = state.live?.state;
   if (state.mode === 'demo' || l === 'demo') return { text: 'DEMO', st: S.warn };
-  if (l === 'connected') return { text: '● LIVE', st: S.up };
+  if (l === 'connected') {
+    const at = state.live?.receivedAt || state.block?.at || 0;
+    if (!at || (state.now ?? Date.now()) - at > 30000) return { text: '◌ stale', st: S.warn };
+    return { text: '● LIVE', st: S.up };
+  }
   if (l === 'connecting') return { text: '○ connecting', st: S.muted };
   return { text: '○ polling', st: S.muted };
 }
@@ -142,8 +146,11 @@ function watchPane(s, state, x, y, w, h, focused, ui) {
   paneTitle(s, x, y, w, 'WATCHLIST', focused, focused ? 'a add · d remove' : `${(state.watch || []).length} tokens`);
   const list = state.watch || [];
   if (!list.length) { s.put(x + 1, y + 1, 'empty — press a (focus this pane) to add a token', S.muted, w - 2); return; }
-  list.slice(0, h - 1).forEach((t, i) => {
-    const row = y + 1 + i;
+  const cap = Math.max(1, h - 1);
+  const start = Math.max(0, Math.min((ui.watchSel || 0) - cap + 1, list.length - cap));
+  list.slice(start, start + cap).forEach((t, offset) => {
+    const i = start + offset;
+    const row = y + 1 + offset;
     const sel = focused && i === ui.watchSel;
     s.put(x, row, sel ? '▸' : ' ', S.signal);
     s.put(x + 1, row, padR(t.symbol || '???', 7), sel ? { fg: PALETTE.ink, bold: true } : S.ink);
@@ -158,7 +165,7 @@ function watchPane(s, state, x, y, w, h, focused, ui) {
 function tradesPane(s, state, x, y, w, h, focused, ui) {
   paneTitle(s, x, y, w, 'LIVE TRADES', focused, 'per block · newest first');
   const trades = state.trades || [];
-  if (!trades.length) { s.put(x + 1, y + 1, state.live?.state === 'connected' ? 'waiting for the next trade…' : 'feed offline — balances and actions still work', S.muted, w - 2); return; }
+  if (!trades.length) { s.put(x + 1, y + 1, state.network === 'orchard' ? 'Market trades are available on mainnet.' : state.live?.state === 'connected' ? 'waiting for the next trade…' : 'feed offline — balances and actions still work', S.muted, w - 2); return; }
   const compact = w < 60;
   let row = y + 1;
   let prev = null;
@@ -193,13 +200,58 @@ function tradesPane(s, state, x, y, w, h, focused, ui) {
 function actionsBar(s, state, cols, y, ui) {
   let x = 1;
   const focused = ui.focus === 'actions';
-  MENU.forEach((name, i) => {
+  let first = 0;
+  while (MENU.slice(first, ui.menu + 1).reduce((n, name) => n + name.length + 3, 0) > cols - 4 && first < ui.menu) first++;
+  if (first) { s.put(x, y, '<', S.key); x += 2; }
+  MENU.slice(first).forEach((name, offset) => {
+    const i = first + offset;
     const sel = i === ui.menu;
     const label = ` ${name} `;
     if (x + label.length >= cols) return;
     s.put(x, y, label, sel ? (focused ? S.focus : S.selected) : S.muted);
     x += label.length + 1;
   });
+}
+
+/** Full-screen Receive geometry: never crop a QR or its four-module quiet zone. */
+export function receiveLayout(o, cols, rows) {
+  const size = o.details?.qr?.matrix?.length || 0;
+  const width = size + 8, height = Math.ceil(width / 2);
+  return { qrFits: size > 0 && cols >= width + 6 && rows >= height + 5, qr: { x: 1, y: 2, width, height }, side: { x: width + 3, y: 2, width: cols - width - 4 } };
+}
+
+function receiveOverlay(s, cols, rows, o) {
+  s.fill(0, 0, cols, rows, ' ', S.ink);
+  s.put(1, 0, `RECEIVE QUAI  ${o.walletName || ''}`, S.title, cols - 2);
+  s.put(1, 1, `${o.network || ''} · Cyprus-1`, S.muted, cols - 2);
+  s.put(1, rows - 1, '[A] Copy address  [L] Copy paylink  Esc back', S.key, cols - 2);
+  if (o.status !== 'ready') { s.put(1, 4, o.message || 'Preparing receiving details...', o.status === 'error' ? S.down : S.muted, cols - 2); return; }
+  const L = receiveLayout(o, cols, rows);
+  if (!L.qrFits) {
+    s.put(1, 3, `Resize to at least ${L.qr.width + 6}x${L.qr.height + 5} for the complete QR.`, S.warn, cols - 2);
+    wrapLine(o.details.address, cols - 2).forEach((line, i) => s.put(1, 5 + i, line, S.ink));
+    s.put(1, rows - 2, o.message, o.messageKind === 'ok' ? S.up : S.warn, cols - 2);
+    return;
+  }
+  const matrix = o.details.qr.matrix, quiet = 4;
+  const dark = (r, c) => r >= 0 && c >= 0 && r < matrix.length && c < matrix.length && matrix[r][c];
+  const qrStyle = { fg: [0, 0, 0], bg: [255, 255, 255] };
+  for (let r = -quiet, y = 0; r < matrix.length + quiet; r += 2, y++) {
+    for (let c = -quiet, x = 0; c < matrix.length + quiet; c++, x++) {
+      const top = dark(r, c), bottom = dark(r + 1, c);
+      s.put(L.qr.x + x, L.qr.y + y, top ? (bottom ? '\u2588' : '\u2580') : (bottom ? '\u2584' : ' '), qrStyle);
+    }
+  }
+  let y = L.side.y;
+  const put = (text, style = S.ink) => {
+    for (const line of wrapLine(text, Math.max(4, L.side.width))) { if (y < rows - 3) s.put(L.side.x, y++, line, style, L.side.width); }
+  };
+  put('YOUR ADDRESS', S.muted); put(o.details.address, S.title); y++;
+  put('HARTIIBIOME PAYLINK', S.muted);
+  put(o.details.paylink || 'Paylinks require mainnet.', o.details.paylink ? S.ink : S.warn);
+  y++; put('QR: public address only. Check the payer network.', S.muted);
+  if (o.details.demo) put('DEMO - Do not send funds.', S.warn);
+  s.put(1, rows - 2, o.message, o.messageKind === 'ok' ? S.up : o.messageKind === 'error' ? S.down : S.muted, cols - 2);
 }
 
 function statusLine(s, state, cols, y, ui) {
@@ -245,7 +297,10 @@ function formOverlay(s, cols, rows, o) {
   const h = Math.min(rows - 2, o.fields.length * 3 + 6);
   const b = overlayBox(s, cols, rows, o.title.toUpperCase(), w, h);
   let y = b.y + 2;
-  o.fields.forEach((f, i) => {
+  const cap = Math.max(1, Math.floor((h - 5) / 3));
+  const start = Math.max(0, Math.min(o.index - cap + 1, o.fields.length - cap));
+  o.fields.slice(start, start + cap).forEach((f, offset) => {
+    const i = start + offset;
     if (y + 2 >= b.y + h - 2) return;
     const active = i === o.index;
     s.put(b.x + 3, y, f.label, active ? S.title : S.muted);
@@ -314,11 +369,22 @@ function confirmOverlay(s, cols, rows, o) {
 }
 
 function textOverlay(s, cols, rows, o) {
+  if (o.type === 'result') {
+    const L = confirmLayout(o, cols, rows);
+    const b = overlayBox(s, cols, rows, o.title.toUpperCase(), L.w, L.h);
+    const scroll = Math.min(Math.max(0, o.scroll || 0), L.maxScroll);
+    L.lines.slice(scroll, scroll + L.cap).forEach((line, i) => s.put(b.x + 3, b.y + 2 + i, line.text, line.st, L.w - 6));
+    if (L.maxScroll > 0) s.put(b.x + 3, b.y + L.h - 3, `${scroll + 1}-${Math.min(scroll + L.cap, L.lines.length)} of ${L.lines.length} · ↑↓ PgUp PgDn Home End`, S.muted, L.w - 6);
+    if (o.footer) s.put(b.x + 3, b.y + L.h - 2, o.footer, S.key, L.w - 6);
+    return;
+  }
   const lines = o.lines || [];
   const w = Math.min(cols - 4, Math.max(40, ...lines.map((l) => Array.from(String(l.text ?? l)).length + 6), o.title.length + 8));
   const h = Math.min(rows - 2, lines.length + 6);
   const b = overlayBox(s, cols, rows, o.title.toUpperCase(), w, h);
-  lines.slice(0, h - 5).forEach((l, i) => {
+  const cap = Math.max(1, h - 5);
+  const start = o.type === 'list' ? Math.max(0, Math.min(o.index - cap + 1, lines.length - cap)) : 0;
+  lines.slice(start, start + cap).forEach((l, i) => {
     const text = typeof l === 'string' ? l : l.text;
     const st = typeof l === 'string' ? S.ink : (l.st || S.ink);
     s.put(b.x + 3, b.y + 2 + i, clip(text, w - 6), st);
@@ -328,6 +394,7 @@ function textOverlay(s, cols, rows, o) {
 
 function overlays(s, cols, rows, o) {
   if (!o) return;
+  if (o.type === 'receive') return receiveOverlay(s, cols, rows, o);
   if (o.type === 'help') return helpOverlay(s, cols, rows);
   if (o.type === 'form' || o.type === 'prompt') return formOverlay(s, cols, rows, o);
   if (o.type === 'confirm') return confirmOverlay(s, cols, rows, o);

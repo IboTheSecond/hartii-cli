@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, afterEach, describe, it, expect, vi } from 'vite
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Interface, Wallet, QuaiTransaction, Zone, JsonRpcApiProvider } from 'quais';
+import { Interface, Wallet, QuaiTransaction, Zone, JsonRpcApiProvider, AbstractProvider, Network } from 'quais';
 import { runBuy } from '../src/commands/buy.js';
 import { main } from '../src/cli.js';
 import { readGasPrice } from '../src/gasPrice.js';
@@ -68,6 +68,46 @@ function harness({ balance = 20n * ONE, nonce = 0, gasPrice = 1n, gas = 100_000n
 }
 
 describe('buy transaction preparation with the real quais signing implementation', () => {
+  it.each([0, 1, 17])('tracks a broadcast formatted by the real SDK at nonce %i', async nonce => {
+    const { provider, deps, opts } = harness({ nonce });
+    const sdk = new AbstractProvider();
+    sdk.getNetwork = async () => Network.from({ name: 'mainnet', chainId: 9 });
+    sdk.getBlockNumber = async () => 100;
+    sdk._perform = vi.fn(async request => {
+      expect(request.method).toBe('broadcastTransaction');
+      return QuaiTransaction.from(request.signedTransaction).hash;
+    });
+    let response;
+    provider.broadcastTransaction.mockImplementation(async (zone, raw) => {
+      response = await sdk.broadcastTransaction(zone, raw);
+      // Only receipt I/O is synthetic. Keep the actual SDK's broadcast formatter,
+      // response class and replaceable-transaction conversion in the execution path.
+      response.wait = vi.fn(async () => ({ status: 1, hash: response.hash, fee: 7n }));
+      return response;
+    });
+    try {
+      const result = await runBuy(opts, deps);
+      expect(result.status).toBe('success');
+      expect(response.nonce).toBe(nonce);
+      expect(response.wait).toHaveBeenCalledOnce();
+      expect(sdk._perform).toHaveBeenCalledOnce();
+      expect(listSpendReservations(home)).toEqual([]);
+      expect(fetch).not.toHaveBeenCalled();
+    } finally { sdk.destroy(); }
+  });
+
+  it.each([
+    [0, 1], [1, null], [1, 0], [0, false], [0, ''],
+  ])('retains authority for reviewed nonce %i with a conflicting response nonce %s', async (nonce, responseNonce) => {
+    const { provider, deps, opts } = harness({ nonce });
+    provider.broadcastTransaction.mockImplementation(async (_zone, raw) => {
+      const signed = QuaiTransaction.from(raw);
+      return { ...signed.toJSON(), nonce: responseNonce, wait: vi.fn() };
+    });
+    await expect(runBuy(opts, deps)).rejects.toThrow(/identity.*UNCONFIRMED/);
+    expect(listSpendReservations(home)).toHaveLength(1);
+  });
+
   it('preserves an explicitly reviewed nonce zero instead of letting SDK population replace it', async () => {
     const { provider, deps, opts } = harness();
     // A first-use wallet is reviewed at nonce zero; an extra SDK population read sees a different nonce.

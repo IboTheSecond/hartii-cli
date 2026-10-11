@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
@@ -57,6 +58,27 @@ describe('semver + tarball helpers', () => {
 });
 
 describe('hartii update', () => {
+  it('keeps actual installer child output off the JSON stdout channel', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hartii-update-json-'));
+    const file = join(dir, 'probe.mjs');
+    const tar = tgz('99.1.0');
+    const lines = [
+      'import {runUpdate} from ' + JSON.stringify(new URL('../src/commands/update.js', import.meta.url).href) + ';',
+      'import {spawnSync} from "node:child_process";',
+      'const tar=Buffer.from(' + JSON.stringify(tar.toString('base64')) + ',"base64");',
+      'const digest=' + JSON.stringify(sha(tar)) + ';',
+      'const fetchFn=async url=>({ok:true,status:200,json:async()=>({version:"99.1.0",sha256:digest,url:"https://hartiilabs.com/downloads/hartii-cli.tgz"}),arrayBuffer:async()=>tar.buffer.slice(tar.byteOffset,tar.byteOffset+tar.length)});',
+      'const installerCode=' + JSON.stringify("process.stdout.write('INSTALLER-PROGRESS\\n')") + ';',
+      'const spawnFn=(_cmd,args,opts)=>args.includes("install")?spawnSync(process.execPath,["-e",installerCode],opts):{status:0,stdout:"99.1.0\\n"};',
+      'const result=await runUpdate({yes:true,json:true},{installed:"0.1.0",fetchFn,spawnFn});',
+      'process.stdout.write(JSON.stringify(result));',
+    ];
+    writeFileSync(file, lines.join('\n'));
+    const result = spawnSync(process.execPath, [file], { encoding: 'utf8', windowsHide: true, timeout: 15000 });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ updated: true, latest: '99.1.0' });
+    expect(result.stderr).toContain('INSTALLER-PROGRESS');
+  });
   it('already on the latest version', async () => {
     const { fetchFn } = world({ version: '0.0.1' });
     const spawnFn = vi.fn();
@@ -83,7 +105,7 @@ describe('hartii update', () => {
     if (process.platform === 'win32') expect(args.slice(0, 4)).toEqual(['/d', '/s', '/c', 'npm.cmd']);
     else expect(cmd).toBe('npm');
     expect(args.slice(args.indexOf('install'), args.indexOf('install') + 2)).toEqual(['install', '-g']);
-    expect(o.stdio).toBe('inherit');
+    expect(o.stdio).toEqual(['inherit', 2, 2]);
     expect(installedBytes).toEqual(tar);
     expect(seen[1][1].at(-1)).toBe('--version');
     for (const c of calls) { expect(c.init.redirect).toBe('error'); expect(c.url.startsWith(BASE)).toBe(true); }

@@ -94,6 +94,7 @@ export function createDataSource(o = {}) {
   const home = o.home || getHartiiHome(env);
   const fetchFn = o.fetchFn;
   const providerFactory = o.providerFactory || createProvider;
+  const clock = o.now || Date.now;
 
   if (o.demo) {
     const initial = demoState(o.now ? o.now() : Date.now());
@@ -133,12 +134,14 @@ export function createDataSource(o = {}) {
     };
   }
 
-  const net = () => resolveRuntimeNetwork({ network: o.network || loadConfig(home).network, rpc: o.rpc });
+  let selectedNetwork = o.network || null;
+  const net = () => resolveRuntimeNetwork({ network: selectedNetwork || loadConfig(home).network, rpc: o.rpc });
+  let selectedWallet = o.wallet || null; // a startup override is the initial selection, not a permanent pin
   let current = null; // wallet { name, address } or null
   const resolveWallet = () => {
     try {
       const list = walletList(home);
-      const pick = (o.wallet && list.find((w) => w.name === o.wallet)) || list.find((w) => w.current) || list[0] || null;
+      const pick = selectedWallet ? list.find((w) => w.name === selectedWallet) : list.find((w) => w.current) || null;
       current = pick && pick.address ? { name: pick.name, address: pick.address } : null;
     } catch { current = null; }
     return current;
@@ -156,25 +159,48 @@ export function createDataSource(o = {}) {
   let timers = [];
   let stopped = false;
   let lastHead = 0;
+  let balanceGeneration = 0;
+  let watchGeneration = 0;
+  let feedGeneration = 0;
+  let reconnectTimer = null;
 
-  const baseOpts = () => ({ home, network: o.network || undefined, rpc: o.rpc || undefined, wallet: o.wallet || undefined });
+  const baseOpts = () => ({ home, network: selectedNetwork || undefined, rpc: o.rpc || undefined, wallet: selectedWallet || undefined });
   const deps = {
     now: o.now,
     runCommand: async (fn, opts, extra = {}) => {
+      if (stopped) throw new Error('Terminal session closed; no command was started.');
       const run = RUNNERS[fn];
       if (!run) throw new Error(`Unknown action "${fn}".`);
       return run({ ...baseOpts(), ...opts, json: false, yes: false, dryRun: false }, { fetchFn, providerFactory, walletFactory: o.walletFactory, io: { ...extra.io, env }, passwordDeps: extra.passwordDeps });
     },
-    listWallets: () => { try { return walletList(home); } catch { return []; } },
-    useWallet: (name) => { walletUse(home, name); resolveWallet(); app?.setData({ wallet: current }); },
-    loadSettings: () => { const c = loadConfig(home); return { network: c.network, perTxQuai: c.limits.perTxQuai, dailyQuai: c.limits.dailyQuai }; },
+    listWallets: () => { try { return walletList(home).map(wallet => ({ ...wallet, current: wallet.name === current?.name })); } catch { return []; } },
+    useWallet: (name) => {
+      if (stopped) return;
+      walletUse(home, name);
+      selectedWallet = name;
+      balanceGeneration += 1;
+      resolveWallet();
+      app?.setData({ wallet: current, quaiWei: null, holdings: [], holdingsError: null });
+    },
+    loadSettings: () => { const c = loadConfig(home); return { network: net().name, perTxQuai: c.limits.perTxQuai, dailyQuai: c.limits.dailyQuai }; },
     saveSettings: async (v) => {
+      if (stopped) return;
+      if (o.rpc && v.network !== net().name) throw new Error('Restart without --rpc to change networks. The custom RPC remains tied to the startup network.');
+      const previousNetwork = net().name;
       let c = loadConfig(home);
       c = configSet(c, 'network', v.network);
       c = configSet(c, 'limits.perTxQuai', v.perTxQuai);
       c = configSet(c, 'limits.dailyQuai', v.dailyQuai);
       saveConfig(home, c);
-      app?.setData({ network: c.network });
+      selectedNetwork = c.network;
+      balanceGeneration += 1;
+      watchGeneration += 1;
+      app?.setData({ network: c.network, quaiWei: null, holdings: [], holdingsError: null });
+      if (previousNetwork !== c.network) {
+        resetFeed();
+        app?.setData({ watch: loadWatchlist(home).map(ref => ({ ref, symbol: ref, address: ref, priceWei: null, change24h: null })) });
+        connect();
+      }
     },
     addWatch: async (ref) => {
       const list = loadWatchlist(home);
@@ -192,33 +218,43 @@ export function createDataSource(o = {}) {
   };
 
   async function refreshBalances() {
-    if (!resolveWallet()) { app?.setData({ wallet: null, quaiWei: null, holdings: [] }); return; }
+    if (stopped) return;
+    const generation = ++balanceGeneration;
+    const wallet = resolveWallet();
+    if (!wallet) { app?.setData({ wallet: null, quaiWei: null, holdings: [], holdingsError: null }); return; }
     try {
       const r = await runBalance({ ...baseOpts(), tokens: true }, { fetchFn, providerFactory });
-      app?.setData({ wallet: current, network: r.network, quaiWei: r.quaiWei, holdings: Array.isArray(r.holdings) ? r.holdings : [], holdingsError: r.holdingsError || null, live: { ...(app?.data.live || {}), refreshedAt: Date.now() } });
+      if (stopped || generation !== balanceGeneration) return;
+      app?.setData({ wallet, network: r.network, quaiWei: r.quaiWei, holdings: Array.isArray(r.holdings) ? r.holdings : [], holdingsError: r.holdingsError || null, live: { ...(app?.data.live || {}), refreshedAt: clock() } });
     } catch (e) {
+      if (stopped || generation !== balanceGeneration) return;
+      app?.setData({ quaiWei: null, holdings: [], holdingsError: String(e.message || e) });
       app?.status(`Balance refresh failed: ${String(e.message || e).slice(0, 80)}`, 'error');
     }
   }
 
   async function refreshWatch() {
+    if (stopped) return;
+    const generation = ++watchGeneration;
+    const network = net().name;
     const refs = loadWatchlist(home);
     const out = [];
     for (const ref of refs) {
       try {
-        const { token } = await fetchToken(ref, { network: net().name, fetchFn });
-        out.push({ symbol: token.symbol || ref, address: token.address, priceWei: token.lastPriceWei ?? null, change24h: token.change24h ?? null });
+        const { token } = await fetchToken(ref, { network, fetchFn });
+        out.push({ ref, symbol: token.symbol || ref, address: token.address, priceWei: token.lastPriceWei ?? null, change24h: token.change24h ?? null });
       } catch {
-        out.push({ symbol: ref.length > 12 ? `${ref.slice(0, 6)}…` : ref, address: ref, priceWei: null, change24h: null });
+        out.push({ ref, symbol: ref.length > 12 ? `${ref.slice(0, 6)}…` : ref, address: ref, priceWei: null, change24h: null });
       }
     }
-    app?.setData({ watch: out });
+    if (!stopped && generation === watchGeneration) app?.setData({ watch: out });
   }
 
   function onFrame(msg) {
+    app.setData({ live: { ...app.data.live, receivedAt: clock() } });
     if (msg.type === 'head') {
       const h = msg.data?.blockNumber;
-      if (Number.isFinite(h)) { lastHead = Date.now(); app.setData({ block: foldBlock(app.data.block, h) }); }
+      if (Number.isFinite(h)) { lastHead = clock(); app.setData({ block: { ...foldBlock(app.data.block, h), at: clock() } }); }
     } else if (msg.type === 'trade' || msg.type === 'burn') {
       const t = tradeFromFrame(msg);
       const trades = [t, ...(app.data.trades || [])].slice(0, MAX_TRADES);
@@ -230,35 +266,50 @@ export function createDataSource(o = {}) {
 
   function connect() {
     if (stopped) return;
+    if (net().name !== 'mainnet') { app?.setData({ live: { ...app.data.live, state: 'polling' } }); return; }
+    const generation = feedGeneration;
     let WS;
     try { WS = o.WebSocketImpl || getWebSocketImpl(); } catch { app?.setData({ live: { ...app.data.live, state: 'polling' } }); return; }
     try {
       ws = new WS('wss://hartiilabs.com/api/live/ws?channel=global', { headers: { Origin: 'https://hartiilabs.com' } });
     } catch { schedule(); return; }
-    ws.addEventListener('open', () => { attempt = 0; ws.send(encodeMessage({ type: 'subscribe', channel: GLOBAL_CHANNEL })); app?.setData({ live: { ...app.data.live, state: 'connected' } }); });
-    ws.addEventListener('message', (ev) => { const m = decodeMessage(ev.data); if (m) onFrame(m); });
+    const socket = ws;
+    const valid = () => !stopped && generation === feedGeneration && socket === ws && net().name === 'mainnet';
+    ws.addEventListener('open', () => { if (!valid()) return; attempt = 0; socket.send(encodeMessage({ type: 'subscribe', channel: GLOBAL_CHANNEL })); app?.setData({ live: { ...app.data.live, state: 'connected', receivedAt: clock() } }); });
+    ws.addEventListener('message', (ev) => { if (!valid()) return; const m = decodeMessage(ev.data); if (m) onFrame(m); });
     ws.addEventListener('error', () => {});
-    ws.addEventListener('close', () => { app?.setData({ live: { ...app.data.live, state: 'polling' } }); schedule(); });
+    ws.addEventListener('close', () => { if (!valid()) return; app?.setData({ live: { ...app.data.live, state: 'polling' } }); schedule(); });
+  }
+  function resetFeed() {
+    feedGeneration += 1;
+    clearTimeout(reconnectTimer); reconnectTimer = null; lastHead = 0; attempt = 0;
+    const previous = ws; ws = null;
+    try { previous?.close(); } catch { /* obsolete callbacks are already invalid */ }
+    app?.setData({ trades: [], block: { height: null, at: 0, history: [] }, live: { state: net().name === 'mainnet' ? 'connecting' : 'polling', refreshedAt: 0, receivedAt: 0 } });
   }
   function schedule() {
     if (stopped) return;
     attempt += 1;
-    timers.push(setTimeout(connect, nextBackoffMs(attempt)));
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, nextBackoffMs(attempt));
   }
   async function poll() {
-    if (stopped || Date.now() - lastHead < POLL_MS * 2) return;
+    if (stopped || clock() - lastHead < POLL_MS * 2) return;
+    const generation = feedGeneration;
+    let provider;
     try {
-      const provider = providerFactory(net().rpcUrl);
+      provider = providerFactory(net().rpcUrl);
       const h = Number(await provider.getBlockNumber());
-      provider.destroy?.();
-      if (Number.isFinite(h) && h > 0) app.setData({ block: foldBlock(app.data.block, h) });
+      if (!stopped && generation === feedGeneration && Number.isFinite(h) && h > 0) app.setData({ block: foldBlock(app.data.block, h) });
     } catch { /* feed stays as is */ }
+    finally { try { provider?.destroy?.(); } catch { /* cleanup cannot publish a failed poll */ } }
   }
 
   return {
     initial,
     deps,
     start(a) {
+      if (stopped) return;
       app = a;
       refreshBalances();
       refreshWatch();
@@ -268,6 +319,8 @@ export function createDataSource(o = {}) {
     },
     stop() {
       stopped = true;
+      balanceGeneration += 1; watchGeneration += 1; feedGeneration += 1;
+      clearTimeout(reconnectTimer);
       for (const t of timers) { clearTimeout(t); clearInterval(t); }
       timers = [];
       try { ws?.close(); } catch { /* already closed */ }

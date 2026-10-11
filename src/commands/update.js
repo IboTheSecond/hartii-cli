@@ -157,7 +157,9 @@ export async function runUpdate(o, deps = {}) {
     writeFileSync(file, buf, { mode: 0o600 });
     say(`Verified sha256 ${info.sha256.slice(0, 12)}... Installing with npm...`);
     const [npmCmd, npmArgs] = wrap(platform, 'npm', ['install', '-g', file], process.env);
-    const r = spawnFn(npmCmd, npmArgs, { stdio: 'inherit', windowsHide: true });
+    // Installer progress belongs to diagnostics; stdout is reserved for the
+    // command result, including when a real child writes directly to its fd.
+    const r = spawnFn(npmCmd, npmArgs, { stdio: ['inherit', 2, 2], windowsHide: true });
     if (r?.error || r?.status !== 0) {
       const lines = [`npm install failed${r?.status != null ? ` (exit ${r.status})` : r?.error ? ` (${r.error.message})` : ''}.`, `Run it yourself:  ${manual}`];
       if (platform !== 'win32') lines.push('If it said EACCES (permission denied): re-run with sudo, or install to your home: npm config set prefix ~/.npm-global && export PATH=~/.npm-global/bin:$PATH');
