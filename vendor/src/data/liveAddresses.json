@@ -8,6 +8,8 @@
   "mainnet": {
     "launchFactoryV3": "0x00249722868732Ee678b88Db668EAf7cC75Ae12A",
     "launchFactoryV4": "0x005566187B52313e03978C2caF4BE1a0A88eb90A",
+    "launchFactoryV5": "0x003fb8428777cDFED5de367519818D4240b08A12",
+    "launchFactoryV5_doc": "TokenFactoryV5 (BondingCurveV5: treasury and creator fees PAID OUT INSIDE EACH TRADE instead of accruing for a sweep). LIVE on mainnet since 2026-10-14 (deploy tx 0x0059006b58e4675eb9460a885ff6568a37d74be8bc067d5b4e1ec94c2a86f0f5, creationFee 5 QUAI, same parameters as V4). New launches go through V5; V4 and V3 factories and every token launched through them keep working and are still scanned.",
     "stakingFactory": null,
     "burnVaults": {},
     "externalVenues": {
