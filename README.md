@@ -15,7 +15,7 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.3.3). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.3.4). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Install
@@ -54,6 +54,11 @@ hartii buy <token-address> 5 --dry-run  # replace the token address and review l
 
 Global flags work anywhere on the line: `--json`, `--network mainnet|orchard`, `--rpc <url>`,
 `--wallet <name>`, `--yes` / `-y`, `--dry-run`, `--demo`, `--key-env <VAR>`, `--help`, `--version`.
+
+Boolean flags are bare switches: use `--dry-run`, not `--dry-run=true` or `--dry-run=false`.
+Omit a switch to disable it. Inline boolean values are rejected before any command, TUI or MCP
+server starts; `--allow-writes` likewise requires the bare switch. Value flags still support
+both forms, such as `--network orchard` and `--network=orchard`.
 Default network is mainnet (`https://rpc.quai.network/cyprus1`, chain 9); Orchard is
 `https://orchard.rpc.quai.network/cyprus1`, chain 15000. The chain id is verified before every write.
 

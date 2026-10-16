@@ -39,7 +39,15 @@ export async function main(argv, deps = {}) {
   const env = deps.env || process.env;
   const colors = makeColors({ env });
 
-  const { globals, extraFlags: flags, command: rawCommand, commandArgs: rawArgs } = parseArgv(argv);
+  let parsed;
+  try {
+    parsed = parseArgv(argv);
+  } catch (err) {
+    if (!(err instanceof CliError) && deps.rethrowUnknown) throw err;
+    printError(err, { json: argv.includes('--json'), writeErr, colors });
+    return 1;
+  }
+  const { globals, extraFlags: flags, command: rawCommand, commandArgs: rawArgs } = parsed;
   const interactive = deps.interactive ?? Boolean(process.stdin.isTTY && process.stdout.isTTY);
   const routed = route({ command: rawCommand, commandArgs: rawArgs, globals, extraFlags: flags }, { colors, interactive });
 

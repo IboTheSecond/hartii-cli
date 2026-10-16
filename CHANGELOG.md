@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-10-16
+
+- Reject inline values on declared boolean flags before command, TUI or MCP dispatch. Inputs such as `--dry-run=true` can no longer silently disable the requested safety mode; use the bare `--dry-run` switch. MCP write opt-in remains bare-only. Parser errors return exit 1, keep stdout clean and do not echo the supplied value.
+
 ## [0.3.3] — 2026-10-11
 
 - Copy-only patch: drop the audit-status disclaimer wording from `hartii help`, `hartii doctor`, `hartii version` status output, wallet reminders, the MCP server description, the README and the public SECURITY text. No command, flag, signing or limit behaviour changes.

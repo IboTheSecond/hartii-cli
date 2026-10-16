@@ -5,13 +5,16 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { main } from '../src/cli.js';
 import * as walletCommands from '../src/commands/walletCmd.js';
+import { COMMAND_TABLE } from '../src/commandTable.js';
 
 let home;
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'hartii-cli-cli-test-'));
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('Unexpected network use in isolated CLI dispatch test'); }));
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   rmSync(home, { recursive: true, force: true });
 });
 
@@ -97,10 +100,56 @@ describe('main — globals', () => {
     expect(runMcp).toHaveBeenCalledTimes(1);
     expect(out).toEqual([]);
   });
-  it.each(['false','no','1','true'])('MCP write opt-in refuses string flag value %s', async value => {
+  it.each(['false','no','1','true'])('MCP write opt-in refuses string flag value %s before startup', async value => {
     const runMcp=vi.fn(async()=>0);
-    await main(['mcp',`--allow-writes=${value}`],{env:{HARTII_HOME:home},write:vi.fn(),writeErr:vi.fn(),runMcp});
-    expect(runMcp.mock.calls[0][0].allowWrites).toBe(false);
+    const writeErr=vi.fn();
+    const code=await main(['mcp',`--allow-writes=${value}`],{env:{HARTII_HOME:home},write:vi.fn(),writeErr,runMcp});
+    expect(code).toBe(1);
+    expect(runMcp).not.toHaveBeenCalled();
+    expect(writeErr.mock.calls.join(' ')).toMatch(/--allow-writes.*does not accept a value/);
+  });
+
+  it('keeps bare MCP write opt-in explicit', async () => {
+    const runMcp = vi.fn(async () => 0);
+    const code = await main(['mcp', '--allow-writes'], { env: { HARTII_HOME: home }, write: vi.fn(), writeErr: vi.fn(), runMcp });
+    expect(code).toBe(0);
+    expect(runMcp.mock.calls[0][0].allowWrites).toBe(true);
+  });
+
+  it.each(['true', 'false', 'private-value-must-not-be-echoed', ''])('invalid inline dry-run %s never dispatches a send', async (value) => {
+    const send = vi.spyOn(COMMAND_TABLE, 'send').mockResolvedValue({ ok: true });
+    const fetchFn = vi.fn(), providerFactory = vi.fn(), walletFactory = vi.fn();
+    const { out, err, write, writeErr } = capture();
+    const code = await main(['send', 'public-address-fixture', '1', `--dry-run=${value}`, '--yes', '--json'],
+      { env: { HARTII_HOME: home }, write, writeErr, fetchFn, providerFactory, walletFactory });
+    expect(code).toBe(1);
+    expect(send).not.toHaveBeenCalled();
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(providerFactory).not.toHaveBeenCalled();
+    expect(walletFactory).not.toHaveBeenCalled();
+    expect(out).toEqual([]);
+    expect(err).toHaveLength(1);
+    expect(JSON.parse(err[0])).toMatchObject({ ok: false, error: expect.stringMatching(/--dry-run.*does not accept a value/) });
+    expect(err[0]).not.toContain('private-value-must-not-be-echoed');
+  });
+
+  it('passes a bare dry-run through the actual command table', async () => {
+    const send = vi.spyOn(COMMAND_TABLE, 'send').mockResolvedValue({ ok: true, dryRun: true });
+    const { write, writeErr } = capture();
+    expect(await main(['send', 'public-address-fixture', '1', '--dry-run', '--yes', '--json'],
+      { env: { HARTII_HOME: home }, write, writeErr })).toBe(0);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0].g).toMatchObject({ dryRun: true, yes: true });
+  });
+
+  it.each(['--demo=true', '--demo=false'])('invalid inline %s never starts the TUI', async (flag) => {
+    const runUi = vi.fn(async () => 0);
+    const { out, err, write, writeErr } = capture();
+    expect(await main(['ui', flag], { env: { HARTII_HOME: home }, write, writeErr, runUi })).toBe(1);
+    expect(runUi).not.toHaveBeenCalled();
+    expect(out).toEqual([]);
+    expect(err.join('')).toMatch(/--demo.*does not accept a value/);
+    expect(err.join('')).not.toMatch(/\n\s+at /);
   });
 });
 

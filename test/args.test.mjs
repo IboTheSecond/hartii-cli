@@ -1,6 +1,6 @@
 // packages/hartii-cli/test/args.test.mjs
 import { describe, it, expect } from 'vitest';
-import { parseFlags, parseArgv } from '../src/args.js';
+import { parseFlags, parseArgv, GLOBAL_FLAG_SPECS } from '../src/args.js';
 
 describe('parseFlags', () => {
   it('parses --foo=bar', () => {
@@ -33,6 +33,19 @@ describe('parseFlags', () => {
     const { flags } = parseFlags(['--demo']);
     expect(flags.demo).toBe(true);
   });
+
+  it.each(['true', 'false', '1', 'no', ''])('rejects inline values on a declared boolean (%s)', (value) => {
+    expect(() => parseFlags([`--yes=${value}`], { yes: { type: 'boolean' } })).toThrow(/--yes.*does not accept a value/);
+  });
+
+  it('also rejects an inline value on a boolean short alias', () => {
+    expect(() => parseFlags(['-y=true'], { yes: { type: 'boolean', alias: 'y' } })).toThrow(/--yes.*does not accept a value/);
+  });
+
+  it('keeps string and unspecified flag values unchanged', () => {
+    expect(parseFlags(['--network=orchard', '--slippage=2'], { network: { type: 'string' } }).flags)
+      .toEqual({ network: 'orchard', slippage: '2' });
+  });
 });
 
 describe('parseArgv', () => {
@@ -64,5 +77,21 @@ describe('parseArgv', () => {
 
   it('no command and no flags yields command: null', () => {
     expect(parseArgv([]).command).toBeNull();
+  });
+
+  const booleanFlags = [
+    ...Object.entries(GLOBAL_FLAG_SPECS).filter(([, spec]) => spec.type === 'boolean').map(([name]) => name),
+    'from-arg', 'trust-live-addresses', 'allow-writes', 'mine', 'check', 'qr', 'tokens', 'stdin',
+    'allow-insecure-rpc', 'once', 'observe', 'pair', 'create-wallet', 'browser', 'address-qr',
+  ];
+  it.each(booleanFlags)('refuses inline --%s before it can silently change meaning', (flag) => {
+    for (const value of ['true', 'false', '']) {
+      expect(() => parseArgv(['send', 'public-address-fixture', '1', `--${flag}=${value}`, '--yes']))
+        .toThrow(/does not accept a value/);
+    }
+  });
+
+  it('does not allow a later bare flag to conceal an invalid inline boolean', () => {
+    expect(() => parseArgv(['send', '--dry-run=false', '--dry-run'])).toThrow(/--dry-run/);
   });
 });

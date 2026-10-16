@@ -4,10 +4,13 @@
 // rule allows only quais/@modelcontextprotocol/sdk/zod (see AGENTS.md "Hartii CLI" + the work
 // order's HARD RULES), so the global-flag + subcommand parser is hand-rolled, once, here.
 //
-// Supported shapes for any flag: `--foo bar`, `--foo=bar`, `--foo` (boolean, true if no value
+// Value flags support `--foo bar` and `--foo=bar`; declared booleans are bare-only (`--foo`).
+// Unspecified flags also support `--foo` (boolean, true if no value
 // follows or the next token is itself a flag), `-y` (short alias, only for the globals that
 // define one). Positionals are every non-flag token, in order; everything before the first
 // positional that isn't a known global is still just collected as the command path.
+
+import { CliError } from './errors.js';
 
 // Every global flag, plus their value/boolean shape and short
 // aliases. Subcommand-specific flags (--slippage, --tokens, --csv, ...) are parsed the same way by
@@ -74,6 +77,9 @@ export function parseFlags(argv, specs = {}) {
     if (byAlias[name]) name = byAlias[name];
 
     const spec = specs[name];
+    if (spec?.type === 'boolean' && inlineValue !== undefined) {
+      throw new CliError(`--${name} does not accept a value. Use --${name} by itself to enable it, or omit it to disable it.`);
+    }
     const wantsValue = spec ? spec.type === 'string' : inlineValue === undefined && i + 1 < argv.length && !isFlagToken(argv[i + 1]);
 
     if (inlineValue !== undefined) {
