@@ -444,6 +444,17 @@ export async function sendUncheckedWithGasDiagnostics({ signer, rpc, from, to, d
   }
 
   const gasLimit = (estimate * BigInt(gasHeadroomPercent)) / 100n;
+  // The wallet request carries no chainId (Pelagus zero-fee rule), so chain 9 is enforced here: re-read
+  // the wallet's live chain right before the only call that reaches it. Nothing has been sent yet.
+  if (typeof signer.provider?.send === 'function') {
+    let liveChain;
+    try {
+      liveChain = Number(BigInt(await signer.provider.send('quai_chainId', [])));
+    } catch {
+      throw new Error('Could not confirm your wallet network. Nothing was sent. Reconnect and try again.');
+    }
+    if (liveChain !== 9) throw new Error('Your wallet is not on Quai Mainnet. Nothing was sent.');
+  }
   return signer.sendUncheckedTransaction({ from, to, data, value, gasLimit });
 }
 
