@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "zod": "4.6.5",
+    "zod": "4.6.7",
     "quais": "1.0.0-alpha.54"
   },
   "license": "MIT",
