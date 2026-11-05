@@ -15,7 +15,7 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.3.4). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.4.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Install
@@ -89,9 +89,11 @@ No transaction is sent by receiving, `--demo` or `--dry-run`. Review the full re
 | `wallet new [name]` · `import mnemonic [name]` · `import key [name]` | Create/import a wallet (first Cyprus-1 Quai address). The recovery phrase / key is read from a **hidden prompt or stdin**, never from argv; `--from-arg` is refused with a migration error: use the hidden prompt or stdin. Phrases and keys are **never printed** here. |
 | `wallet list` · `use <name>` · `address [--qr]` · `rename <old> <new>` · `lock-check [name]` | Manage wallets. `address --qr` renders the public receive address as a real offline QR. |
 | `wallet export [name]` · `wallet remove <name>` | The only place a mnemonic/key can appear (export) — behind a typed confirmation of the wallet name. |
-| `balance [--tokens] [--address <addr>]` | QUAI balance; `--tokens` adds indexed holdings with QUAI values and price source. `--address` reads any Cyprus-1 Quai address. |
+| `balance [--tokens] [--address <addr>]` | QUAI balance; `--tokens` adds indexed holdings with QUAI values and price source. It also lists the NFTs the address holds, grouped by collection (Hartii Gallery index). `--address` reads any Cyprus-1 Quai address. |
 | `send <to> <amount> [--token <addr\|ticker>]` | QUAI or ERC-20 transfer. `amount` = decimal, `50%` or `all` (QUAI "all" reserves gas). |
 | `tokens [trending\|new\|search <q>]` · `token <addr\|ticker>` | Launchpad directory; one token's price reference, live curve state, graduation progress, holders, links. |
+| `gallery search <name\|0x address>` · `gallery collection <address\|name>` · `gallery item <address> <tokenId>` · `gallery trending [--days 30] [--limit 10]` | Read-only Hartii Gallery (NFT) lookups from the public Gallery API: collections by name substring or exact address, collection stats and recent activity, one NFT's owner / listing / last sale / traits, and collections ranked by recent indexed sales. No wallet, no writes. |
+| `studio rooms [query]` · `studio open <collection\|name> [tokenId] [--open]` | Hartii Studio (3D museum) rooms. `open` prints the deep link (`/studio?collection=…` or `/studio?piece=<address>:<id>`) with a one-line description; `--open` launches it in your browser (only `https://hartiigallery.com/` URLs). Live visitor counts are not available: the Gallery has no public count endpoint, and the CLI never joins a room. |
 | `buy <token> <quai> [--slippage 3]` | Bonding-curve buy with the on-chain quote and a slippage floor (a buy that finishes the curve uses the repo's finishing-buy rule). |
 | `sell <token> <amount\|all\|50%> [--slippage 3]` | Curve sell; approves the exact amount first when needed. |
 | `swap <in> <out> <amount> [--slippage 3]` | HartiiSwap router; `QUAI`/`WQUAI` wrap 1:1. |
@@ -107,9 +109,9 @@ No transaction is sent by receiving, `--demo` or `--dry-run`. Review the full re
 | `config get <key>` · `config set <key> <value>` | Keys: `network`, `currentWallet`, `limits.perTxQuai`, `limits.dailyQuai`. |
 | `doctor` | Health checklist. |
 | `trader init\|paper\|run --observe\|watch\|status\|pause\|export` (BETA) | Personal holder trader: Observe and Paper, no transaction key needed (see below). |
-| `mcp [--allow-writes --max-per-tx <q> --max-per-day <q>]` | stdio MCP server (see below). |
+| `mcp [--allow-writes (--preset conservative|normal|degen | --max-per-tx <q> --max-per-day <q>)]` | stdio MCP server (see below). |
 
-Airdrop / OTC / Claim / Wall and the market commands (tokens, token, buy, sell, swap, watch) are **mainnet only**;
+Airdrop / OTC / Claim / Wall and the market commands (tokens, token, gallery, studio, buy, sell, swap, watch) are **mainnet only**;
 the CLI refuses them on Orchard before touching the network.
 
 ### Every write goes through one pipeline
@@ -233,12 +235,15 @@ hartii mcp --allow-writes --max-per-tx 5 --max-per-day 20
 ```
 
 **Read tools** (always): `hartii_wallet`, `hartii_balance`, `hartii_portfolio`, `hartii_trending`, `hartii_token`,
-`hartii_quote`, `hartii_tx_status`, `hartii_otc_list`, `hartii_claim_eligibility`, `hartii_wall_stats`, plus the keyless
+`hartii_quote`, `hartii_tx_status`, `hartii_otc_list`, `hartii_claim_eligibility`, `hartii_wall_stats`, the read-only Hartii Gallery and Studio tools `hartii_studio_rooms`,
+`hartii_studio_link`, `hartii_gallery_search`, `hartii_gallery_collection`, `hartii_gallery_item`, `hartii_gallery_trending` (names and traits are third-party data; reads are cached 60 s), plus the keyless
 local trader reads `hartii_trader_status`, `hartii_trader_limits` and `hartii_trader_activity` (no unlock, arm or signing).
 **Write tools** — registered **only** with `--allow-writes`: `hartii_send`, `hartii_buy`, `hartii_sell`,
 `hartii_swap`, `hartii_otc_fill`, `hartii_otc_cancel`, `hartii_claim`. Every write is a **dry run** (the simulated
 confirmation summary, nothing signed) unless the call passes `confirm: true`, and a real send returns the summary plus
 the receipt. `--max-per-tx` / `--max-per-day` can only **tighten** the configured spending caps, never loosen them.
+
+**Cap presets** (`--preset conservative|normal|degen`) imply the caps and an MCP slippage ceiling: conservative 10 QUAI/tx, 50/day, 1% slippage; normal 50/250, 2%; degen 250/1000, 5%. A preset satisfies the `--allow-writes` cap requirement; explicit `--max-per-tx` / `--max-per-day` may only lower a preset value (raising errors), an unknown preset errors, and the active preset is shown by `hartii_trader_limits`, `hartii_wallet` and `hartii trader status`. Writes still need `--allow-writes`, the dry-run `reviewToken` and `confirm:true`; the vault's on-chain caps still apply. `hartii trader init --preset ...` applies the same per-tx/per-day caps to the trader budgets The trader also enforces slippage: the preset's bps (conservative 100, normal 200, degen 500; `--slippage-bps <n>` may only lower it) sets the on-chain min-out of every trader buy/sell, capped at the owner-signed policy ceiling (currently 100 bps, so normal/degen clamp to 100 until that ceiling is raised). If the price moves past the cap between quote and send, the trade is skipped (never retried larger) and a `slippage_skip` record (token, side, quoted, minOut, attempted) appears in `hartii trader status` and the activity feed. `trader init` with no `--preset` defaults to conservative and says so; profiles without a stored slippage use 100 bps.
 
 Stdio is the protocol channel, so there is no password prompt: signing needs `HARTII_PASSWORD` (or `--key-env`) in the
 server's environment. Dry runs work without it.

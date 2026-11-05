@@ -1,6 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] — 2026-11-05
+
+Read-only Hartii Gallery and Studio tools, as CLI commands and MCP tools. No wallet, signing or NFT writes are involved; data comes only from the Gallery's public API (`https://hartiigallery.com/api`).
+
+- `--preset conservative|normal|degen` for `hartii mcp --allow-writes` and `hartii trader init`: implies per-tx/per-day caps (10/50, 50/250, 250/1000 QUAI) and an MCP slippage ceiling (1%, 2%, 5%); explicit caps may only lower a preset. Active preset shown in `hartii_trader_limits`, `hartii_wallet` and `hartii trader status`.
+- New commands: `hartii gallery search|collection|item|trending` and `hartii studio rooms|open [--open]`. `studio open` prints the Studio deep link (`/studio?collection=<address>` or `/studio?piece=<address>:<tokenId>`); `--open` launches it only after checking the URL is on `https://hartiigallery.com/`.
+- New MCP read tools: `hartii_studio_rooms`, `hartii_studio_link`, `hartii_gallery_search`, `hartii_gallery_collection`, `hartii_gallery_item`, `hartii_gallery_trending`. All are annotated read-only and open-world, and their descriptions label names and traits as third-party data.
+- `hartii portfolio` / `balance --tokens` and `hartii_portfolio` now include the address's NFT holdings grouped by collection (first page of up to 100 tokens). A Gallery outage adds `nftHoldingsError` and never fails the balance.
+- `gallery trending` ranks collections by indexed marketplace sales in the last N days (default 30), then by volume, and states that basis in its output; it is not a floor or social ranking.
+- The MCP server keeps a 60 second in-memory cache of Gallery reads to keep Gallery D1 reads low.
+- Not included: live visitor counts per Studio room. The Gallery exposes presence only through a WebSocket join and has no public count endpoint, and these tools never join a room.
 
 ## [0.3.4] — 2026-10-16
 

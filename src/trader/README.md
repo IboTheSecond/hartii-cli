@@ -7,6 +7,8 @@ Normal setup records separate public owner/trading addresses and four absolute Q
 ```text
 hartii trader init --owner <address> --trading-address <address> --capital 100 --max-per-tx 10 --max-per-day 30 --max-fee 1
 hartii trader init --pair
+hartii trader init --owner <address> --trading-address <address> --capital 100 --preset conservative   # per-tx/per-day caps from a preset; explicit caps may only lower it
+# no --preset = conservative (printed in the output). --slippage-bps <n> may only lower the preset slippage.
 hartii trader paper --once
 hartii trader run --observe --once
 hartii trader watch --once --json
@@ -35,3 +37,7 @@ Policy expiry is at most 24 hours. Policy replacement alone never resumes a runn
 Unknown transaction hashes stay pending in both the engine journal and CLI spending ledger. Reconciliation checks the transaction/receipt identities, final status, actual gas and bound trade events, then settles each journal once. A verified local receipt is kept when the hosted service's 20-block confirmation gate is still pending. A separate protected hosted-settlement queue persists the public hash, blocks new signing and retries on subsequent gates or `trader reconcile`. Journal locks do not expire automatically after a crash.
 
 The local activity cache keeps 1000 public events and read tools return at most 100. A stopped-writer export streams every validated financial journal record to a protected JSONL artifact with explicit mode boundaries and integrity hashes. Invalid, partial or unsafe records fail before publishing the artifact. A separate fsynced outbox retains the entire unsent sequence and replays it in bounded requests after restart. Missing outbox appends are reconstructed from the durable engine journal by event identity. Financial journals and outboxes bind the compiled release; historical decisions are never relabeled for a newer release. Read-only status/export and explicit public recovery remain available when an older release's history blocks new signing or observation.
+
+## Slippage protection
+
+Every trader buy and sell carries an on-chain min-out (curve `buy`/`sell` floor, router `amountOutMin`) computed in BigInt as `quote * (10000 - slippageBps) / 10000`. `slippageBps` comes from the profile preset (conservative 100, normal 200, degen 500; an explicit `--slippage-bps` may only lower it) and is clamped to the owner-signed policy ceiling `maxSlippageBps` (100 today). Immediately before the signed transaction is released, the executor re-quotes (the guarded buy/sell path) and compares its floor with the runner's quote: if the price moved beyond the cap the trade is skipped with `slippage-exceeded`, nothing is broadcast and it is never retried with a looser cap. Each skip is stored in `slippage-skips.json` (type `slippage_skip`, token, side, quoted, minOut, attempted) and shown by `hartii trader status` (`slippage.recentSkips`) and the activity reader. Skips are local only; they are not relayed to the hosted dashboard.

@@ -17,7 +17,7 @@ export const GROUPS = [
 // to (optional: a shortcut for another command — { command, args: prefix, flags, dropArgs: ignore the user's own args })
 export const COMMANDS = [
   { name: 'trader', group: 'agents', summary: 'BETA holder trader: keyless Observe/Paper, locally gated Live', usage: [
-    'hartii trader init --owner <address> --trading-address <address> --capital <QUAI> --max-per-tx <QUAI> --max-per-day <QUAI> --max-fee <QUAI>',
+    'hartii trader init --owner <address> --trading-address <address> --capital <QUAI> --max-per-tx <QUAI> --max-per-day <QUAI> --max-fee <QUAI> [--preset conservative|normal|degen]',
     'hartii trader init --pair   # hidden pairing code; confirm fingerprint in dashboard',
     'hartii trader paper [--once] [--demo]', 'hartii trader run --observe [--once]',
     'hartii trader arm [--wallet <dedicated-name>]   # propose, sign in browser, repeat for local typed ARM',
@@ -56,6 +56,8 @@ export const COMMANDS = [
   { name: 'tx', group: 'read', summary: 'transaction status and local pending reservations', usage: ['hartii tx <hash>', 'hartii tx pending'], examples: ['hartii tx pending', 'hartii tx 0x…'] },
   { name: 'block', group: 'read', summary: 'current block height', usage: ['hartii block'], examples: ['hartii block'], aliases: ['height'] },
   { name: 'gas', group: 'read', summary: 'live gas price and what a transfer costs', usage: ['hartii gas'], examples: ['hartii gas'] },
+  { name: 'gallery', group: 'read', summary: 'Hartii Gallery NFT market (read-only): search, collection, item, trending', usage: ['hartii gallery search <name|0x address> [--limit n]', 'hartii gallery collection <address|name>', 'hartii gallery item <address> <tokenId>', 'hartii gallery trending [--days 30] [--limit 10]'], examples: ['hartii gallery search youkai', 'hartii gallery item 0x0060e0eb00491dfc54cf4149aaf574fac9ebfbb7 5', 'hartii gallery trending --days 7'] },
+  { name: 'studio', group: 'read', summary: 'Hartii Studio 3D museum rooms (read-only): list rooms, print or open a link', usage: ['hartii studio rooms [query] [--limit n]', 'hartii studio open <collection address|name> [tokenId] [--open]'], examples: ['hartii studio rooms youkai', 'hartii studio open "fanged youkai"', 'hartii studio open 0x0060e0eb00491dfc54cf4149aaf574fac9ebfbb7 5 --open'] },
   { name: 'open', group: 'read', summary: 'quaiscan link for a tx hash or address (--browser opens it)', usage: ['hartii open <hash|address> [--browser]'], examples: ['hartii open 0x…'], aliases: ['explorer'] },
 
   { name: 'buy', group: 'trade', summary: 'buy a token with QUAI on its bonding curve', usage: ['hartii buy <token> <quai> [--slippage 3] [--max-fee <quai>]'], examples: ['hartii buy DEMO 5 --dry-run', 'hartii buy DEMO 25%'] },
@@ -76,7 +78,7 @@ export const COMMANDS = [
   { name: 'about', group: 'system', summary: 'version, links and where your data lives', usage: ['hartii about'], examples: ['hartii about'], aliases: ['links'] },
   { name: 'version', group: 'system', summary: 'print the version (also --version)', usage: ['hartii version'], examples: ['hartii version'], aliases: ['ver'] },
 
-  { name: 'mcp', group: 'agents', summary: 'stdio MCP server for AI agents (Claude Code, Cursor)', usage: ['hartii mcp', 'hartii mcp --allow-writes --max-per-tx <quai> --max-per-day <quai>   (writes REQUIRE both caps)'], examples: ['claude mcp add hartii -- hartii mcp'] },
+  { name: 'mcp', group: 'agents', summary: 'stdio MCP server for AI agents (Claude Code, Cursor)', usage: ['hartii mcp', 'hartii mcp --allow-writes --max-per-tx <quai> --max-per-day <quai>   (writes REQUIRE both caps)', 'hartii mcp --allow-writes --preset conservative|normal|degen   (preset caps; explicit caps may only lower it)'], examples: ['claude mcp add hartii -- hartii mcp'] },
 ];
 
 const byName = new Map(COMMANDS.map((c) => [c.name, c]));

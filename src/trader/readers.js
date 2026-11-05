@@ -1,9 +1,11 @@
 import { profilePaths,loadProfile,requireProfile,readPrivateJson,requestPause,pauseRequested,withStoppedTraderJournals,privateStreamExport,TraderCliError } from './storage.js';
+import { PRESETS } from '../presets.js';
 import { validatePolicy,validateModelFeatures,canonicalJson,canonicalPolicyMessage } from '../../vendor/packages/hartii-trader/src/index.mjs';
 import { open } from 'node:fs/promises';
 import { createHash,randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { TRADER_RELEASE_ID } from './release.js';
+import { readSlippageSkips } from './slippage.js';
 
 const snapshotFields=['schemaVersion','runnerId','owner','tradingWallet','chainId','mode','state','updatedAt','heartbeatAt','policy','membership','finances','positions','latestDecision','blockers','qualification'];
 const pick=(value,keys)=>Object.fromEntries(keys.map(key=>[key,['string','number','boolean'].includes(typeof value?.[key])?value[key]:null]));
@@ -44,15 +46,17 @@ export function readTraderStatus(opts = {}, deps = {}) {
   const now=deps.clock?.() ?? Date.now(),stale=!!snapshot && (!Number.isSafeInteger(snapshot.heartbeatAt) || now-snapshot.heartbeatAt>120000);
   if(snapshot && stale){snapshot.qualification.liveEnabled=false;snapshot.blockers=[...new Set([...snapshot.blockers,'heartbeat-stale'])];if(!['paused','pending'].includes(snapshot.state))snapshot.state='disconnected';}
   if(snapshot?.mode==='live' && snapshot.policy?.expiresAt<=now){snapshot.qualification.liveEnabled=false;snapshot.blockers=[...new Set([...snapshot.blockers,'policy-expired'])];}
-  return {ok:true,configured:true,profile:paths.name,snapshot,identity:{owner:profile.owner,tradingWallet:profile.tradingWallet,runnerId:profile.runnerId,chainId:9},
+  return {ok:true,configured:true,profile:paths.name,snapshot,preset:presetView(profile),slippage:slippageView(profile,paths,opts,deps),identity:{owner:profile.owner,tradingWallet:profile.tradingWallet,runnerId:profile.runnerId,chainId:9},
     paused:pauseRequested(paths),stale,note:snapshot ? undefined : 'No cycle has run for this profile.'};
 }
+function slippageView(profile,paths,opts,deps){const own=Number.isSafeInteger(profile.slippageBps)?profile.slippageBps:100;return {bps:own,legacyDefault:!Number.isSafeInteger(profile.slippageBps),recentSkips:readSlippageSkips(opts,deps).slice(-10)};}
+function presetView(profile){const p=profile.preset&&PRESETS[profile.preset];return p?{name:profile.preset,maxPerTxWei:p.perTxWei.toString(),maxPerDayWei:p.dailyWei.toString()}:null;}
 export function readTraderLimits(opts = {}, deps = {}) {
   const paths=profilePaths(opts,deps), profile=loadProfile(paths);
   if(!profile) return {ok:true,configured:false,limits:null};
   const envelope=readPrivateJson(paths.policy,{optional:true});
   const policy=envelope?.policy ? validatePolicy(envelope.policy,{now:envelope.policy.issuedAt}) : null;
-  return {ok:true,configured:true,limits:pick(profile.budgets,['capitalWei','maxPerTxWei','maxPerDayWei','maxFeeWei']),policy,armed:!!policy && policy.expiresAt>(deps.clock?.() ?? Date.now()),paused:pauseRequested(paths)};
+  return {ok:true,configured:true,limits:pick(profile.budgets,['capitalWei','maxPerTxWei','maxPerDayWei','maxFeeWei']),preset:presetView(profile),policy,armed:!!policy && policy.expiresAt>(deps.clock?.() ?? Date.now()),paused:pauseRequested(paths)};
 }
 export function readTraderActivity(opts = {}, deps = {}) {
   const paths=profilePaths(opts,deps), profile=loadProfile(paths);
@@ -60,7 +64,7 @@ export function readTraderActivity(opts = {}, deps = {}) {
   const after=Number.isSafeInteger(opts.after)?opts.after:0;
   const events=profile ? readPrivateJson(paths.events,{optional:true}) || [] : [];
   const items=events.filter(e=>e.schemaVersion===1 && e.runnerId===profile?.runnerId && e.seq>after).slice(-limit).map(publicEvent).filter(Boolean);
-  return {ok:true,configured:!!profile,events:items,nextCursor:items.at(-1)?.seq ?? after};
+  return {ok:true,configured:!!profile,events:items,slippageSkips:profile?readSlippageSkips(opts,deps).slice(-limit):[],nextCursor:items.at(-1)?.seq ?? after};
 }
 /** In-process seam used by MCP. It has no arm, credential, or spending method. */
 export function createTraderReader(opts = {}, deps = {}) {

@@ -129,3 +129,14 @@ it('refuses to take the local ARM confirmation from a pipe or any non-terminal s
   expect(await main(['trader','arm','--policy-file',file,'--json'],{...deps,stdin:terminal,stdout:new PassThrough()})).toBe(0);
   expect(existsSync(join(home,'trader/default/armed-policy.json'))).toBe(true);
 },120000);
+it('trader init --preset applies preset caps, only lets explicit caps lower them, and status shows the preset',async()=>{
+  const {deps}=fixture();
+  const base=['trader','init','--owner','0x0010000000000000000000000000000000000001','--trading-address','0x0010000000000000000000000000000000000002','--capital','1000','--max-fee','1','--json'];
+  expect(await main([...base,'--preset','nope'],deps)).not.toBe(0);
+  expect(await main([...base,'--preset','conservative','--max-per-tx','11'],deps)).not.toBe(0);
+  expect(await main([...base,'--preset','conservative','--max-per-tx','4'],deps)).toBe(0);
+  expect(await main(['trader','status','--json'],deps)).toBe(0);
+  expect(JSON.parse(deps.write.mock.calls.at(-1)[0]).preset).toMatchObject({name:'conservative',maxPerTxWei:'10000000000000000000',maxPerDayWei:'50000000000000000000'});
+  const limits=createTraderReader({home:deps.env.HARTII_HOME,profile:'default'}).limits();
+  expect(limits).toMatchObject({preset:{name:'conservative'},limits:{maxPerTxWei:'4000000000000000000',maxPerDayWei:'50000000000000000000'}});
+});

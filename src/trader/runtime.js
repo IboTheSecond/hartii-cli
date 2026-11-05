@@ -13,6 +13,7 @@ import { createHostedServices } from './services.js';
 import { TRADER_RELEASE_ID } from './release.js';
 import { readFundingTransaction } from './funding.js';
 import { createTelemetryPump } from './telemetry.js';
+import { traderSlippageBps, recordSlippageSkip } from './slippage.js';
 
 export function verifyOwnerPolicy({policy,signature,message=canonicalPolicyMessage(policy)}) {
   let owner;
@@ -91,7 +92,7 @@ export async function runLocalTrader(opts={},deps={}) {
       decisionProvider=factory({...providerOptions,role:'rank'});critiqueProvider=factory({...providerOptions,role:'critique'});
     }
     market=demo || recovery?{snapshot:async({now})=>({at:now,cashWei:demo?profile.budgets.capitalWei:null,positions:[],candidates:[]})}:
-      (deps.market || createRealMarket({...opts,profile,policy},{...deps,clock}));
+      (deps.market || createRealMarket({...opts,profile,policy,slippageBps:traderSlippageBps(profile,policy)},{...deps,clock}));
     let durableEvents=outbox?(await outbox.read()).map(r=>publicEvent(r.data)).filter(Boolean):[];
     // Repair a crash between the engine's fsynced event and the outbox append without
     // inventing an event, dropping old history, or changing an already assigned cursor.
@@ -104,7 +105,7 @@ export async function runLocalTrader(opts={},deps={}) {
     const cursor=paths?readPrivateJson(paths.relayCursor,{optional:true})?.lastSeq || 0:0;
     let queued=durableEvents.filter(event=>event.seq>cursor),relayUnavailable=false,observedDays=null;
     const services=deps.traderServices || (relay?createHostedServices({relay,policy,paths},{...deps,clock}):{});
-    const executor=mode==='live'?createLiveExecutor({...opts,tradingWallet:profile.tradingWallet,wallet},{...deps,clock,isPaused:()=>controller.signal.aborted || deps.signal?.aborted || pauseRequested(paths),
+    const executor=mode==='live'?createLiveExecutor({...opts,tradingWallet:profile.tradingWallet,wallet,slippageBps:traderSlippageBps(profile,policy)},{...deps,clock,onSlippageSkip:event=>{try{if(paths)recordSlippageSkip(opts,event,deps);}catch{/* the skip itself already stopped the trade */}deps.onSlippageSkip?.(event);},isPaused:()=>controller.signal.aborted || deps.signal?.aborted || pauseRequested(paths),
       onPrepared:services.onPrepared || deps.onPrepared,onReconciled:services.onReconciled || deps.onReconciled}):undefined;
     runner=new TraderRunner({mode,policy,journal,market,clock,initialBalanceWei:mode==='paper'?profile.budgets.capitalWei:undefined,decisionProvider,critiqueProvider,executor,
       signature:envelope?.signature,verifyPolicy:verifyOwnerPolicy,

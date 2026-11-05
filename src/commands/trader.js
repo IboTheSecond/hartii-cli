@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { resolvePreset } from '../presets.js';
 import { existsSync,statSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createPolicy, validatePolicy, canonicalPolicyMessage, parseUnits, FileJournal,TraderLedger } from '../../vendor/packages/hartii-trader/src/index.mjs';
@@ -14,7 +15,7 @@ import { unlockDevice,signTradingPolicy,createHostedServices,policyHash } from '
 import { TRADER_RELEASE_ID } from '../trader/release.js';
 import { safeTerminalText } from '../output.js';
 
-const allowedFlags=new Set(['profile','once','observe','policy-file','funding-tx','owner','trading-address','create-wallet','capital','max-per-tx','max-per-day','max-fee','provider','model','model-key-env','pricing-file','pair','out','limit','after','stdin','mode','allow-insecure-rpc']);
+const allowedFlags=new Set(['profile','once','observe','policy-file','funding-tx','owner','trading-address','create-wallet','capital','max-per-tx','max-per-day','preset','slippage-bps','max-fee','provider','model','model-key-env','pricing-file','pair','out','limit','after','stdin','mode','allow-insecure-rpc']);
 function inputPolicy(profile,now) {return createPolicy({...profile.budgets,owner:profile.owner,tradingWallet:profile.tradingWallet,runnerId:profile.runnerId,nonce:String(now),issuedAt:now,expiresAt:now+86400000});}
 function checkedFlags(flags={}) {
   if(Object.keys(flags).some(k=>!allowedFlags.has(k)))throw new TraderCliError('Unsupported trader option. Secrets must use a hidden prompt or an environment-variable name, never arguments.');
@@ -23,6 +24,9 @@ async function ask(value,label,deps) {
   if(value!==undefined && value!==null && value!=='')return value;
   if(!(deps.interactive ?? process.stdin.isTTY))throw new TraderCliError(`${label} is required; supply its named option or use an interactive terminal.`);
   return (deps.promptFn || readVisibleInput)(`${label}: `,deps.io || {});
+}
+function resolveTraderPreset(opts) {
+  try {return resolvePreset({preset:opts.preset||'conservative',maxPerTx:opts.maxPerTx,maxPerDay:opts.maxPerDay,slippageBps:opts.slippageBps});}catch(e){throw new TraderCliError(e.message);}
 }
 async function initialize(opts,deps) {
   const paths=profilePaths(opts,deps),old=loadProfile(paths),clock=deps.clock || Date.now;
@@ -40,9 +44,9 @@ async function initialize(opts,deps) {
       writeKeystoreFile(paths.home,wallet,await encryptAccount(account,password));tradingWallet=account.address;
     } else if(wallet) tradingWallet=resolveWalletAddress(paths.home,wallet).address;
     tradingWallet=assertCyprus1QuaiAddress(await ask(tradingWallet,'Dedicated trading wallet address (--trading-address)',deps));
-    const budgets={};
-    for(const [key,flag,value] of [['capitalWei','capital',opts.capital],['maxPerTxWei','max-per-tx',opts.maxPerTx],['maxPerDayWei','max-per-day',opts.maxPerDay],['maxFeeWei','max-fee',opts.maxFee]])budgets[key]=parseUnits(String(await ask(value,`Absolute QUAI budget (--${flag})`,deps)),18).toString();
-    profile={schemaVersion:1,profile:paths.name,chainId:9,runnerId:randomUUID(),owner,tradingWallet,budgets,...(wallet?{wallet}:{})};
+    const budgets={},preset=resolveTraderPreset(opts);
+    for(const [key,flag,value] of [['capitalWei','capital',opts.capital],['maxPerTxWei','max-per-tx',preset?preset.perTxQuai:opts.maxPerTx],['maxPerDayWei','max-per-day',preset?preset.dailyQuai:opts.maxPerDay],['maxFeeWei','max-fee',opts.maxFee]])budgets[key]=parseUnits(String(await ask(value,`Absolute QUAI budget (--${flag})`,deps)),18).toString();
+    profile={schemaVersion:1,profile:paths.name,chainId:9,runnerId:randomUUID(),owner,tradingWallet,budgets,preset:preset.preset,slippageBps:preset.slippageBps,...(wallet?{wallet}:{})};
     inputPolicy(profile,clock());
   }
   let password;
@@ -71,7 +75,7 @@ async function initialize(opts,deps) {
     writePrivateJson(paths.credentials,encryptCredentials(credentials,await credentialPassword()),{replace:!!oldCredentials});
   }
   writePrivateJson(paths.profile,profile,{replace:!!old});
-  return {ok:true,configured:true,profile:paths.name,owner:profile.owner,tradingWallet:profile.tradingWallet,runnerId:profile.runnerId,chainId:9,budgets:profile.budgets,
+  return {ok:true,configured:true,profile:paths.name,owner:profile.owner,tradingWallet:profile.tradingWallet,runnerId:profile.runnerId,chainId:9,budgets:profile.budgets,preset:profile.preset ?? null,slippageBps:profile.slippageBps ?? 100,...(!opts.preset&&!old?{presetNote:'No --preset given: defaulted to conservative (10 QUAI/tx, 50/day, 1% slippage).'}:{}),
     ...(pairing?{pairing}:{}),note:pairing?'Confirm this device fingerprint in your dashboard before telemetry is accepted.':'Ready for keyless Observe/Paper. Live stays blocked until local arm and verified release qualification.'};
 }
 async function armPolicy(opts,deps,journal) {

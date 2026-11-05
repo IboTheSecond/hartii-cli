@@ -29,7 +29,7 @@ export const GLOBAL_FLAG_SPECS = {
 };
 
 // Command-specific flags that never take a value (so they cannot swallow a following positional).
-const EXTRA_BOOLEAN_FLAGS = ['from-arg', 'trust-live-addresses', 'allow-writes', 'mine', 'check', 'qr', 'tokens', 'stdin', 'allow-insecure-rpc', 'once', 'observe', 'pair', 'create-wallet', 'browser', 'address-qr'];
+const EXTRA_BOOLEAN_FLAGS = ['from-arg', 'trust-live-addresses', 'allow-writes', 'mine', 'check', 'qr', 'tokens', 'stdin', 'allow-insecure-rpc', 'once', 'observe', 'pair', 'create-wallet', 'browser', 'address-qr', 'open'];
 
 function isFlagToken(tok) {
   return typeof tok === 'string' && tok.length > 1 && tok[0] === '-';

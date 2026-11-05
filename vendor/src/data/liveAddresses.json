@@ -35,8 +35,8 @@
     ],
     "relays": [
       {
-        "_doc": "QuaiRelay: forwards exactly msg.value to the recipient NAMED IN THE CALL, in the same transaction. The general form of the forwarder above, and the one /blipsend offers publicly — a fixed-destination contract on a public page is a one-click send to a stranger's wallet. Stateless: no owner, no admin, no fee, no setter, no storage, no receive(). Deployed 2026-09-19, 600-byte runtime. Source at /blipsend-source/QuaiRelay.sol.txt.",
-        "address": "0x0031B09e63592B713768761cdDACC603974c10bD"
+        "_doc": "QuaiRelay: forwards exactly msg.value to the recipient NAMED IN THE CALL, in the same transaction. The general form of the forwarder above, and the one /blipsend offers publicly — a fixed-destination contract on a public page is a one-click send to a stranger's wallet. Stateless: no owner, no admin, no fee, no setter, no storage, no receive(). v2, deployed 2026-11-02 (tx 0x001f0025ecd2a597a970f64144403005269cfbc72d7bcef61455e1ba885ae3fd), 674-byte runtime; also refuses a Qi-ledger recipient by name. v1 0x0031B09e63592B713768761cdDACC603974c10bD is retired (a Qi recipient burned the whole gas limit) and must not be offered for new sends. Source at /blipsend-source/QuaiRelay.sol.txt.",
+        "address": "0x003D2EC4C1Ff5e98898fEa6C6D1AAaA48FaDc11A"
       }
     ],
     "hartiiSwap": {
@@ -98,7 +98,12 @@
       "address": "0x001d607B22de6ACcFB4adEE62838DED222Aa0c8a",
       "deployBlock": 10352297,
       "attestor": "0x006C4c9bEFcE9E9fAbDd4799217BD37cbaEE816F",
-      "_deployed": "2026-09-29: deployed on mainnet via deploy-achievement-rewards.cjs (tx 0x002d00515b9aea40b44ede32ddf38c54f94780c49e4c86ed556583a36291c75e); owner = admin wallet, attestor + REWARD 25 QUAI read back; funded 2,000 QUAI (tx 0x001a002510e1d9e3b39b29fb5749d3368a22b059acc6c6ca8336bfd72958354b) = 80 claims."
+      "_deployed": "2026-09-29: deployed on mainnet via deploy-achievement-rewards.cjs (tx 0x002d00515b9aea40b44ede32ddf38c54f94780c49e4c86ed556583a36291c75e); owner = admin wallet, attestor + REWARD 25 QUAI read back; funded 2,000 QUAI (tx 0x001a002510e1d9e3b39b29fb5749d3368a22b059acc6c6ca8336bfd72958354b) = 80 claims.",
+      "closed": true,
+      "closedAt": "2026-10-23",
+      "pauseTx": "0x0071004c0df9197a2597cb9bc5459d0f6c238576aa6d3e00170db05dc8ca3fe7",
+      "withdrawTx": "0x0032001aaf565c3d3a81669cb256510a3b254d62fc95ff212cf25c21b5e2d734",
+      "_closed": "2026-10-23 (owner order): CLOSED. Nobody had ever claimed (80 of 80 left). The contract was paused (block 10765601, pauseTx) and the whole 2,000 QUAI withdrawn to the admin wallet (block 10765611, withdrawTx); that money funds round 2 of the HartiiPay welcome claim (60 more people, 25 QUAI each). SINGLE SOURCE OF TRUTH for the closed state: src/utils/appConfig.js ACHIEVEMENT_REWARDS_CLOSED reads closed here; functions/_lib/achievementRewardsConfig.js mirrors it (test/achievementRewardsClosed.test.mjs fails if they drift). The address stays so the contract link and the history remain."
     },
     "wallMeta": {
       "_doc": "WallMeta (contracts/contracts/wall/WallMeta.sol) — author-only on-chain style metadata (animation/material/accentColor/speed/glow) for existing QuaiWallV2 engravings on THIS mainnet wall (immutable wall reference, set at deploy). Null until deployed via contracts/scripts/deploy-wall-meta.cjs; the deployed, read-back-verified address is copied here in the SAME commit as src/abi/wallMeta.js reconciliation. src/utils/wallMetaReads.js and src/components/WallStyleForm.jsx stay dark while this is null.",

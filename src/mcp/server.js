@@ -11,6 +11,7 @@ import { buildTools, clean } from './tools.js';
 import { PKG_VERSION } from '../version.js';
 import { getHartiiHome, loadConfig } from '../config.js';
 import { readRuntime } from '../commandContext.js';
+import { resolvePreset } from '../presets.js';
 import { installConsoleGuard } from '../stdoutGuard.js';
 import { OUTPUT_SCHEMA, resultMetadata, toolAnnotations, toolResult } from '../../vendor/packages/agent-mcp/src/capabilities.js';
 
@@ -55,19 +56,21 @@ export function buildMcpServer(ctx, makeServer = () => new McpServer({ name: 'ha
 export function resolveMcpContext(opts = {}) {
   const env = opts.env || process.env;
   const limits = {};
-  for (const [flag, key] of [['maxPerTx', 'perTxQuai'], ['maxPerDay', 'dailyQuai']]) {
+  const preset = resolvePreset({ preset: opts.preset, maxPerTx: opts.maxPerTx, maxPerDay: opts.maxPerDay });
+  for (const [flag, key] of preset ? [] : [['maxPerTx', 'perTxQuai'], ['maxPerDay', 'dailyQuai']]) {
     const v = opts[flag];
     if (v === undefined || v === null || v === false) continue;
     if (!DECIMAL.test(String(v)) || !/[1-9]/.test(String(v))) throw new Error(`--${flag === 'maxPerTx' ? 'max-per-tx' : 'max-per-day'} must be a bounded positive QUAI amount like 5 or 0.5.`);
     limits[key] = String(v);
   }
+  if (preset) { limits.perTxQuai = preset.perTxQuai; limits.dailyQuai = preset.dailyQuai; }
   if (opts.allowWrites === true && (limits.perTxQuai === undefined || limits.dailyQuai === undefined)) {
-    throw new Error('--allow-writes requires explicit --max-per-tx <quai> AND --max-per-day <quai> (they can only tighten the config caps). Refusing to start.');
+    throw new Error('--allow-writes requires explicit --max-per-tx <quai> AND --max-per-day <quai>, or --preset conservative|normal|degen (they can only tighten the config caps). Refusing to start.');
   }
   const home = opts.home || getHartiiHome(env);
   loadConfig(home); // fail fast on a corrupt config
   return {
-    home, env, limits,
+    home, env, limits, preset,
     network: opts.network || undefined, rpc: opts.rpc || undefined, wallet: opts.wallet || undefined, keyEnv: opts.keyEnv || undefined,
     allowWrites: opts.allowWrites === true,
     traderReader: opts.traderReader,
@@ -93,7 +96,7 @@ export async function runMcp(opts = {}) {
   if (ctx.allowWrites) {
     // Print the EFFECTIVE caps (flags can only tighten the config limits), never the raw flag values.
     const eff = readRuntime({ home: ctx.home, network: ctx.network, rpc: ctx.rpc }, { limits: ctx.limits }).limits;
-    stderr(`hartii mcp: WRITES ENABLED (dry-run unless confirm:true). Caps: per-tx ${eff.perTxQuai}, per-day ${eff.dailyQuai} QUAI.\n`);
+    stderr(`hartii mcp: WRITES ENABLED (dry-run unless confirm:true). ${ctx.preset ? `Preset ${ctx.preset.preset} (max slippage ${ctx.preset.maxSlippageBps / 100}%). ` : ''}Caps: per-tx ${eff.perTxQuai}, per-day ${eff.dailyQuai} QUAI.\n`);
     if (!ctx.keyEnv && !(ctx.env.HARTII_PASSWORD)) stderr('hartii mcp: no HARTII_PASSWORD / --key-env set — dry runs work, confirm:true will be refused.\n');
   } else {
     stderr('hartii mcp: read-only (pass --allow-writes to enable send/buy/sell/swap/otc/claim).\n');

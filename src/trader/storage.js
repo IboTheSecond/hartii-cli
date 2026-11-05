@@ -14,7 +14,7 @@ export function profilePaths(opts = {}, deps = {}) {
   const home = opts.home || getHartiiHome(deps.env || deps.io?.env);
   const root = securePath(join(home, 'trader', name)).path;
   return { home, name, root, profile: join(root, 'profile.json'), snapshot: join(root, 'snapshot.json'),
-    events: join(root, 'activity.json'), relayCursor:join(root,'relay-cursor.json'),hostedPending:join(root,'hosted-pending.json'),policy: join(root, 'armed-policy.json'),proposal:join(root,'policy-proposal.json'),pause: join(root, 'paused.json'),resumeAck:join(root,'resume-ack.json'),
+    events: join(root, 'activity.json'), slippageSkips: join(root, 'slippage-skips.json'), relayCursor:join(root,'relay-cursor.json'),hostedPending:join(root,'hosted-pending.json'),policy: join(root, 'armed-policy.json'),proposal:join(root,'policy-proposal.json'),pause: join(root, 'paused.json'),resumeAck:join(root,'resume-ack.json'),
     credentials: join(root, 'credentials.json'),outbox:join(root,'telemetry.journal.jsonl'),journal: mode => join(root, `${mode}.journal.jsonl`) };
 }
 export function readPrivateJson(path, { optional = false, maximum = 2_000_000 } = {}) {

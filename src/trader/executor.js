@@ -25,7 +25,7 @@ const same=(a,b)=>typeof a==='string' && typeof b==='string' && a.toLowerCase()=
 const reject=code=>{throw new TraderError(code);};
 const deferred=()=>{let resolve,reject; const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 
-export function validateTraderTransaction({transaction:tx,intent,quote,policy,now=Date.now(),paused=false}) {
+export function validateTraderTransaction({transaction:tx,intent,quote,policy,now=Date.now(),paused=false,slippageBps=policy?.slippageBps}) {
   validatePolicy(policy,{now});
   if(paused)reject('runner-paused');
   if(!policy.allowedActions.includes(intent.action==='approve'?'sell':intent.action) || !policy.allowedVenues.includes(intent.venue))reject('policy-action-denied');
@@ -40,6 +40,8 @@ export function validateTraderTransaction({transaction:tx,intent,quote,policy,no
     return;
   }
   if(!same(tx.to,quote.authority?.to))reject('transaction-authority-mismatch');
+  // The quote's own floor must respect the effective slippage cap (skipped only if a legacy quote has no expected output).
+  if(quote.expectedOutputWei!==undefined && BigInt(quote.minOutputWei)<BigInt(quote.expectedOutputWei)*BigInt(10000-slippageBps)/10000n)reject('slippage-exceeded');
   let decoded;
   if(intent.venue==='hartii-swap') {
     decoded=swap.parseTransaction({data:tx.data});
@@ -48,13 +50,14 @@ export function validateTraderTransaction({transaction:tx,intent,quote,policy,no
     const addresses=hartiiSwapAddresses(),path=decoded.args.path;
     if(!same(tx.to,addresses.router) || path.length!==2 || !same(decoded.args.to,policy.tradingWallet) ||
       !same(path[0],intent.action==='buy'?addresses.wquai:intent.token) || !same(path[1],intent.action==='buy'?intent.token:addresses.wquai))reject('transaction-authority-mismatch');
-    if(BigInt(decoded.args.amountOutMin)<BigInt(quote.minOutputWei) || Number(decoded.args.deadline)*1000<=now)reject('transaction-floor-or-expiry');
+    if(BigInt(decoded.args.amountOutMin)<BigInt(quote.minOutputWei))reject('slippage-exceeded');
+    if(Number(decoded.args.deadline)*1000<=now)reject('transaction-floor-or-expiry');
     if(intent.action==='sell' && BigInt(decoded.args.amountIn)!==BigInt(intent.units))reject('transaction-amount-changed');
   } else {
     try {decoded=(['curve-v3','curve-v4'].includes(intent.venue)?curveV3:curveV1).parseTransaction({data:tx.data});}catch {reject('approval-or-route-not-authorized');}
     if(decoded?.name!==intent.action)reject('approval-or-route-not-authorized');
     const floor=decoded.args[intent.action==='buy'?0:1];
-    if(BigInt(floor)<BigInt(quote.minOutputWei))reject('transaction-minimum-output-reduced');
+    if(BigInt(floor)<BigInt(quote.minOutputWei))reject('slippage-exceeded');
     if(intent.action==='sell' && BigInt(decoded.args[0])!==BigInt(intent.units))reject('transaction-amount-changed');
     if(['curve-v3','curve-v4'].includes(intent.venue) && Number(decoded.args.at(-1))*1000<=now)reject('transaction-expired');
   }
@@ -147,7 +150,18 @@ export function createLiveExecutor(opts={},deps={}) {
       if(!opts.wallet)reject('encrypted-trading-wallet-required');
       const ready=deferred(),permit=deferred(),opaque=Object.freeze({}),state={permit,intent:structuredClone(intent),policy:structuredClone(policy),intentId:intent.id,hookReached:false,txHash:null,transaction:null,permitReleased:false,broadcastStarted:false,cancelled:false,completed:false};
       active.set(opaque,state);
-      const validate=({transaction})=>validateTraderTransaction({transaction,intent,quote,policy,now:clock(),paused:deps.isPaused?.()===true});
+      const slippageBps=Number.isSafeInteger(opts.slippageBps)?opts.slippageBps:policy.slippageBps;
+      const validate=({transaction})=>{
+        try{validateTraderTransaction({transaction,intent,quote,policy,now:clock(),paused:deps.isPaused?.()===true,slippageBps});}
+        catch(error){
+          if(error?.code==='slippage-exceeded' && intent.action!=='approve'){
+            let attempted=null;
+            try{const d=intent.venue==='hartii-swap'?swap.parseTransaction({data:transaction.data}).args.amountOutMin:(['curve-v3','curve-v4'].includes(intent.venue)?curveV3:curveV1).parseTransaction({data:transaction.data}).args[intent.action==='buy'?0:1];attempted=BigInt(d).toString();}catch{/* undecodable: leave null */}
+            try{deps.onSlippageSkip?.({type:'slippage_skip',at:clock(),token:intent.token,side:intent.action,quoted:String(quote.expectedOutputWei ?? quote.minOutputWei),minOut:String(quote.minOutputWei),attempted,slippageBps});}catch{/* logging must not mask the skip */}
+          }
+          throw error;
+        }
+      };
       const io={...deps.io,write:()=>{},writeErr:()=>{},maxFeeWei:policy.maxFeeWei,validateBeforeSubmit:validate,
         onBroadcastStarted:({txHash})=>{if(!same(txHash,state.txHash) || !state.permitReleased || state.cancelled)reject('invalid-native-dispatch');state.broadcastStarted=true;},
         managedExitBudget:intent.action==='sell'?details=>{
@@ -163,7 +177,7 @@ export function createLiveExecutor(opts={},deps={}) {
           ready.resolve({txHash,prepared:opaque});
           await permit.promise;
         }};
-      const base={home:opts.home,wallet:opts.wallet,network:'mainnet',rpc:opts.rpc,allowInsecureRpc:opts.allowInsecureRpc,yes:true,json:true,slippage:String(policy.slippageBps/100)};
+      const base={home:opts.home,wallet:opts.wallet,network:'mainnet',rpc:opts.rpc,allowInsecureRpc:opts.allowInsecureRpc,yes:true,json:true,slippage:String(slippageBps/100)};
       const run=intent.action==='approve'?(o,d)=>runApproval(o,d,intent):intent.venue==='hartii-swap'?runSwap:intent.action==='buy'?runBuy:runSell;
       const params=intent.action==='approve'?{}:intent.venue==='hartii-swap'?{tokenIn:intent.action==='buy'?'QUAI':intent.token,tokenOut:intent.action==='buy'?intent.token:'QUAI',amount:formatAmount(BigInt(intent.action==='buy'?intent.amountWei:intent.units),intent.action==='buy'?18:quote.tokenDecimals)}:
         intent.action==='buy'?{token:intent.token,quai:formatAmount(BigInt(intent.amountWei))}:{token:intent.token,amount:formatAmount(BigInt(intent.units),quote.tokenDecimals)};

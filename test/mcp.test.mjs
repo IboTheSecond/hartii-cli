@@ -25,7 +25,7 @@ beforeAll(() => { THROWAWAY = generateMnemonicAccount().privateKey; }, 120_000);
 const erc = new Interface(ERC20_ABI), curve = new Interface([...BONDING_CURVE_ABI, ...BONDING_CURVE_V3_ABI]);
 
 const factoryI = new Interface(['function curveOf(address) view returns (address)']);
-const READ_TOOLS = ['hartii_wallet', 'hartii_balance', 'hartii_portfolio', 'hartii_trending', 'hartii_token', 'hartii_quote', 'hartii_tx_status', 'hartii_otc_list', 'hartii_claim_eligibility', 'hartii_wall_stats', 'hartii_trader_status', 'hartii_trader_limits', 'hartii_trader_activity'];
+const READ_TOOLS = ['hartii_wallet', 'hartii_balance', 'hartii_portfolio', 'hartii_trending', 'hartii_token', 'hartii_quote', 'hartii_tx_status', 'hartii_otc_list', 'hartii_claim_eligibility', 'hartii_wall_stats', 'hartii_studio_rooms', 'hartii_studio_link', 'hartii_gallery_search', 'hartii_gallery_collection', 'hartii_gallery_item', 'hartii_gallery_trending', 'hartii_trader_status', 'hartii_trader_limits', 'hartii_trader_activity'];
 const WRITE_TOOLS = ['hartii_send', 'hartii_buy', 'hartii_sell', 'hartii_swap', 'hartii_otc_fill', 'hartii_otc_cancel', 'hartii_claim'];
 
 let home;

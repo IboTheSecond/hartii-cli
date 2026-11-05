@@ -22,6 +22,10 @@ export function sanitizeMcpText(value) {
       // including harmless punctuation surrounding those known complete paths.
       const publicLink = raw.match(/^(https:\/\/(?:quaiscan\.io|orchard\.quaiscan\.io)\/(?:tx\/0x[0-9a-f]{64}|address\/0x[0-9a-f]{40})\/?)([)\]}.,;!:'"<>]*)$/i);
       if (publicLink) return publicLink[1] + publicLink[2];
+      // hartii-cli 0.4.0: the exact Hartii Gallery/Studio deep links the read-only Gallery tools generate. Only these
+      // four shapes, each carrying a plain 0x+40-hex address (a public identifier) and an optional decimal token id.
+      const galleryLink = raw.match(/^(https:\/\/hartiigallery\.com\/(?:studio\?collection=0x[0-9a-f]{40}|studio\?piece=0x[0-9a-f]{40}:\d{1,78}|collection\/0x[0-9a-f]{40}|item\/0x[0-9a-f]{40}\/\d{1,78}))([)\]}.,;!:'"<>]*)$/);
+      if (galleryLink) return galleryLink[1] + galleryLink[2];
       const url = new URL(raw);
       const publicPath = url.protocol === 'https:' && !url.port && ['quaiscan.io', 'orchard.quaiscan.io'].includes(url.hostname)
         && /^\/(?:tx\/0x[0-9a-f]{64}|address\/0x[0-9a-f]{40})\/?$/i.test(url.pathname);
@@ -55,8 +59,9 @@ export const OUTPUT_SCHEMA = z.object({
   }).strict(),
 }).passthrough();
 
-export function toolAnnotations({ write = false, local = false, openWorld = !local }) {
-  return { readOnlyHint: !write, destructiveHint: write, idempotentHint: !write, openWorldHint: openWorld };
+export function toolAnnotations({ write = false, local = false, openWorld = !local, localWrite = false, destructive = false }) {
+  // localWrite: writes only a local file (never chain, never a key); not read-only, not destructive unless `destructive`.
+  return { readOnlyHint: !write && !localWrite, destructiveHint: write || destructive, idempotentHint: !write, openWorldHint: openWorld };
 }
 
 export function resultMetadata({ authority = 'read-only', mode = 'read-only', chainId = 9, network = 'mainnet', chainVerified = false } = {}) {

@@ -16,6 +16,7 @@ import { assertCyprus1QuaiAddress } from '../address.js';
 import { resilientRead } from '../../vendor/packages/agent-mcp/src/rpcClient.js';
 import { DEMO_ADDRESS, DEMO_NETWORK, DEMO_BALANCE_WEI, DEMO_TOKEN_HOLDINGS } from '../demoFixtures.js';
 import { CliError } from '../errors.js';
+import { getNftHoldings } from '../galleryApi.js';
 
 const API_BASE = 'https://hartiilabs.com';
 
@@ -79,6 +80,13 @@ export async function runBalance(opts = {}, deps = {}) {
       result.holdings = null;
       result.totals = null;
       result.holdingsError = `Could not reach ${apiBase}/api/portfolio: ${err?.message || err}`;
+    }
+    // NFTs held (by collection) from the Hartii Gallery index; a failure here never fails the portfolio.
+    try {
+      result.nftHoldings = await getNftHoldings(address, {}, { fetchFn, cache: deps.cache, now: deps.now, network: net.name });
+    } catch (err) {
+      result.nftHoldings = null;
+      result.nftHoldingsError = `Could not read NFT holdings from the Hartii Gallery index: ${err?.message || err}`;
     }
   }
 

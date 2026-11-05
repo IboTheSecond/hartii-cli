@@ -92,6 +92,7 @@ export function createRealMarket({profile,policy,...opts},deps={}) {
   }
   async function quote({action,candidate,position,amountWei,units,now,mode='live',approvals=[]}) {
     await checkChain();
+    const slip=Number.isSafeInteger(opts.slippageBps)?opts.slippageBps:policy.slippageBps;
     const route=await getRoute(candidate.token,now,candidate.venue), tokenDecimals=Number(await call(provider,route.token,erc,'decimals'));
     if(!Number.isSafeInteger(tokenDecimals) || tokenDecimals<0 || tokenDecimals>36) throw new TraderError('unsupported-token-decimals');
     if(route.venue!==candidate.venue)throw new TraderError('route-changed');
@@ -105,13 +106,13 @@ export function createRealMarket({profile,policy,...opts},deps={}) {
     const swapSell=async(value)=>{
       const path=[route.token,route.wrapped],out=await call(provider,route.target,router,'getAmountsOut',[value,path]);
       if(out.length!==2 || BigInt(out[0])!==value)throw new TraderError('invalid-swap-quote');
-      const expectedOut=BigInt(out[1]),minQuaiOut=expectedOut*BigInt(10000-policy.slippageBps)/10000n;
+      const expectedOut=BigInt(out[1]),minQuaiOut=expectedOut*BigInt(10000-slip)/10000n;
       return {expectedOut,minQuaiOut,data:router.encodeFunctionData('swapExactTokensForETH',[value,minQuaiOut,path,from,Math.floor(now/1000)+300])};
     };
-    const buy=action==='buy' ? await (route.venue==='hartii-swap'?swapBuy(amount,policy.slippageBps):quoteAndBuildBuy(provider,route.target,amount,policy.slippageBps)) : null;
+    const buy=action==='buy' ? await (route.venue==='hartii-swap'?swapBuy(amount,slip):quoteAndBuildBuy(provider,route.target,amount,slip)) : null;
     if(buy?.finishing || buy && buy.valueWei!==amount)throw new TraderError('finishing-buy-not-supported');
     const tokenUnits=buy ? buy.expectedOut : uint(units || position?.units);
-    const sell=await (route.venue==='hartii-swap'?swapSell(tokenUnits):quoteAndBuildSell(provider,route.target,tokenUnits,policy.slippageBps));
+    const sell=await (route.venue==='hartii-swap'?swapSell(tokenUnits):quoteAndBuildSell(provider,route.target,tokenUnits,slip));
     if(tokenUnits===0n || sell.expectedOut===0n)throw new TraderError('empty-quote');
     const allowance=uint(await call(provider,route.token,erc,'allowance',[from,route.target]));
     const simulatedApproval=mode==='paper' && position && approvals.some(a=>a.simulated===true && a.positionId===position.id && same(a.token,route.token) && same(a.spender,route.target) && a.units===tokenUnits.toString());

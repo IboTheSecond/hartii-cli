@@ -1,6 +1,7 @@
 import { formatTable, makeColors, safeTerminalText } from './output.js';
 import { formatAmount } from './amount.js';
 import {renderReceiveQr} from './qr.js';
+import { formatGalleryView, nftHoldingsLines } from './galleryHuman.js';
 
 const text = value => value === null || value === undefined ? '—' : safeTerminalText(String(value));
 function wei(value) { try { return value == null ? '—' : formatAmount(BigInt(value)); } catch { return '—'; } }
@@ -22,6 +23,8 @@ function fields(value, prefix = '') {
 
 /** Human formatting only. JSON stays lossless and machine-readable in output.printJson. */
 export function formatHumanResult(result, { colors = makeColors({ enabled: false }) } = {}) {
+  const galleryView = formatGalleryView(result, colors);
+  if (galleryView) return galleryView.join('\n');
   const lines = [];
   if (result?.demo) lines.push(colors.purple('DEMO · fixture data · no signing'));
   if (result?.aborted) lines.push(colors.yellow('Aborted'));
@@ -61,6 +64,8 @@ export function formatHumanResult(result, { colors = makeColors({ enabled: false
         ...result.holdings.map(h => [text(h.symbol), text(h.balance), text(h.valueQuai), text(h.priceSource)]),
       ]) : 'No token holdings.');
     }
+    if (result.nftHoldingsError) lines.push(colors.yellow(text(result.nftHoldingsError)));
+    else if (result.nftHoldings) lines.push(...nftHoldingsLines(result.nftHoldings, colors));
   } else if (result?.summary) {
     lines.push(colors.bold(text(result.summary.action || 'Transaction')));
     if (result.dryRun) lines.push('Simulation only · not sent');
