@@ -149,10 +149,13 @@ describe('encryptAccount / decryptAccount round trip', () => {
   });
 });
 
+// Filesystem semantics do not need random address grinding or production-cost KDFs.
+// Real encryption/decryption and mnemonic recovery remain tested above.
+const syntheticKeystore=(address='0011111111111111111111111111111111111111',marker='fixture')=>JSON.stringify({version:3,address,crypto:{cipher:'synthetic encrypted envelope '+marker}});
+
 describe('keystore file operations', () => {
   it('writes 0600 and creates the keystore dir 0700 (POSIX only)', async () => {
-    const account = generateMnemonicAccount();
-    const json = await encryptAccount({ address: account.address, privateKey: account.privateKey }, 'pw');
+    const json = syntheticKeystore();
     writeKeystoreFile(home, 'alice', json);
     expect(walletExists(home, 'alice')).toBe(true);
     if (process.platform !== 'win32') {
@@ -161,14 +164,14 @@ describe('keystore file operations', () => {
   });
 
   it('refuses to overwrite an existing wallet without force', async () => {
-    const json = await encryptAccount(generateMnemonicAccount(), 'pw');
+    const json = syntheticKeystore();
     writeKeystoreFile(home, 'bob', json);
     expect(() => writeKeystoreFile(home, 'bob', json)).toThrow(WalletError);
   });
 
   it('force overwrites', async () => {
-    const json1 = await encryptAccount(generateMnemonicAccount(), 'pw');
-    const json2 = await encryptAccount(generateMnemonicAccount(), 'pw');
+    const json1 = syntheticKeystore('0011111111111111111111111111111111111111','first');
+    const json2 = syntheticKeystore('0022222222222222222222222222222222222222','replacement');
     writeKeystoreFile(home, 'carol', json1);
     writeKeystoreFile(home, 'carol', json2, { force: true });
     expect(readKeystoreFile(home, 'carol')).toBe(json2);
@@ -176,7 +179,7 @@ describe('keystore file operations', () => {
 
   it('listWallets returns sorted names; empty when no keystore dir yet', async () => {
     expect(listWallets(home)).toEqual([]);
-    const json = await encryptAccount(generateMnemonicAccount(), 'pw');
+    const json = syntheticKeystore();
     writeKeystoreFile(home, 'zed', json);
     writeKeystoreFile(home, 'amy', json, { force: true });
     expect(listWallets(home)).toEqual(['amy', 'zed']);
@@ -187,7 +190,7 @@ describe('keystore file operations', () => {
   });
 
   it('removeKeystoreFile deletes the file', async () => {
-    const json = await encryptAccount(generateMnemonicAccount(), 'pw');
+    const json = syntheticKeystore();
     writeKeystoreFile(home, 'dave', json);
     removeKeystoreFile(home, 'dave');
     expect(walletExists(home, 'dave')).toBe(false);
@@ -198,7 +201,7 @@ describe('keystore file operations', () => {
   });
 
   it('renameKeystoreFile moves the file and refuses a colliding destination', async () => {
-    const json = await encryptAccount(generateMnemonicAccount(), 'pw');
+    const json = syntheticKeystore();
     writeKeystoreFile(home, 'old', json);
     writeKeystoreFile(home, 'taken', json, { force: true });
     renameKeystoreFile(home, 'old', 'new');

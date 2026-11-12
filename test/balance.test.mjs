@@ -103,6 +103,8 @@ describe('runBalance', () => {
     const result = await runBalance({ demo: true, tokens: true }, { providerFactory });
     expect(result.wallet).toBe(DEMO_ADDRESS);
     expect(result.holdings.length).toBeGreaterThan(0);
+    expect(result.holdings[0].valueQuai).toBe('105000000000000000000');
+    expect(result.holdings[0].priceQuai).toBe('2100000000000000');
     expect(providerFactory).not.toHaveBeenCalled();
   });
   it('never falls back from an Orchard RPC failure to the mainnet proxy', async () => {

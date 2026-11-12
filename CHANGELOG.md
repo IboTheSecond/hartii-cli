@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.5.0] — 2026-11-12
+
+- Constraint Desk / Fill Ledger beta commands: watch-only position context, swap preview, individually confirmed guarded swaps, private decision journal, canonical receipt observations and self-contained HTML/JSON exports.
+- Capture reviewed authority and locally verified signed hashes through existing native hooks. Preserve unknown outcomes and separate approval decisions; no new signing engine or automatic trading mode.
+- Include raw asset units/decimals in swap summaries for exact-denomination quote comparisons. Distinguish gas ceilings, observed fees and event-derived output; do not invent native proceeds, balance proof or historical P&L.
+- Convert API portfolio wei marks to QUAI in Desk and the existing balance table. Keep exact `indexedValueWei` alongside formatted `indexedValueQuai`; distinguish unknown/malformed values from zero. Balance fixtures now match the live API's wei wire units.
+
 ## [0.4.0] — 2026-11-05
 
 Read-only Hartii Gallery and Studio tools, as CLI commands and MCP tools. No wallet, signing or NFT writes are involved; data comes only from the Gallery's public API (`https://hartiigallery.com/api`).

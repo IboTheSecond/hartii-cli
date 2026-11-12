@@ -2,9 +2,17 @@ import { formatTable, makeColors, safeTerminalText } from './output.js';
 import { formatAmount } from './amount.js';
 import {renderReceiveQr} from './qr.js';
 import { formatGalleryView, nftHoldingsLines } from './galleryHuman.js';
+import { formatDeskResult } from './desk/human.js';
 
 const text = value => value === null || value === undefined ? '—' : safeTerminalText(String(value));
-function wei(value) { try { return value == null ? '—' : formatAmount(BigInt(value)); } catch { return '—'; } }
+function wei(value) {
+  try {
+    if (typeof value === 'string') { if (!/^(0|[1-9][0-9]*)$/.test(value) || value.length > 78) return '—'; }
+    else if (typeof value !== 'bigint') return '—';
+    const amount = BigInt(value);
+    return amount < 0n || amount >= 2n ** 256n ? '—' : formatAmount(amount);
+  } catch { return '—'; }
+}
 function fields(value, prefix = '') {
   if (!value || typeof value !== 'object') return [prefix + text(value)];
   const lines = [];
@@ -23,6 +31,8 @@ function fields(value, prefix = '') {
 
 /** Human formatting only. JSON stays lossless and machine-readable in output.printJson. */
 export function formatHumanResult(result, { colors = makeColors({ enabled: false }) } = {}) {
+  const deskView = formatDeskResult(result, colors);
+  if (deskView) return deskView.join('\n');
   const galleryView = formatGalleryView(result, colors);
   if (galleryView) return galleryView.join('\n');
   const lines = [];
@@ -61,7 +71,7 @@ export function formatHumanResult(result, { colors = makeColors({ enabled: false
     else if (Array.isArray(result.holdings)) {
       lines.push(result.holdings.length ? formatTable([
         ['TOKEN', 'BALANCE · BASE UNITS', 'VALUE · QUAI', 'PRICE SOURCE'],
-        ...result.holdings.map(h => [text(h.symbol), text(h.balance), text(h.valueQuai), text(h.priceSource)]),
+        ...result.holdings.map(h => [text(h.symbol), text(h.balance), wei(h.valueQuai), text(h.priceSource)]),
       ]) : 'No token holdings.');
     }
     if (result.nftHoldingsError) lines.push(colors.yellow(text(result.nftHoldingsError)));

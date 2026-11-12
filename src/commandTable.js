@@ -29,6 +29,7 @@ import { runWall } from './commands/wall.js';
 import { runExtra, EXTRA_COMMANDS, ExtraError } from './commands/extras.js';
 import { runMcp } from './mcp/server.js';
 import { runTrader } from './commands/trader.js';
+import { runDesk } from './commands/desk.js';
 import { createTraderReader } from './trader/readers.js';
 
 /** ctx = { args, flags, g, deps, env, io, home, write } — see cli.js. */
@@ -73,6 +74,7 @@ const extra = (command) => async (c) => {
 };
 
 export const COMMAND_TABLE = {
+  desk: c=>runDesk({sub:c.args[0]||'status',args:c.args.slice(1),...writeOpts(c),flags:c.flags,address:typeof c.flags.address==='string'?c.flags.address:undefined},{...c.deps,env:c.env,io:{...c.io,confirmFn:c.deps.confirmFn},passwordDeps:c.io.passwordDeps}),
   trader: c => runTrader({sub:c.args[0] || 'status',...readOpts(c),wallet:c.g.wallet,keyEnv:c.g.keyEnv,json:c.g.json,
     flags:c.flags,profile:c.flags.profile,once:c.flags.once===true,observe:c.flags.observe===true,policyFile:c.flags['policy-file'],fundingTx:c.flags['funding-tx'],
     owner:c.flags.owner,tradingAddress:c.flags['trading-address'],createWallet:c.flags['create-wallet']===true,

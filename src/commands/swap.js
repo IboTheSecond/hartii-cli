@@ -157,7 +157,13 @@ async function runSwapCore(opts, deps = {}, approvedCtx = null) {
   const managedSpend=managedExitSpend(ctx,{action:sideIn.kind==='erc20' && sideOut.kind==='native'?'sell':'swap',token:sideIn.address,spender:router,units:amountInWei.toString()});
   if(managedSpend!==null)spendWei=managedSpend;
   checkSpend(home, fromAddress, spendWei, limits, {now:deps.io?.now});
-  const plannedTrade = { action: `Swap ${withAddr(sideIn.symbol, sideIn.address)} -> ${withAddr(sideOut.symbol, sideOut.address)}`, amountIn:formatAmount(amountInWei,sideIn.decimals), expectedOut:formatAmount(expectedOut,sideOut.decimals), minOut:formatAmount(minOut,sideOut.decimals), guardedQuai:formatAmount(spendWei), path:path.join(' -> '), feeBps:'30' };
+  const rawQuote = {
+    assetInAddress: sideIn.kind === 'native' ? 'native' : sideIn.address,
+    assetOutAddress: sideOut.kind === 'native' ? 'native' : sideOut.address,
+    assetInDecimals: String(sideIn.decimals), assetOutDecimals: String(sideOut.decimals),
+    amountInUnits: amountInWei.toString(), expectedOutUnits: expectedOut.toString(), minimumOutUnits: minOut.toString(),
+  };
+  const plannedTrade = { action: `Swap ${withAddr(sideIn.symbol, sideIn.address)} -> ${withAddr(sideOut.symbol, sideOut.address)}`, amountIn:formatAmount(amountInWei,sideIn.decimals), expectedOut:formatAmount(expectedOut,sideOut.decimals), minOut:formatAmount(minOut,sideOut.decimals), guardedQuai:formatAmount(spendWei), path:path.join(' -> '), feeBps:'30', ...rawQuote };
   // Approval, through the SAME write pipeline, whenever the input side is an ERC-20.
   if (sideIn.kind === 'erc20') {
     const approval = await ensureAllowance(ctx, {
@@ -174,6 +180,7 @@ async function runSwapCore(opts, deps = {}, approvedCtx = null) {
   }
 
   const extraSummary = {
+    ...rawQuote,
     feeBps: '30',
     feeIncludedInQuote: true,
     tokenIn: withAddr(sideIn.symbol, sideIn.address),

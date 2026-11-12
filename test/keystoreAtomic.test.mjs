@@ -16,7 +16,7 @@ import { saveConfig, loadConfig } from '../src/config.js';
 const base = process.env.HARTII_HOME;
 if (!base || !isAbsolute(base) || !basename(base).startsWith('hartii-cli-proof-')) throw Error('Native isolated HARTII_HOME required');
 let home;
-beforeEach(() => { home = mkdtempSync(join(base, 'atomic-case-')); fault.collide = null; fault.failReplace = false; });
+beforeEach(() => { mkdirSync(base,{recursive:true}); home = mkdtempSync(join(base, 'atomic-case-')); fault.collide = null; fault.failReplace = false; });
 const payload = JSON.stringify({ version: 3, address: '0011111111111111111111111111111111111111', crypto: { cipher: 'synthetic' } });
 
 describe('actual keystore filesystem race boundaries', () => {

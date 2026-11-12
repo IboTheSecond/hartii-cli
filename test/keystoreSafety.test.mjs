@@ -16,7 +16,7 @@ expect(getHartiiHome()).toBe(base);
 const ADDRESS = '0x0011111111111111111111111111111111111111';
 const encryptedFixture = JSON.stringify({ version: 3, address: ADDRESS.slice(2), crypto: { cipher: 'synthetic encrypted fixture' } });
 let home;
-beforeEach(() => { home = mkdtempSync(join(base, 'keystore-case-')); vi.stubGlobal('fetch', () => { throw Error('No network in wallet safety tests'); }); });
+beforeEach(() => { mkdirSync(base,{recursive:true}); home = mkdtempSync(join(base, 'keystore-case-')); vi.stubGlobal('fetch', () => { throw Error('No network in wallet safety tests'); }); });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('wallet local boundaries', () => {

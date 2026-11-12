@@ -16,6 +16,15 @@ export const GROUPS = [
 // name, group, one-line summary, usage lines, examples, aliases (alias tokens that expand to this command),
 // to (optional: a shortcut for another command — { command, args: prefix, flags, dropArgs: ignore the user's own args })
 export const COMMANDS = [
+  { name:'desk',group:'trade',summary:'BETA Constraint Desk: positions, exact cost reviews and local Fill Ledger',usage:[
+    'hartii desk positions [--address <address>] [--json]',
+    'hartii desk preview <in> <out> <amount> [--slippage <percent>]',
+    'hartii desk swap <in> <out> <amount>   # manual confirmation for each transaction; no --yes',
+    'hartii desk journal [--day YYYY-MM-DD] [--limit 25] [--before <id>]',
+    'hartii desk receipt <decision-id>   # read-only receipt observation; no reservation release',
+    'hartii desk export --out <report.html|report.json> [--day YYYY-MM-DD] [--limit 25]',
+    'hartii desk --demo [--json] [--out <report.html>]   # fixture data; no wallet or network',
+  ],examples:['hartii desk --demo --json','hartii desk positions --address <address>','hartii desk preview QUAI <token-address> 1'] },
   { name: 'trader', group: 'agents', summary: 'BETA holder trader: keyless Observe/Paper, locally gated Live', usage: [
     'hartii trader init --owner <address> --trading-address <address> --capital <QUAI> --max-per-tx <QUAI> --max-per-day <QUAI> --max-fee <QUAI> [--preset conservative|normal|degen]',
     'hartii trader init --pair   # hidden pairing code; confirm fingerprint in dashboard',

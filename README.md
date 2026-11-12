@@ -15,8 +15,35 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.4.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.5.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
+
+## Constraint Desk / Fill Ledger (0.5.0 beta)
+
+Constraint Desk adds position context, exact quote denominations, local reviewed-decision records and receipt observations around the existing guarded HartiiSwap path. Check `hartii --version` and `hartii help desk` in the installed version; a browser or docs refresh does not upgrade an installed CLI.
+
+```text
+hartii desk --demo
+hartii desk --demo --out desk-example.html
+hartii desk positions --address <Cyprus-1-Quai-address> --json
+hartii desk preview QUAI <token-address> 1 --json
+hartii desk swap QUAI <token-address> 1
+hartii desk journal --day 2026-11-12 --limit 25 --json
+hartii desk receipt <decision-id> --json
+hartii desk export --out desk-report.html --day 2026-11-12
+```
+
+`preview` uses the ordinary swap dry run and never signs or creates an authorized decision. A real `desk swap` requires the native confirmation for **each** allowance approval and swap; `--yes` is refused. Reviewed authority and a locally verified signed hash are persisted through the existing native hooks before dispatch. The operation is refused before broadcast if it exceeds five minutes, gas price/buffered estimate moves outside ±20%, the fresh estimate exceeds the signed gas limit, or the fresh quote is below the signed minimum. Existing spending caps, chain/nonce checks and exact-amount allowances stay in force. No new signer or automatic personal trader is introduced.
+
+Decisions live under `~/.hartii/desk/mainnet/<UTC-day>/` (the normal CLI home override applies). Atomic private files are integrity-checked and use per-record writer locks. A stale lock needs manual inspection; it is never aged out or cleared automatically. Signed and broadcast-start markers do not prove network acceptance. A `signed` status has no possible-broadcast marker; read its evidence reason rather than treating the hash as a submitted or mined transaction. `receipt` updates local evidence only and **does not release native spending reservations or resend**. Repeated checks preserve distinct observations, including later reorganization/unknown states.
+
+Receipt gas is reported only when actual fee fields support it; a signed gas ceiling is not an actual charge. Token output is explicitly **event-derived**, bound to the reviewed recipient and canonical factory pair, not universal proof of actual balance or realized P&L for arbitrary tokens. Native recipient proceeds remain unavailable in this receipt-only slice. Position context covers indexed tokens; historical lot basis/P&L and mark timestamps remain unknown rather than fabricated.
+
+Position JSON preserves the indexed mark as `indexedValueWei` (exact QUAI wei) and `indexedValueQuai` (formatted QUAI). The API's `valueQuai` field is a wei string; the human balance view converts it before printing QUAI. Missing or malformed Desk values stay unknown; an actual zero stays zero. Balance demo fixtures use the same wire units as live API data.
+
+HTML/JSON exports contain selected public transaction evidence and can reveal activity. They are local, make no automatic network calls and never overwrite an existing file. Journal, status and export default to 25 records from today UTC; use `--day YYYY-MM-DD` for earlier records. `--limit` caps at 100 and `--before` follows the journal cursor. Exports go outside hidden configuration folders and protected configuration/journal directories. Daily journal storage is bounded at 10,000 decisions, 2 MiB per record and 100 distinct observations per decision; capacity refusal preserves history.
+
+Only the bundled direct HartiiSwap route and its approvals are captured. Wrapping, external routes, generic arbitrary calls, full-wallet history, an exposure-goal solver and paid monitoring are not implemented by this slice. Desk currently has a human CLI and private report; no new MCP write tool is registered. The existing MCP swap flow is unchanged. A read-only Desk resource can follow once the evidence schema and privacy expectations have been validated with users.
 
 ## Install
 

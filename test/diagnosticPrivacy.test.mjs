@@ -12,3 +12,8 @@ test('opaque encoded RPC credentials and URL user info stay redacted',()=>{
  const output=redactUrls(`https://user:${secret}@rpc.example/v3/${encoded}?key=${secret}`);
  assert.ok(!output.includes(secret));assert.ok(!output.includes(encoded));assert.ok(!output.includes('user:'));
 });
+test('desk unknown-option errors do not echo a secret-shaped flag name',async()=>{
+ const marker='0x'+'a'.repeat(64);let output='';
+ const code=await main(['desk','--demo','--'+marker,'--json'],{writeErr:text=>{output+=text;},write:()=>{}});
+ assert.equal(code,1);assert.equal(output.includes(marker),false);
+});

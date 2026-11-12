@@ -166,7 +166,7 @@ describe('stdout guard: dependency console output never reaches stdout (--json a
   beforeEach(() => {
     // Simulates quais printing to console.log from inside a command: the first network call logs noise.
     preload = join(home, 'noise.mjs');
-    writeFileSync(preload, "const f = globalThis.fetch; globalThis.fetch = (...a) => { console.log('QUAI-NOISE-STDOUT'); console.error('QUAI-NOISE-ERR'); return f(...a); };\n");
+    writeFileSync(preload, "globalThis.fetch = async () => { console.log('QUAI-NOISE-STDOUT'); console.error('QUAI-NOISE-ERR'); return new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'content-type': 'application/json' } }); };\n");
   });
   const env = () => ({ ...process.env, HARTII_HOME: home, NODE_OPTIONS: `--import ${pathToFileURL(preload).href}`, NO_COLOR: '1' });
 

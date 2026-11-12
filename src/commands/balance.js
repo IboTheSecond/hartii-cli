@@ -6,7 +6,7 @@ import { redactUrls } from '../output.js';
 // wallet's ADDRESS never needs the keystore password — a keystore v3 file stores `address` in
 // plaintext by design (see keystore.js) — so this is a read-only command that never prompts.
 import { existsSync, readFileSync } from 'node:fs';
-import { getAddress } from 'quais';
+import { getAddress, parseUnits } from 'quais';
 import { resolveRuntimeNetwork } from '../network.js';
 import { keystorePath } from '../keystore.js';
 import { getHartiiHome, loadConfig } from '../config.js';
@@ -40,7 +40,7 @@ export function resolveWalletAddress(home, walletName) {
 export async function runBalance(opts = {}, deps = {}) {
   if (opts.demo) {
     const result = { wallet: DEMO_ADDRESS, network: DEMO_NETWORK, quai: formatAmount(DEMO_BALANCE_WEI), quaiWei: DEMO_BALANCE_WEI.toString() };
-    if (opts.tokens) result.holdings = DEMO_TOKEN_HOLDINGS;
+    if (opts.tokens) result.holdings = DEMO_TOKEN_HOLDINGS.map(h => ({...h, valueQuai:parseUnits(h.valueQuai,18).toString(),priceQuai:parseUnits(h.priceQuai,18).toString()}));
     return result;
   }
 

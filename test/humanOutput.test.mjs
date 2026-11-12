@@ -2,6 +2,14 @@
 import { describe, it, expect } from 'vitest';
 import { formatHumanResult } from '../src/humanOutput.js';
 describe('human command output', () => {
+  it('converts indexed QUAI wei marks to QUAI while preserving token balances as base units', () => {
+    const text = formatHumanResult({wallet:'fixture',network:'mainnet',quai:'100.0',holdings:[{symbol:'TOK',balance:'1000000000000000000',valueQuai:'3000000000000000000',priceSource:'curve'}]});
+    expect(text).toContain('3.0');expect(text).not.toContain('3000000000000000000');expect(text).toContain('1000000000000000000');
+  });
+  it.each([['0','0.0'],[null,'—'],['','—'],[' ','—'],['bad','—'],['-1','—'],['0x10','—'],['0001','—']])('keeps zero distinct from an unavailable or malformed balance mark (%s)',(value,expected)=>{
+    const text=formatHumanResult({wallet:'fixture',network:'mainnet',quai:'1.0',holdings:[{symbol:'MARK',balance:'9',valueQuai:value,priceSource:'curve'}]});
+    expect(text).toContain(expected);if(expected==='—')expect(text).not.toContain('0.0');
+  });
   it('aligns token columns and preserves exact price strings', () => {
     const text = formatHumanResult({ items: [{ symbol: 'HRTI', address: '0xabc', lastPriceWei: '1000000000000001', holderCount: 0, status: 'active' }] });
     expect(text).toContain('0.001000000000000001');
