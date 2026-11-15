@@ -412,8 +412,15 @@ export async function sendWithGasDiagnostics({ send, estimateGas }) {
  *
  * @returns {Promise<string>} the transaction hash returned by quai_sendTransaction
  */
-export async function sendUncheckedWithGasDiagnostics({ signer, rpc, from, to, data, value = 0n, gasEstimate, gasHeadroomPercent = 130 }) {
+export async function sendUncheckedWithGasDiagnostics({ signer, rpc, from, to, data, value = 0n, gasEstimate, gasHeadroomPercent = 130, blip, blipExtraGas = 0n, sleep, timeoutMs, pollMs }) {
   if (!Number.isInteger(gasHeadroomPercent) || gasHeadroomPercent < 110 || gasHeadroomPercent > 200) throw new Error('Gas headroom must be 110–200%.');
+  // Blip: top the per-origin app wallet up from the main vault BEFORE estimating (an unfunded sender
+  // makes the estimate fail and nothing would ever reach Blip). A no-op in every other wallet.
+  const funding = await ensureBlipAppWalletFunds({
+    rpc, from, to, data, value, gasHeadroomPercent, extraGas: blipExtraGas,
+    blip: blip || defaultBlipContext(signer), sleep, timeoutMs, pollMs,
+  });
+  if (funding.toppedUp) gasEstimate = undefined; // a speculative estimate made while unfunded is stale
   const tx = { from, to, data, value };
   const estimateOnce = () => rpc.estimateGas(tx);
 
@@ -456,6 +463,124 @@ export async function sendUncheckedWithGasDiagnostics({ signer, rpc, from, to, d
     if (liveChain !== 9) throw new Error('Your wallet is not on Quai Mainnet. Nothing was sent.');
   }
   return signer.sendUncheckedTransaction({ from, to, data, value, gasLimit });
+}
+
+/**
+ * BLIP APP-WALLET FUNDING (2026-11-15). Blip signs from a per-origin app wallet that is often empty
+ * while the user's QUAI sits in the main Blip vault (blippay.me/docs, checked 2026-11-15). Labs used to
+ * stop before the wallet: the Buy button said "Insufficient QUAI" and an unfunded estimate failed, so
+ * Blip's own top-up never ran. Here, inside Blip only: read the app wallet's balance on OUR provider,
+ * size value + buffered gas (estimate WITHOUT `from` when the balance cannot cover the value; a fixed
+ * budget if even that fails), ask Blip once for the shortfall with blip_requestAppWalletFunding (native
+ * QUAI; silent within the user's auto top-up limit, a sheet above it), then wait until OUR provider sees
+ * the new balance. An older Blip without the method is left to its own send-time top-up.
+ */
+// Budgets when no estimate is possible (measured 2026-11-15: buys 68k-171k gas, sells 70k-103k).
+export const BLIP_FALLBACK_GAS = 250_000n; // a send carrying QUAI (buy, swap in)
+export const BLIP_FALLBACK_GAS_NO_VALUE = 150_000n; // approve, sell
+const BLIP_UNSUPPORTED_CODES = new Set([-32601, 4200, 4100]);
+const BLIP_REQUEST_TIMEOUT_MS = 180_000; // an approval sheet left open must not hold the trade forever
+const BLIP_READ_TIMEOUT_MS = 10_000;
+// A top-up already asked for (per app wallet) is waited for, never asked for twice: covers approve->sell
+// and a retry after a slow top-up.
+const recentTopUps = new Map();
+export function _resetBlipTopUps() { recentTopUps.clear(); }
+
+function withTimeout(promise, ms, onTimeout) {
+  let t;
+  return Promise.race([promise, new Promise((_, reject) => { t = setTimeout(() => reject(onTimeout()), ms); })]).finally(() => clearTimeout(t));
+}
+
+function defaultBlipContext(signer) {
+  let isBlip = false;
+  try {
+    const w = typeof window !== 'undefined' ? window : undefined;
+    isBlip = !!w && [w.quai, w.ethereum, w.pelagus].some((p) => p && (p.isBlip === true || p._isSwiftBlip === true));
+  } catch { isBlip = false; }
+  return { isBlip, request: ({ method, params }) => signer.provider.send(method, params) };
+}
+
+function blipError(message, code) {
+  const e = new Error(message);
+  if (code !== undefined) e.code = code;
+  e.blipFunding = true; // classifyTradeError only trusts its "Nothing was sent" copy for these
+  return e;
+}
+
+export async function ensureBlipAppWalletFunds({
+  rpc, from, to, data, value = 0n, gasHeadroomPercent = 130, blip, extraGas = 0n,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)), timeoutMs = 120_000, pollMs = 1_500,
+}) {
+  if (!blip?.isBlip || !from || typeof rpc?.getBalance !== 'function') return { toppedUp: false };
+  const readBalance = () => withTimeout(Promise.resolve(rpc.getBalance(from)), BLIP_READ_TIMEOUT_MS, () => new Error('balance read timed out')).then((x) => BigInt(x));
+  // A failed read must never block a trade that would have worked: fall back to the old path
+  // (Blip still applies its own send-time top-up rules).
+  let balance;
+  let gasPrice;
+  try {
+    [balance, gasPrice] = await Promise.all([
+      readBalance(),
+      withTimeout(Promise.resolve(rpc.send('quai_gasPrice', [])), BLIP_READ_TIMEOUT_MS, () => new Error('gas price read timed out')).then((x) => BigInt(x)),
+    ]);
+  } catch {
+    return { toppedUp: false, unread: true };
+  }
+  // Estimate with `from` when the wallet can cover the value, else without it (the node refuses an
+  // unfunded sender); a per-shape budget only if both fail.
+  let gas;
+  const attempts = balance >= value ? [{ from, to, data, value }, { to, data, value }] : [{ to, data, value }];
+  for (const tx of attempts) {
+    try { gas = BigInt(await rpc.estimateGas(tx)); break; } catch { /* next */ }
+  }
+  if (gas === undefined) gas = value > 0n ? BLIP_FALLBACK_GAS : BLIP_FALLBACK_GAS_NO_VALUE;
+  // Same headroom the real send uses, plus 20% for the price moving before Blip signs. `extraGas` covers a
+  // send that is known to follow (the sell after its approval), so one top-up serves both.
+  const need = value + (((gas * BigInt(gasHeadroomPercent)) / 100n) + extraGas) * gasPrice * 12n / 10n;
+  if (balance >= need) return { toppedUp: false };
+
+  const key = String(from).toLowerCase();
+  const waitFor = async (target, amount) => {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      let now;
+      try { now = await readBalance(); } catch { now = 0n; }
+      if (now >= target) { recentTopUps.delete(key); return { toppedUp: true, amount }; }
+      if (Date.now() >= deadline) {
+        throw blipError('Blip sent the top-up but it has not shown up on the network yet. Any QUAI it moved is in this site\'s Blip wallet. Nothing else was sent. Try again in a moment.');
+      }
+      await sleep(pollMs);
+    }
+  };
+  const pending = recentTopUps.get(key);
+  if (pending && Date.now() - pending.at < 3 * 60_000) {
+    // A top-up for this wallet is still landing: wait for it rather than moving more QUAI.
+    if (balance + pending.amount >= need) return waitFor(need, 0n);
+  }
+
+  const amount = ((need - balance) * 110n) / 100n; // Blip asks for >= 10% buffer
+  let res;
+  try {
+    res = await withTimeout(Promise.resolve(blip.request({
+      method: 'blip_requestAppWalletFunding',
+      params: [{
+        chainId: '0x9',
+        reason: value > 0n ? 'swap' : 'gas',
+        continueLabel: value > 0n ? 'Continue trade on Hartii Labs' : 'Continue on Hartii Labs',
+        assets: [{ type: 'native', symbol: 'QUAI', decimals: 18, amountWei: '0x' + amount.toString(16), purpose: value > 0n ? 'swapInput' : 'gas' }],
+      }],
+    })), BLIP_REQUEST_TIMEOUT_MS, () => blipError('Blip did not answer the top-up request. Nothing was sent. Check Blip, then try again.'));
+  } catch (err) {
+    if (err?.blipFunding) throw err;
+    if (err?.code === 4001) throw blipError('Top-up cancelled in Blip. User rejected. Nothing was sent.', 4001);
+    if (err?.code === -32010) throw blipError('Your main Blip vault does not hold enough QUAI for this trade and its gas. Nothing was sent.', -32010);
+    if (BLIP_UNSUPPORTED_CODES.has(err?.code)) return { toppedUp: false, unsupported: true };
+    throw err;
+  }
+  if (!res || res.funded !== true) throw blipError('Blip did not top up this site\'s wallet. Nothing was sent.');
+  recentTopUps.set(key, { at: Date.now(), amount });
+  // Proceed once the balance covers the trade. If Blip delivered less than asked (the user edited the
+  // sheet), the send's own estimate decides; a short top-up then fails before anything is sent.
+  return waitFor(need, amount);
 }
 
 // PR1 latency programme (2026-10-02): halved both ends of the backoff — a confirmed trade now
@@ -587,6 +712,8 @@ export function classifyTradeError(err) {
   if (err?.code === 4001 || /user rejected/i.test(message)) {
     return 'Transaction rejected in wallet. Nothing was submitted.';
   }
+  // Raised only by ensureBlipAppWalletFunds, before any trade reached the wallet.
+  if (err?.blipFunding) return err.message;
   // waitForReceipt's own timeout (2026-09-30 hotfix): the trade was already broadcast — this is
   // never "the trade failed," only "we stopped waiting." Its own message already says so and
   // names the explorer; never let a later, less specific branch below overwrite that.
