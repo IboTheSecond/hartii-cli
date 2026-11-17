@@ -1,0 +1,43 @@
+=== tx @ 60 columns (NO_COLOR) ===
+  ▍ Transaction  mainnet
+  ────────────────────────────────────────────
+
+  Status    Confirmed
+  Hash
+    0xabababababababababababababababababababababababababababababababab
+  Block     10,400,000
+  From      0x0000 0000 0000 0000 0000
+              0000 0000 0000 0000 0d01
+  To        0x0000 0000 0000 0000 0000
+              0000 0000 0000 0000 0D04
+  Value     5 QUAI
+  Gas used  98,234
+  Explorer
+    https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab
+
+=== tx @ 80 columns (NO_COLOR) ===
+  ▍ Transaction  mainnet
+  ────────────────────────────────────────────
+
+  Status    Confirmed
+  Hash      0xabababababababababababababababababababababababababababababababab
+  Block     10,400,000
+  From      0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+  To        0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0D04
+  Value     5 QUAI
+  Gas used  98,234
+  Explorer
+    https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab
+
+=== tx @ 120 columns (NO_COLOR) ===
+  ▍ Transaction  mainnet
+  ────────────────────────────────────────────
+
+  Status    Confirmed
+  Hash      0xabababababababababababababababababababababababababababababababab
+  Block     10,400,000
+  From      0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+  To        0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0D04
+  Value     5 QUAI
+  Gas used  98,234
+  Explorer  https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab

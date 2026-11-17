@@ -1,0 +1,54 @@
+=== doctor-fail @ 60 columns (NO_COLOR) ===
+  ▍ Health check
+  ────────────────────────────────────────────
+
+  FAIL   Quai node
+         http://127.0.0.1:1/ unreachable: fetch failed
+         Fix: Check your internet connection, then run
+         `hartii doctor` again. To use another node:
+         `hartii doctor --rpc <url>`.
+  FAIL   Network match   skipped (RPC unreachable)
+         Fix: hartii config set network mainnet
+  OK     Wallet files    no keystore directory exists yet
+  OK     Current wallet  no current wallet set
+  OK     Hartii service
+         https://hartiilabs.com/api/health -> 200
+  CHECK  Clock
+         could not read a valid positive block timestamp
+
+  2 things to fix
+  1 check could not be verified on this system.
+
+=== doctor-fail @ 80 columns (NO_COLOR) ===
+  ▍ Health check
+  ────────────────────────────────────────────
+
+  FAIL   Quai node       http://127.0.0.1:1/ unreachable: fetch failed
+         Fix: Check your internet connection, then run `hartii doctor` again.
+         To use another node: `hartii doctor --rpc <url>`.
+  FAIL   Network match   skipped (RPC unreachable)
+         Fix: hartii config set network mainnet
+  OK     Wallet files    no keystore directory exists yet
+  OK     Current wallet  no current wallet set
+  OK     Hartii service  https://hartiilabs.com/api/health -> 200
+  CHECK  Clock           could not read a valid positive block timestamp
+
+  2 things to fix
+  1 check could not be verified on this system.
+
+=== doctor-fail @ 120 columns (NO_COLOR) ===
+  ▍ Health check
+  ────────────────────────────────────────────
+
+  FAIL   Quai node       http://127.0.0.1:1/ unreachable: fetch failed
+         Fix: Check your internet connection, then run `hartii doctor` again. To use another node: `hartii
+         doctor --rpc <url>`.
+  FAIL   Network match   skipped (RPC unreachable)
+         Fix: hartii config set network mainnet
+  OK     Wallet files    no keystore directory exists yet
+  OK     Current wallet  no current wallet set
+  OK     Hartii service  https://hartiilabs.com/api/health -> 200
+  CHECK  Clock           could not read a valid positive block timestamp
+
+  2 things to fix
+  1 check could not be verified on this system.

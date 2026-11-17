@@ -9,6 +9,10 @@ import { reserveFeeWei } from '../gasReserve.js';
 import { ERC20_IFACE, readErc20, tokenAddressOf } from '../toolKit.js';
 import { DEMO_ADDRESS, DEMO_NETWORK } from '../demoFixtures.js';
 import { CliError } from '../errors.js';
+import { tradeWarnings } from '../trade.js';
+import { findContactByName, addContact, hasContactsFile, ContactError } from '../contacts.js';
+import { readVisibleInput } from '../prompt.js';
+import { shortAddress } from '../address.js';
 import {parseNativePaylink,exactReceiveAmount} from '../paylinks.js';
 
 export class SendError extends CliError {}
@@ -42,7 +46,15 @@ async function runSendCore(opts, deps = {}) {
   const ctx = await writeRuntime(opts, deps);
   const { net, provider, from: fromAddress } = ctx;
   if(paymentRequest&&net.chainId!==9)throw new SendError('HPAY payments require Quai mainnet chain 9.');
-  const to = assertCyprus1QuaiAddress(opts.to);
+  // A saved contact name resolves to its address; the review still shows the full address and the contact name.
+  let toInput = opts.to;
+  if (!/^0x/i.test(String(toInput).trim())) {
+    if (hasContactsFile(ctx.home)) await ctx.unlockData?.();
+    const contact = hasContactsFile(ctx.home) ? findContactByName(ctx.home, toInput) : null;
+    if (!contact) throw new SendError(`"${String(toInput).slice(0, 40)}" is not an address and not a saved contact. Use a 0x address, or save one first: hartii contacts add <name> <address>`);
+    toInput = contact.address;
+  }
+  const to = assertCyprus1QuaiAddress(toInput);
   let target = to;
   let spendWei;
   let data = '0x';
@@ -94,9 +106,11 @@ async function runSendCore(opts, deps = {}) {
     action = 'Send QUAI';
   }
 
-  return writeVia(ctx, {
+  const result = await writeVia(ctx, {
     to: target,
     spendWei,
+    recipient: to,
+    warnings: opts.token ? tradeWarnings({ tickers: [opts.token] }) : [],
     data,
     validateSimulation: opts.token ? (hex) => { if (ERC20_IFACE.decodeFunctionResult('transfer', hex)[0] !== true) throw new Error('Token transfer returned false.'); } : undefined,
     value,
@@ -104,6 +118,24 @@ async function runSendCore(opts, deps = {}) {
     extraSummary,
     validateBeforeSubmit:paymentRequest&&paymentRequest.expiresAt!==null?()=>{if(paymentRequest.expiresAt*1000<=Date.now())throw new SendError('Payment request expired before signing.');}:undefined,
   }, SendError);
+  await offerContact(ctx, result, opts, deps);
+  return result;
+}
+
+/** After a successful send to an address you had never paid: offer to save it (interactive only; never fails the send). */
+async function offerContact(ctx, result, opts, deps) {
+  if (!result?.ok || !result.newRecipient || opts.json || opts.yes) return;
+  const ask = deps.io?.offerContactFn || (process.stdin.isTTY && process.stdout.isTTY ? (q) => readVisibleInput(q, { stdout: process.stderr }) : null);
+  if (!ask) return;
+  try {
+    const name = String(await ask(`Save ${shortAddress(result.newRecipient)} as a contact? Type a name, or press Enter to skip: `) ?? '').trim();
+    if (!name) return;
+    const saved = addContact(ctx.home, name, result.newRecipient);
+    result.contactSaved = saved.name;
+  } catch (error) {
+    try { process.stderr.write(`Contact not saved: ${error instanceof ContactError ? error.message : 'unexpected error'}
+`); } catch { /* stderr closed */ }
+  }
 }
 
 export function runSend(opts = {}, deps = {}) { return withProviderCleanup(deps, (runtimeDeps) => runSendCore(opts, runtimeDeps)); }

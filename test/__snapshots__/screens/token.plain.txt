@@ -1,0 +1,68 @@
+=== token @ 60 columns (NO_COLOR) ===
+  ▍ DEMO  Demo Token
+  ────────────────────────────────────────────
+
+  Contract        0x0000 0000 0000 0000 0000
+                    0000 0000 0000 0000 0d02
+  Curve           0x0000 0000 0000 0000 0000
+                    0000 0000 0000 0000 0D04
+  Phase           active
+  Price           0.0000186 QUAI
+  Volume 24h      1,200 QUAI
+  Holders         42
+  Curve progress  ██░░░░░░░░░░░░░░░░░░  7.83%
+  Trading fee     1%
+  Sold on curve   84M DEMO
+  Left on curve   700M DEMO
+
+  Links
+  Explorer
+    https://quaiscan.io/address/0x0000000000000000000000000000000000000d02
+  Hartii    https://hartiilabs.com/DEMO
+
+  Always check the contract address above before you trade
+  a token you do not know.
+
+=== token @ 80 columns (NO_COLOR) ===
+  ▍ DEMO  Demo Token
+  ────────────────────────────────────────────
+
+  Contract        0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d02
+  Curve           0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0D04
+  Phase           active
+  Price           0.0000186 QUAI
+  Volume 24h      1,200 QUAI
+  Holders         42
+  Curve progress  ██░░░░░░░░░░░░░░░░░░  7.83%
+  Trading fee     1%
+  Sold on curve   84M DEMO
+  Left on curve   700M DEMO
+
+  Links
+  Explorer
+    https://quaiscan.io/address/0x0000000000000000000000000000000000000d02
+  Hartii    https://hartiilabs.com/DEMO
+
+  Always check the contract address above before you trade a token you do not
+  know.
+
+=== token @ 120 columns (NO_COLOR) ===
+  ▍ DEMO  Demo Token
+  ────────────────────────────────────────────
+
+  Contract        0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d02
+  Curve           0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0D04
+  Phase           active
+  Price           0.0000186 QUAI
+  Volume 24h      1,200 QUAI
+  Holders         42
+  Curve progress  ██░░░░░░░░░░░░░░░░░░  7.83%
+  Trading fee     1%
+  Sold on curve   84M DEMO
+  Left on curve   700M DEMO
+
+  Links
+  Explorer  https://quaiscan.io/address/0x0000000000000000000000000000000000000d02
+  Hartii    https://hartiilabs.com/DEMO
+
+  Always check the contract address above before you trade a token you do not know.

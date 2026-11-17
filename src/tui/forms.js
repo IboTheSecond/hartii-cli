@@ -42,7 +42,8 @@ export const v = {
   expiry: (val) => (!String(val ?? '').trim() || /^(none|\d+[dhm])$/i.test(String(val).trim()) ? '' : 'Use 7d, 12h, 90m or none.'),
   color: (val) => (!String(val ?? '').trim() || hexToColor(String(val).trim()) !== null ? '' : 'Colour must be a 6-digit hex like #7c3aed.'),
   message: (val) => { const r = validateMessage(String(val ?? '')); return r.ok ? '' : r.error; },
-  limit: (val) => (/^\d+(\.\d{1,18})?$/.test(String(val ?? '').trim()) && Number(val) > 0 ? '' : 'Use a positive QUAI amount.'),
+  // Caps are optional (owner 2026-11-16): blank means no cap; anything typed must be a positive QUAI amount.
+  limit: (val) => { const s = String(val ?? '').trim(); return s === '' || (/^\d+(\.\d{1,18})?$/.test(s) && Number(s) > 0) ? '' : 'Use a positive QUAI amount, or leave it blank for no cap.'; },
   count: (val) => (!String(val ?? '').trim() || /^\d{1,2}$/.test(String(val).trim()) ? '' : 'A small whole number.'),
 };
 

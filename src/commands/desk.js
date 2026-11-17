@@ -17,6 +17,7 @@ import {DeskStore,summarizeDecision} from '../desk/store.js';
 import {readDecisionEvidence} from '../desk/reconcile.js';
 import {makeDeskExport,renderDeskReport} from '../desk/report.js';
 import {atomicPrivateWrite} from '../secureFiles.js';
+import {unlockForRead} from '../localData.js';
 import {resolve,extname} from 'node:path';
 
 const route=new Interface(['function getAmountsOut(uint256,address[]) view returns (uint256[])']);
@@ -51,6 +52,7 @@ function fixtureRecord(){
 async function swapWithLedger(opts,deps){
   requireThat(!opts.yes,'Desk execution does not accept --yes. Review and confirm each transaction, or use preview.');
   const {net}=readRuntime(opts,deps);assertMarketNetwork(net.name);const live=hartiiSwapAddresses(net.name);requireThat(live?.router&&live?.wquai,'Bundled HartiiSwap provenance is unavailable.');
+  await unlockForRead(opts.home,{wallet:opts.wallet,passwordDeps:deps.passwordDeps??deps.io?.passwordDeps});
   const store=new DeskStore(opts.home),captured=new Map(),signed=new Map(),clock=deps.clock??Date.now,startedAt=clock(),original=deps.io??{};
   let activeProvider,recordingError=null;
   const fresh=()=>{const elapsed=clock()-startedAt;if(!Number.isSafeInteger(elapsed)||elapsed<0||elapsed>300000)throw new WalletError('Desk quote operation exceeded five minutes. Review fresh terms.');};
@@ -84,6 +86,7 @@ export async function runDesk(opts={},deps={}){
     flags(opts,['slippage','max-fee','allow-insecure-rpc','stdin']);requireThat(args.length===3,'Usage: hartii desk preview <in> <out> <amount>');const result=await runSwap({...opts,tokenIn:args[0],tokenOut:args[1],amount:args[2],slippage:opts.flags?.slippage,dryRun:true},deps);return {...result,desk:{view:'preview',previewScope:result.tradeSimulated===false?'approval-only':'swap',note:'Read-only preflight. No decision was signed or durably authorized; desk swap obtains a fresh quote and manual confirmation.'}};
   }
   if(sub==='swap'){flags(opts,['slippage','max-fee','allow-insecure-rpc','stdin']);requireThat(args.length===3,'Usage: hartii desk swap <in> <out> <amount>');return swapWithLedger({...opts,args},deps);}
+  await unlockForRead(opts.home,{wallet:opts.wallet,passwordDeps:deps.passwordDeps??deps.io?.passwordDeps});
   const store=new DeskStore(opts.home);
   if(sub==='export'){flags(opts,['day','limit','before','out']);noArgs(args);const journal=store.list({day:opts.flags?.day,limit:limit(opts.flags?.limit),before:opts.flags?.before}),records=journal.records.map(row=>store.get(row.id)),output=saveExport(opts.flags?.out,{records,coverage:journal.coverage+(journal.nextCursor?' More records exist beyond this selection.':'')},opts.home);return {ok:true,desk:{view:'export',output,count:records.length,nextCursor:journal.nextCursor,note:'Private evidence export. Existing files were not overwritten.'}};}
   if(sub==='status'||sub==='journal'){flags(opts,['day','limit','before']);noArgs(args);const journal=store.list({day:opts.flags?.day,limit:limit(opts.flags?.limit),before:opts.flags?.before});return {ok:true,desk:{view:'journal',...journal,note:'Showing only the selected UTC day '+journal.day+'. Default: today UTC. Use --day YYYY-MM-DD for earlier decisions; hartii tx pending shows native unresolved reservations.'}};}

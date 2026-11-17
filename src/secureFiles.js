@@ -1,6 +1,8 @@
 import { lstatSync, realpathSync, mkdirSync, openSync, writeFileSync, fsyncSync, closeSync, renameSync, linkSync, unlinkSync } from 'node:fs';
 import { resolve, parse, sep, dirname, join, basename } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { homedir } from 'node:os';
 
 export class SecureFileError extends Error {}
 const samePath = (a, b) => process.platform === 'win32' ? resolve(a).toLowerCase() === resolve(b).toLowerCase() : resolve(a) === resolve(b);
@@ -28,7 +30,10 @@ export function securePath(path, { regularFile = false } = {}) {
 export function secureDirectory(path) {
   const checked = securePath(path);
   if (checked.stat && !checked.stat.isDirectory()) throw new SecureFileError('Wallet storage requires a directory.');
-  if (!checked.stat) mkdirSync(checked.path, { recursive: true, mode: 0o700 });
+  if (!checked.stat) {
+    mkdirSync(checked.path, { recursive: true, mode: 0o700 });
+    if (basename(checked.path) === '.hartii') hardenWindowsDirectory(checked.path); // the default CLI home; no-op off Windows
+  }
   securePath(checked.path);
   return checked.path;
 }
@@ -81,4 +86,28 @@ export function renamePrivateFile(oldPath, newPath) {
     if (error instanceof SecureFileError) throw error;
     throw new SecureFileError('Could not rename wallet safely; a destination was not overwritten.');
   }
+}
+
+// ---- Windows folder hardening -------------------------------------------------------------------------------
+// POSIX gets mode 0700 from mkdir. Windows ignores modes, so the CLI home would inherit its parent's ACL (often
+// readable by other local accounts). icacls removes inherited access and grants the current user only.
+let icaclsRunner = (args) => spawnSync('icacls', args, { windowsHide: true, encoding: 'utf8' });
+const hardened = new Set();
+/** Test hook: replace the icacls process runner. Pass null to restore the real one. */
+export function setIcaclsRunner(fn) { icaclsRunner = fn || ((args) => spawnSync('icacls', args, { windowsHide: true, encoding: 'utf8' })); hardened.clear(); }
+/** Best-effort, once per process per folder. Returns true when icacls reported success. No-op off Windows. */
+export function hardenWindowsDirectory(dir, { platform = process.platform, env = process.env } = {}) {
+  if (platform !== 'win32') return false;
+  const target = resolve(dir), user = env.USERNAME ? (env.USERDOMAIN ? `${env.USERDOMAIN}\\${env.USERNAME}` : env.USERNAME) : null;
+  if (!user || hardened.has(target.toLowerCase())) return false;
+  hardened.add(target.toLowerCase());
+  try { return icaclsRunner([target, '/inheritance:r', '/grant:r', `${user}:(OI)(CI)F`]).status === 0; } catch { return false; }
+}
+/** Doctor helper: a CLI home outside the user's profile folder is easier for other accounts to read. */
+export function homeLocationWarning(home, { env = process.env, profile = homedir(), platform = process.platform } = {}) {
+  if (!env.HARTII_HOME) return null;
+  const norm = p => { const r = resolve(p); return platform === 'win32' ? r.toLowerCase() : r; };
+  const h = norm(home), p = norm(profile);
+  if (h === p || h.startsWith(p + sep)) return null;
+  return 'HARTII_HOME points outside your user profile folder, so other accounts on this computer may be able to read your wallet files. Move it inside your profile, or restrict that folder to your account.';
 }

@@ -57,7 +57,8 @@ describe('saveConfig / loadConfig round trip', () => {
 describe('configGet / configSet', () => {
   it('gets a dotted-path value', () => {
     const cfg = loadConfig(home);
-    expect(configGet(cfg, 'limits.perTxQuai')).toBe('100');
+    expect(configGet(cfg, 'limits.perTxQuai')).toBeUndefined(); // no default caps (owner 2026-11-16)
+    expect(configGet(configSet(cfg, 'limits.perTxQuai', '25'), 'limits.perTxQuai')).toBe('25');
   });
 
   it('sets network', () => {

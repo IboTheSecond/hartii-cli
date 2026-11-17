@@ -1,0 +1,46 @@
+=== doctor @ 60 columns (NO_COLOR) ===
+  ▍ Health check
+  ────────────────────────────────────────────
+
+  OK     Quai node
+         demo mode — no real RPC contacted
+  OK     Network match   demo mode — assumed correct
+  OK     Wallet files
+         demo mode — no real keystore read
+  OK     Current wallet
+         demo wallet
+         0x0000000000000000000000000000000000000d01
+         (Cyprus-1 Quai)
+  OK     Hartii service
+         demo mode — no real API contacted
+  OK     Clock           demo mode — not checked
+
+  Ready
+
+=== doctor @ 80 columns (NO_COLOR) ===
+  ▍ Health check
+  ────────────────────────────────────────────
+
+  OK     Quai node       demo mode — no real RPC contacted
+  OK     Network match   demo mode — assumed correct
+  OK     Wallet files    demo mode — no real keystore read
+  OK     Current wallet
+         demo wallet 0x0000000000000000000000000000000000000d01 (Cyprus-1
+         Quai)
+  OK     Hartii service  demo mode — no real API contacted
+  OK     Clock           demo mode — not checked
+
+  Ready
+
+=== doctor @ 120 columns (NO_COLOR) ===
+  ▍ Health check
+  ────────────────────────────────────────────
+
+  OK     Quai node       demo mode — no real RPC contacted
+  OK     Network match   demo mode — assumed correct
+  OK     Wallet files    demo mode — no real keystore read
+  OK     Current wallet  demo wallet 0x0000000000000000000000000000000000000d01 (Cyprus-1 Quai)
+  OK     Hartii service  demo mode — no real API contacted
+  OK     Clock           demo mode — not checked
+
+  Ready

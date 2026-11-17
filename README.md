@@ -15,7 +15,7 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.5.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.6.1). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Constraint Desk / Fill Ledger (0.5.0 beta)
@@ -62,13 +62,22 @@ hartii update               # ask, download, verify, install
 hartii update --yes         # no prompt (required when not on a terminal or with --json)
 ```
 
-It reads `https://hartiilabs.com/downloads/hartii-cli.json` (`{version, sha256, url}`; falls back to the `.sha256` file), downloads the tarball over same-origin HTTPS with no redirects, refuses unless its sha256 equals the published one, then runs `npm install -g <the verified local file>` and confirms with `hartii --version`. If npm fails it prints the exact manual command (`npm install -g https://hartiilabs.com/downloads/hartii-cli.tgz`; on macOS/Linux with EACCES use `sudo` or an npm prefix in your home). The MCP server never updates anything. Versions up to 0.2.2 only print a hint: run the manual command above once to reach 0.2.3. One-off without installing: `npx -y https://hartiilabs.com/downloads/hartii-cli.tgz --help`.
+It reads `https://hartiilabs.com/downloads/hartii-cli.json` (`{version, sha256, url}`; falls back to the `.sha256` file), downloads the tarball over same-origin HTTPS with no redirects, refuses unless its sha256 equals the published one **and** its ed25519 signature verifies against the release key built into this CLI (key id `3f0f68fc9ba1a619`; an unsigned or wrongly signed download is refused, with no override), then runs `npm install -g <the verified local file>` and confirms with `hartii --version`. If npm fails it prints the exact manual command (`npm install -g https://hartiilabs.com/downloads/hartii-cli.tgz`; on macOS/Linux with EACCES use `sudo` or an npm prefix in your home). The MCP server never updates anything. Versions up to 0.2.2 only print a hint: run the manual command above once to reach 0.2.3. One-off without installing: `npx -y https://hartiilabs.com/downloads/hartii-cli.tgz --help`.
 
-The download's checksum is published next to it: `https://hartiilabs.com/downloads/hartii-cli.tgz.sha256`.
+The download's checksum is published next to it: `https://hartiilabs.com/downloads/hartii-cli.tgz.sha256`, and its signature in `hartii-cli.tgz.sig` (also inside `hartii-cli.json`). The checksum alone only proves the file arrived intact; the signature proves it came from the Hartii release key.
+
+## New in 0.6.0
+
+- **Guided first run.** `hartii` with no wallet opens setup: create or import, a password of at least 12 characters, the recovery phrase shown once, a check of 3 random words, optional spending caps (recommended), then your first receive.
+- **No default spending caps.** Caps exist only when you set them. Without caps every send asks you first; `--yes` (no question) needs caps you set yourself.
+- **Plain review before every send:** one sentence first ("You send 2.5 QUAI to …"), fee and total rounded up, then warnings that never block (new recipient, look-alike address, fee bigger than the amount, high slippage, a token picked by ticker). `--details` shows every technical field; `--terse` or `hartii config set ui.terse true` keeps one line per result.
+- **New payee check:** the first time you pay an address from this computer you type its last 4 characters.
+- **Contacts** (`hartii contacts`), **encrypted local files** (ledger, paid list, contacts, desk journal sealed with your wallet password), **signed updates**, and **`hartii qi`** (BETA, Orchard testnet first).
 
 ## Quickstart
 
 ```bash
+hartii                         # no wallet yet? guided setup: create or import, password, phrase check, optional caps
 hartii ui --demo               # look around with fixture data — no wallet, no network, never signs
 hartii wallet new              # creates an encrypted keystore (password prompt) and selects it
 hartii wallet address          # your Cyprus-1 Quai address
@@ -130,10 +139,13 @@ No transaction is sent by receiving, `--demo` or `--dry-run`. Review the full re
 | `claim list [--mine\|--creator <addr>]` · `claim <campaignId> [--check]` | HartiiClaim: list a creator's campaigns; check or claim your allocation (Merkle leaves are re-verified against the on-chain root). |
 | `wall engrave "<message>" [--color #hex] [--token <addr\|ticker>]` · `wall stats` · `wall recent [n]` | Wall of Blocks (Global Wall). Price read live. |
 | `help` · `?` · `commands` · `completion <shell>` | Help for everything (`hartii ?`, `hartii buy ?`), a flat command list, shell completion. |
-| `init` · `whoami` · `limits` · `networks` · `about` · `update` | First-run checklist, who you are, your spending caps and today's spend, networks, version/links, whether a newer CLI exists (`update`: `--check`, `--yes`). |
+| `init` · `whoami` · `limits` · `networks` · `about` · `update` | Guided setup (no wallet yet) or the first-run checklist, who you are, your spending caps and today's spend, networks, version/links, whether a newer CLI exists (`update`: `--check`, `--yes`). |
 | `price` · `quote <buy\|sell>` · `holders` · `trades` · `gas` · `block` · `open` | Read-only lookups; no wallet needed. |
 | shortcuts | `bal`, `pf`/`portfolio`, `ls`, `use`, `addr`, `top`, `new`, `search`, `me`. |
-| `config get <key>` · `config set <key> <value>` | Keys: `network`, `currentWallet`, `limits.perTxQuai`, `limits.dailyQuai`. |
+| `config get <key>` · `config set <key> <value>` | Keys: `network`, `currentWallet`, `limits.perTxQuai`, `limits.dailyQuai` (`none` clears a cap), `ui.terse` (`true`/`false`). |
+| `contacts add <name> <address>` · `contacts list` · `contacts remove <name>` · `contacts rename <old> <new>` | Your private address book, encrypted on this computer; `hartii send <name> <amount>` pays a saved contact. |
+| `vault enroll <wallet>` | Let a wallet with a different password unlock your encrypted local files. |
+| `qi address` · `qi balance` · `qi notes` · `qi receive` · `qi send <payment-code\|qi-address> <amount>` (BETA) | Qi, the private cash coin. Orchard testnet first; mainnet sends need `--network mainnet --allow-mainnet-qi`. Needs a wallet made from a recovery phrase. |
 | `doctor` | Health checklist. |
 | `trader init\|paper\|run --observe\|watch\|status\|pause\|export` (BETA) | Personal holder trader: Observe and Paper, no transaction key needed (see below). |
 | `mcp [--allow-writes (--preset conservative|normal|degen | --max-per-tx <q> --max-per-day <q>)]` | stdio MCP server (see below). |
@@ -145,8 +157,9 @@ the CLI refuses them on Orchard before touching the network.
 
 validate addresses (checksummed, Quai ledger only, Qi `0x0080…` rejected) → spending guard → **simulate**
 (`quai_call` from the real sender) → Quai **access list** (`quai_createAccessList`) → gas = estimate × 1.2 at the
-live gas price → print the **confirmation summary** (action, amounts, fee, gas cost, destination, network) →
-`y/N` (skip with `--yes`) → send → **require receipt status 1** → print the quaiscan link. `--dry-run` stops after the
+live gas price → print the **review** (one plain sentence first, fee and total rounded up, warnings that never block; `--details` adds
+action, amounts, gas cost, destination and network) → a never-paid address asks for its last 4 characters →
+`y/N` (`--yes` skips it only when you have set spending caps) → send → **require receipt status 1** → print the quaiscan link. `--dry-run` stops after the
 summary and never signs. Examples:
 
 ```bash
@@ -268,7 +281,7 @@ local trader reads `hartii_trader_status`, `hartii_trader_limits` and `hartii_tr
 **Write tools** — registered **only** with `--allow-writes`: `hartii_send`, `hartii_buy`, `hartii_sell`,
 `hartii_swap`, `hartii_otc_fill`, `hartii_otc_cancel`, `hartii_claim`. Every write is a **dry run** (the simulated
 confirmation summary, nothing signed) unless the call passes `confirm: true`, and a real send returns the summary plus
-the receipt. `--max-per-tx` / `--max-per-day` can only **tighten** the configured spending caps, never loosen them.
+the receipt. `--max-per-tx` / `--max-per-day` are the caps when you have set none in config; with config caps the lower one wins, so they can only **tighten**, never loosen. Agent sends only go to addresses this computer has already paid; pay a new address yourself first.
 
 **Cap presets** (`--preset conservative|normal|degen`) imply the caps and an MCP slippage ceiling: conservative 10 QUAI/tx, 50/day, 1% slippage; normal 50/250, 2%; degen 250/1000, 5%. A preset satisfies the `--allow-writes` cap requirement; explicit `--max-per-tx` / `--max-per-day` may only lower a preset value (raising errors), an unknown preset errors, and the active preset is shown by `hartii_trader_limits`, `hartii_wallet` and `hartii trader status`. Writes still need `--allow-writes`, the dry-run `reviewToken` and `confirm:true`; the vault's on-chain caps still apply. `hartii trader init --preset ...` applies the same per-tx/per-day caps to the trader budgets The trader also enforces slippage: the preset's bps (conservative 100, normal 200, degen 500; `--slippage-bps <n>` may only lower it) sets the on-chain min-out of every trader buy/sell, capped at the owner-signed policy ceiling (currently 100 bps, so normal/degen clamp to 100 until that ceiling is raised). If the price moves past the cap between quote and send, the trade is skipped (never retried larger) and a `slippage_skip` record (token, side, quoted, minOut, attempted) appears in `hartii trader status` and the activity feed. `trader init` with no `--preset` defaults to conservative and says so; profiles without a stored slippage use 100 bps.
 
@@ -316,8 +329,10 @@ Changing wallet or network discards old balances and obsolete responses. Orchard
   the OS supports it). The password comes from a hidden prompt or `HARTII_PASSWORD`. `--key-env VAR` reads a raw key
   from an environment variable for CI and prints a loud warning.
 - **Keys and mnemonics are never printed**, except by `wallet export` after you type the wallet's name back.
-- **Spending guard** on every write, including MCP: `limits.perTxQuai` (default 100) and `limits.dailyQuai` (default
-  500), tracked in `~/.hartii/spend.json`. Canonical mined successes charge guarded value plus gas; canonical mined
+- **Local files are encrypted** with your wallet password (AES-256-GCM, scrypt-wrapped key) once you make a real send: the spending ledger, the paid list, contacts and the desk journal. Read commands show them as locked when no password is available. The watchlist (a public token list) stays readable.
+- **Signed updates**: `hartii update` checks the release's ed25519 signature against the key built into the CLI before npm runs.
+- **Spending guard** on every write, including MCP: `limits.perTxQuai` and `limits.dailyQuai` once you set them (there are
+  no caps by default; setup recommends them; `none` clears one), tracked in `~/.hartii/spend.json`. Canonical mined successes charge guarded value plus gas; canonical mined
   reverts charge gas even though the requested value did not move. Unknown or non-final receipts retain the full
   guarded-value-plus-gas reservation; check the transaction before retrying or reconciling allowance.
   Native QUAI value is capped directly; token-denominated writes are valued in QUAI from a live quote and

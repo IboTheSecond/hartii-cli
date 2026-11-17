@@ -3,14 +3,15 @@
 // `hartii config get <key>` / `hartii config set <key> <value>` — thin wrapper over config.js's
 // dotted-path get/set, settable keys restricted there to the small documented surface
 // (network, currentWallet, limits.perTxQuai, limits.dailyQuai).
+import { tagView } from '../output.js';
 import { getHartiiHome, loadConfig, saveConfig, configGet, configSet } from '../config.js';
 
 function runConfigGet(home, key) {
   const cfg = loadConfig(home || getHartiiHome());
-  if (!key) return cfg;
+  if (!key) return tagView(cfg, 'config.get');
   const value = configGet(cfg, key);
   if (value === undefined) throw new Error(`"${key}" is not set.`);
-  return { [key]: value };
+  return tagView({ [key]: value }, 'config.get');
 }
 
 function runConfigSet(home, key, value) {
@@ -18,7 +19,7 @@ function runConfigSet(home, key, value) {
   const cfg = loadConfig(resolvedHome);
   const next = configSet(cfg, key, value);
   saveConfig(resolvedHome, next);
-  return { [key]: configGet(next, key) };
+  return tagView({ [key]: configGet(next, key) }, 'config.set');
 }
 
 /** `hartii config get|set ...` */

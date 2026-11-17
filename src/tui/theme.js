@@ -1,29 +1,42 @@
 // packages/hartii-cli/src/tui/theme.js
 //
-// Palette ROLES for the Hartii terminal (the frontend craft notes rules 3-4, translated to a terminal):
-// neutral surfaces with a slight violet bias, ONE signal accent (Hartii red) for focus / state / the
-// block pulse, the purple camel as the brand voice (mark, titles), and functional colours only for
-// status (up/live = green, down/sell = rose, warn = amber). Never washes a whole pane in a colour.
-// Contrast: ink on a dark terminal background is >= 7:1; muted >= 4.6:1; faint is for hairlines only.
+// The Hartii terminal palette (Labs look, owner 2026-11-16): a black-and-white base, violet as the ONE
+// accent, red ONLY for danger or failure. Tokens are truecolor and degrade to the nearest 256 and 16
+// colours; NO_COLOR drops colour entirely, so meaning is always also carried by a word or a glyph
+// (never by colour alone). Never washes a whole pane in a colour.
+//   text #F2F1F4  muted #9B98A3  dim #66636D  surface #141416  background #0D0D0E
+//   accent #7C3AED  accent bright #A78BFA  accent dark #6D28D9
+//   danger #F0465C  ok #22C55E  warn #FFB020
 
 export const PALETTE = {
-  ink: [232, 230, 240], // body text
-  muted: [150, 146, 170], // secondary text, labels
-  faint: [75, 73, 96], // hairlines only — never text
-  signal: [229, 36, 59], // Hartii red #E5243B — focus, selection, newest-block pulse
-  camel: [139, 92, 246], // purple camel #8B5CF6
-  camelLight: [167, 139, 250], // #A78BFA — titles, mark highlights
-  up: [74, 222, 128], // status green #4ADE80
-  down: [248, 113, 113], // sell / negative (functional, distinct from the brand signal)
-  warn: [251, 191, 36],
+  ink: [242, 241, 244], // text #F2F1F4
+  muted: [155, 152, 163], // #9B98A3 secondary text, labels
+  faint: [102, 99, 109], // #66636D hairlines and the quietest hints
+  surface: [20, 20, 22], // #141416
+  bg: [13, 13, 14], // #0D0D0E
+  accent: [124, 58, 237], // violet #7C3AED, the one accent
+  accentBright: [167, 139, 250], // #A78BFA
+  accentDark: [109, 40, 217], // #6D28D9
+  danger: [240, 70, 92], // #F0465C, danger and failure only
+  up: [34, 197, 94], // ok green #22C55E
+  warn: [255, 176, 32], // amber #FFB020
 };
+// Legacy aliases kept so older call sites keep compiling. `signal` is now the accent, never red.
+PALETTE.signal = PALETTE.accentBright;
+PALETTE.camel = PALETTE.accent;
+PALETTE.camelLight = PALETTE.accentBright;
+PALETTE.down = PALETTE.muted;
 
-/** @returns {'truecolor'|'256'|'none'} */
-export function colorDepth(env = process.env) {
+/** @returns {'truecolor'|'256'|'16'|'none'} */
+export function colorDepth(env = process.env, platform = process.platform) {
   if (typeof env.NO_COLOR === 'string' && env.NO_COLOR !== '') return 'none';
+  const term = String(env.TERM || '').toLowerCase();
+  if (term === 'dumb') return 'none';
   const ct = String(env.COLORTERM || '').toLowerCase();
   if (ct === 'truecolor' || ct === '24bit' || env.WT_SESSION || /^(iTerm|vscode|WezTerm|Hyper)/i.test(String(env.TERM_PROGRAM || ''))) return 'truecolor';
-  if (process.platform === 'win32') return 'truecolor'; // Windows 10+ consoles render 24-bit SGR
+  if (platform === 'win32') return 'truecolor'; // Windows 10+ consoles render 24-bit SGR
+  if (/256color/.test(term)) return '256';
+  if (['linux', 'vt100', 'vt220', 'ansi', 'cons25', 'cygwin'].includes(term)) return '16';
   return '256';
 }
 
@@ -37,16 +50,27 @@ function to256([r, g, b]) {
   return 16 + 36 * c(r) + 6 * c(g) + c(b);
 }
 
+// The 16 ANSI colours (typical xterm values) for nearest-colour matching: index 0-7 normal, 8-15 bright.
+const ANSI16 = [[0, 0, 0], [205, 49, 49], [13, 188, 121], [229, 229, 16], [36, 114, 200], [188, 63, 188], [17, 168, 205], [229, 229, 229],
+  [102, 102, 102], [241, 76, 76], [35, 209, 139], [245, 245, 67], [59, 142, 234], [214, 112, 214], [41, 184, 219], [255, 255, 255]];
+function to16([r, g, b]) {
+  let best = 0, bd = Infinity;
+  ANSI16.forEach(([R, G, B], i) => { const d = (r - R) ** 2 + (g - G) ** 2 + (b - B) ** 2; if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+const fg16 = (i) => (i < 8 ? 30 + i : 90 + i - 8);
+const bg16 = (i) => (i < 8 ? 40 + i : 100 + i - 8);
+
 /** SGR parameter string for a cell style under a given colour depth. '' = default style. */
 export function sgr(style, depth) {
   if (!style) return '';
   const parts = [];
   if (style.bold) parts.push('1');
   if (style.dim) parts.push('2');
-  if (style.inverse) parts.push('7');
+  if (style.inverse || (style.invertIfNoColor && depth === 'none')) parts.push('7');
   if (depth !== 'none') {
-    if (style.fg) parts.push(depth === 'truecolor' ? `38;2;${style.fg.join(';')}` : `38;5;${to256(style.fg)}`);
-    if (style.bg) parts.push(depth === 'truecolor' ? `48;2;${style.bg.join(';')}` : `48;5;${to256(style.bg)}`);
+    if (style.fg) parts.push(depth === 'truecolor' ? `38;2;${style.fg.join(';')}` : depth === '16' ? String(fg16(to16(style.fg))) : `38;5;${to256(style.fg)}`);
+    if (style.bg) parts.push(depth === 'truecolor' ? `48;2;${style.bg.join(';')}` : depth === '16' ? String(bg16(to16(style.bg))) : `48;5;${to256(style.bg)}`);
   }
   return parts.join(';');
 }
@@ -54,15 +78,19 @@ export function sgr(style, depth) {
 // Named styles. In NO_COLOR mode the same roles degrade to weight/inversion only (sgr() drops fg/bg).
 export const S = {
   ink: { fg: PALETTE.ink },
+  strong: { fg: PALETTE.ink, bold: true },
   muted: { fg: PALETTE.muted },
   faint: { fg: PALETTE.faint },
-  title: { fg: PALETTE.camelLight, bold: true },
-  brand: { fg: PALETTE.camel, bold: true },
-  signal: { fg: PALETTE.signal, bold: true },
-  focus: { fg: PALETTE.ink, bg: PALETTE.signal, bold: true },
+  title: { fg: PALETTE.accentBright, bold: true },
+  brand: { fg: PALETTE.accent, bold: true },
+  signal: { fg: PALETTE.accentBright, bold: true }, // focus marker, newest-block pulse
+  accent: { fg: PALETTE.accentBright },
+  focus: { fg: PALETTE.ink, bg: PALETTE.accent, bold: true },
   selected: { fg: PALETTE.ink, bold: true, inverse: true },
   up: { fg: PALETTE.up },
-  down: { fg: PALETTE.down },
+  ok: { fg: PALETTE.up },
+  down: { fg: PALETTE.muted }, // a sell / a fall is not an error; the arrow glyph carries the meaning
+  danger: { fg: PALETTE.danger, bold: true }, // danger and failure only
   warn: { fg: PALETTE.warn },
-  key: { fg: PALETTE.camelLight, bold: true },
+  key: { fg: PALETTE.accentBright, bold: true },
 };

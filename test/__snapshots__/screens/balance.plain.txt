@@ -1,0 +1,46 @@
+=== balance @ 60 columns (NO_COLOR) ===
+  ▍ Balance  mainnet
+  ────────────────────────────────────────────
+
+  1,234.56 QUAI
+
+  Address  0x0000 0000 0000 0000 0000
+             0000 0000 0000 0000 0d01
+
+  Tokens
+
+  TOKEN  BALANCE  VALUE (QUAI)  SOURCE
+  DEMO    50,000           105  demo
+    0x0000000000000000000000000000000000000d03
+  HRTI    12,000            96  demo
+    0x0000000000000000000000000000000000000d02
+
+=== balance @ 80 columns (NO_COLOR) ===
+  ▍ Balance  mainnet
+  ────────────────────────────────────────────
+
+  1,234.56 QUAI
+
+  Address  0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+
+  Tokens
+
+  TOKEN  BALANCE  VALUE (QUAI)  SOURCE
+  DEMO    50,000           105  demo
+    0x0000000000000000000000000000000000000d03
+  HRTI    12,000            96  demo
+    0x0000000000000000000000000000000000000d02
+
+=== balance @ 120 columns (NO_COLOR) ===
+  ▍ Balance  mainnet
+  ────────────────────────────────────────────
+
+  1,234.56 QUAI
+
+  Address  0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+
+  Tokens
+
+  TOKEN  BALANCE  VALUE (QUAI)  ADDRESS                                     SOURCE
+  DEMO    50,000           105  0x0000000000000000000000000000000000000d03  demo
+  HRTI    12,000            96  0x0000000000000000000000000000000000000d02  demo

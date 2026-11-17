@@ -1,0 +1,8 @@
+=== write-aborted @ 60 columns (NO_COLOR) ===
+  Aborted  Send QUAI. Nothing was sent.
+
+=== write-aborted @ 80 columns (NO_COLOR) ===
+  Aborted  Send QUAI. Nothing was sent.
+
+=== write-aborted @ 120 columns (NO_COLOR) ===
+  Aborted  Send QUAI. Nothing was sent.

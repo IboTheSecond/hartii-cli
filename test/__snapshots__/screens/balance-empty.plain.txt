@@ -1,0 +1,44 @@
+=== balance-empty @ 60 columns (NO_COLOR) ===
+  ▍ Balance  mainnet
+  ────────────────────────────────────────────
+
+  0 QUAI
+
+  Wallet   main
+  Address  0x0000 0000 0000 0000 0000
+             0000 0000 0000 0000 0d01
+
+  Note: This wallet is empty. Run `hartii receive` to get
+        your address and a QR code.
+
+  Tokens
+  No token holdings.
+
+=== balance-empty @ 80 columns (NO_COLOR) ===
+  ▍ Balance  mainnet
+  ────────────────────────────────────────────
+
+  0 QUAI
+
+  Wallet   main
+  Address  0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+
+  Note: This wallet is empty. Run `hartii receive` to get your address and a
+        QR code.
+
+  Tokens
+  No token holdings.
+
+=== balance-empty @ 120 columns (NO_COLOR) ===
+  ▍ Balance  mainnet
+  ────────────────────────────────────────────
+
+  0 QUAI
+
+  Wallet   main
+  Address  0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+
+  Note: This wallet is empty. Run `hartii receive` to get your address and a QR code.
+
+  Tokens
+  No token holdings.

@@ -1,0 +1,21 @@
+=== write-done @ 60 columns (NO_COLOR) ===
+  Done  Send QUAI is confirmed on chain.
+
+  Transaction
+    0xabababababababababababababababababababababababababababababababab
+  Explorer
+    https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab
+
+=== write-done @ 80 columns (NO_COLOR) ===
+  Done  Send QUAI is confirmed on chain.
+
+  Transaction
+    0xabababababababababababababababababababababababababababababababab
+  Explorer
+    https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab
+
+=== write-done @ 120 columns (NO_COLOR) ===
+  Done  Send QUAI is confirmed on chain.
+
+  Transaction  0xabababababababababababababababababababababababababababababababab
+  Explorer     https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab

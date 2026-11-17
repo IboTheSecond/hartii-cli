@@ -5,6 +5,10 @@
 // `deps` so command/pipeline tests never spawn a real TTY — the default wires up real
 // stdin/stderr only when nothing is injected, keeping stdout clean for --json.
 import { createInterface } from 'node:readline';
+import { checkNewPassword } from './onboarding/password.js';
+import { WalletError } from './keystore.js';
+
+export { MIN_PASSWORD_LENGTH, checkNewPassword } from './onboarding/password.js';
 
 const closedInput = () => new Error('Input closed before an answer.');
 
@@ -136,4 +140,26 @@ export function readVisibleInput(label, deps = {}) {
 export async function confirm(question, deps = {}) {
   const answer = await readLine(`${question} [y/N] `, deps);
   return /^y(es)?$/i.test(String(answer || '').trim());
+}
+
+/**
+ * Password for a NEW wallet (or a password change): 12 characters minimum, typed twice. HARTII_PASSWORD still
+ * works for automation but must meet the same floor. Existing wallets are unaffected (unlocking never calls this).
+ * @param {{ env?: NodeJS.ProcessEnv, promptFn?: typeof readHiddenInput }} [deps]
+ */
+export async function resolveNewPassword(deps = {}) {
+  const env = deps.env || process.env;
+  const fail = (why) => new WalletError(why);
+  if (typeof env.HARTII_PASSWORD === 'string' && env.HARTII_PASSWORD !== '') {
+    const why = checkNewPassword(env.HARTII_PASSWORD);
+    if (why) throw fail(`New wallet password: ${why}`);
+    return resolvePassword(deps);
+  }
+  const promptFn = deps.promptFn || readHiddenInput;
+  const pw1 = await promptFn('New password (12+ characters): ', deps);
+  const why = checkNewPassword(pw1);
+  if (why) throw fail(`Password: ${why}`);
+  const pw2 = await promptFn('Confirm password: ', deps);
+  if (pw1 !== pw2) throw fail('Passwords do not match.');
+  return pw1;
 }

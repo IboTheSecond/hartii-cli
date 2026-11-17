@@ -19,13 +19,25 @@ const CAMEL = [
   '.oo.oo....oo.oo...',
 ];
 
-const PIX = { o: PALETTE.camel, h: PALETTE.camelLight, e: PALETTE.signal };
+const PIX = { o: PALETTE.accent, h: PALETTE.accentBright, e: PALETTE.ink };
 
 export const CAMEL_W = 18;
 export const CAMEL_H = 4;
 
+// The same two-humped camel for ASCII-only terminals (4 rows x 18 columns).
+const CAMEL_ASCII = [
+  '   __    __    ,_  ',
+  '  /  \\__/  \\__/o\\  ',
+  " (            )-'  ",
+  '  ||  ||  ||  ||  ',
+];
+
 /** Paints the camel at (x, y) as 4 terminal rows x 18 columns. */
 export function drawCamel(screen, x, y) {
+  if (screen.ascii) {
+    CAMEL_ASCII.forEach((line, r) => screen.put(x, y + r, line.slice(0, CAMEL_W), { fg: PALETTE.accent, bold: true }));
+    return { w: CAMEL_W, h: CAMEL_H };
+  }
   for (let r = 0; r < CAMEL_H; r += 1) {
     const top = CAMEL[r * 2];
     const bot = CAMEL[r * 2 + 1];
@@ -54,12 +66,13 @@ const LED = {
   8: ['###', '#.#', '###', '#.#', '###'],
   9: ['###', '#.#', '###', '..#', '###'],
   ',': ['..', '..', '..', '.#', '#.'],
+  '.': ['.', '.', '.', '.', '#'],
 };
 
 /** Width in columns of `text` rendered as LED numerals (digits 3 wide, comma 2 wide, 1 gap). */
 export function ledWidth(text) {
   let w = 0;
-  for (const ch of String(text)) if (LED[ch]) w += (ch === ',' ? 2 : 3) + 1;
+  for (const ch of String(text)) if (LED[ch]) w += (ch === ',' ? 2 : ch === '.' ? 1 : 3) + 1;
   return Math.max(0, w - 1);
 }
 
@@ -69,7 +82,7 @@ export function drawLed(screen, x, y, text, st) {
   for (const ch of String(text)) {
     const g = LED[ch];
     if (!g) continue;
-    const w = ch === ',' ? 2 : 3;
+    const w = ch === ',' ? 2 : ch === '.' ? 1 : 3;
     for (let r = 0; r < 3; r += 1) {
       const a = g[r * 2] || '.'.repeat(w);
       const b = g[r * 2 + 1] || '.'.repeat(w);

@@ -8,11 +8,12 @@
 //    and ribbon, 'trade' frames fill the per-block feed), reconnecting with the protocol's own backoff,
 //    with an RPC block-number poll as the fallback when the socket is silent.
 // Nothing here ever prints a key; the password prompt goes through the TUI's masked overlay.
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatUnits } from 'quais';
 import { getHartiiHome, loadConfig, saveConfig, configSet } from '../config.js';
 import { resolveRuntimeNetwork } from '../network.js';
+import { securePath, atomicPrivateWrite } from '../secureFiles.js';
 import { createProvider } from '../signer.js';
 import { runBalance } from '../commands/balance.js';
 import { runSend } from '../commands/send.js';
@@ -38,16 +39,20 @@ const POLL_MS = 6_000;
 
 export const watchlistPath = (home) => join(home, 'watchlist.json');
 
+// The watchlist is a list of PUBLIC token references, and the dashboard reads it at start-up before any password could be
+// asked, so it deliberately stays readable (not sealed by the local data vault). It is still written atomically,
+// owner-only, and never through a symlink or hardlink (verified bug fixed 2026-11-16: it used a plain writeFileSync).
 export function loadWatchlist(home) {
   try {
-    const j = JSON.parse(readFileSync(watchlistPath(home), 'utf8'));
+    const checked = securePath(watchlistPath(home), { regularFile: true });
+    if (!checked.stat) return [];
+    const j = JSON.parse(readFileSync(checked.path, 'utf8'));
     return Array.isArray(j.tokens) ? j.tokens.filter((t) => typeof t === 'string').slice(0, 30) : [];
   } catch { return []; }
 }
 
 export function saveWatchlist(home, tokens) {
-  if (!existsSync(home)) mkdirSync(home, { recursive: true, mode: 0o700 });
-  writeFileSync(watchlistPath(home), JSON.stringify({ tokens }, null, 2) + '\n', { mode: 0o600 });
+  atomicPrivateWrite(watchlistPath(home), JSON.stringify({ tokens }, null, 2) + '\n', { replace: true });
 }
 
 /** Folds a head / trade frame into the block history (kept contiguous, newest last). */
@@ -182,15 +187,15 @@ export function createDataSource(o = {}) {
       resolveWallet();
       app?.setData({ wallet: current, quaiWei: null, holdings: [], holdingsError: null });
     },
-    loadSettings: () => { const c = loadConfig(home); return { network: net().name, perTxQuai: c.limits.perTxQuai, dailyQuai: c.limits.dailyQuai }; },
+    loadSettings: () => { const c = loadConfig(home); return { network: net().name, perTxQuai: c.limits.perTxQuai ?? '', dailyQuai: c.limits.dailyQuai ?? '' }; }, // '' = no cap set
     saveSettings: async (v) => {
       if (stopped) return;
       if (o.rpc && v.network !== net().name) throw new Error('Restart without --rpc to change networks. The custom RPC remains tied to the startup network.');
       const previousNetwork = net().name;
       let c = loadConfig(home);
       c = configSet(c, 'network', v.network);
-      c = configSet(c, 'limits.perTxQuai', v.perTxQuai);
-      c = configSet(c, 'limits.dailyQuai', v.dailyQuai);
+      c = configSet(c, 'limits.perTxQuai', v.perTxQuai ?? ''); // '' or 'none' clears a cap
+      c = configSet(c, 'limits.dailyQuai', v.dailyQuai ?? '');
       saveConfig(home, c);
       selectedNetwork = c.network;
       balanceGeneration += 1;

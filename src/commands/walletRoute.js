@@ -5,6 +5,8 @@
 import * as walletCmd from './walletCmd.js';
 import { WalletError } from '../keystore.js';
 import { readHiddenInput } from '../prompt.js';
+import { tagView } from '../output.js';
+import { WALLET_SUBCOMMANDS } from '../screens.js';
 
 async function importWallet(home, rest, flags, io) {
   const [kind, ...parts] = rest;
@@ -21,7 +23,7 @@ async function importWallet(home, rest, flags, io) {
 export async function runWallet([sub, ...rest], flags, { home, io, g = {} }) {
   const selected = rest[0] || g.wallet;
   switch (sub) {
-    case 'new': return walletCmd.walletNew(home, rest[0], io);
+    case 'new': return walletCmd.walletNew(home, rest[0], { ...io, json: Boolean(g.json) });
     case 'import': return importWallet(home, rest, flags, io);
     case 'list': return { wallets: walletCmd.walletList(home) };
     case 'use': return walletCmd.walletUse(home, rest[0]);
@@ -30,6 +32,10 @@ export async function runWallet([sub, ...rest], flags, { home, io, g = {} }) {
     case 'rename': return walletCmd.walletRename(home, rest[0], rest[1]);
     case 'remove': return walletCmd.walletRemove(home, rest[0], io);
     case 'lock-check': return walletCmd.walletLockCheck(home, selected);
+    case undefined:
+    case '':
+      // No subcommand: show the choices instead of an error.
+      return tagView({ ok: true, subcommands: WALLET_SUBCOMMANDS.map(([name, summary]) => ({ name, summary })) }, 'wallet.help');
     default:
       throw new WalletError(`Unknown \`wallet\` subcommand "${sub || ''}". Try: new, import, list, use, address, export, rename, remove, lock-check.`);
   }

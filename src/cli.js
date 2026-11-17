@@ -6,14 +6,17 @@
 // raw stack trace for an expected (CliError) failure.
 import { parseArgv } from './args.js';
 import { formatHumanResult } from './humanOutput.js';
-import { makeColors, printJson, safeTerminalText, redactUrls } from './output.js';
-import { getHartiiHome } from './config.js';
+import { makeColors, printJson, safeTerminalText, redactUrls, uiOptions, withProgress } from './output.js';
+import { getHartiiHome, loadConfig } from './config.js';
 import { route } from './router.js';
 import { COMMAND_TABLE, RAW_COMMANDS } from './commandTable.js';
 import { suggest } from './help.js';
 import { CliError } from './errors.js';
 import { WalletError } from './keystore.js';
 import { runTui } from './tui/run.js';
+
+// Commands that can ask for a password, a confirmation or typed input: a spinner on stderr would draw over the prompt.
+const PROMPTING_COMMANDS = new Set(['send', 'buy', 'sell', 'swap', 'airdrop', 'otc', 'claim', 'wall', 'wallet', 'init', 'desk', 'update', 'contacts', 'vault', 'trader', 'qi', 'config']);
 
 function printError(err, { json, writeErr, colors }) {
   const message = redactUrls(err?.message || String(err));
@@ -68,6 +71,12 @@ export async function main(argv, deps = {}) {
     env, writeErr, write, colors, passwordDeps: { allowPipedSecret: flags.stdin === true, ...deps.passwordDeps }, allowPipedSecret: flags.stdin === true, confirmTypedFn: deps.confirmTypedFn, promptFn: deps.promptFn,
     confirmFn: deps.confirmFn, stdin: deps.stdin, stdout: deps.stdout, now: deps.now,
   };
+  // Presentation: --terse / config ui.terse, --details, terminal width (60/80/120 all work). A config that cannot be read
+  // must not stop a command here; the command itself reports it.
+  let uiCfg = {};
+  if (!globals.demo) { try { uiCfg = loadConfig(getHartiiHome(env)); } catch { uiCfg = {}; } }
+  const ui = uiOptions({ flags, cfg: uiCfg, stdout: deps.stdout || process.stdout });
+  io.details = ui.details; io.terse = ui.terse; io.width = ui.width;
 
   try {
     if (flags['max-fee'] !== undefined) io.maxFeeWei = parseMaxFee(flags['max-fee']);
@@ -77,10 +86,13 @@ export async function main(argv, deps = {}) {
       const label=/^[a-z][a-z0-9_-]{0,31}$/i.test(command)?` "${safeTerminalText(command)}"`:'';
       throw new Error(`Unknown command${label}.${near.length ? ` Did you mean: ${near.join(', ')}?` : ''} Run \`hartii ?\` for every command.`);
     }
-    const result = await handler({ args, flags, g: globals, deps, env, io, write, home: globals.demo ? null : getHartiiHome(env) });
+    const run = () => handler({ args, flags, g: globals, deps, env, io, write, home: globals.demo ? null : getHartiiHome(env) });
+    // A progress line on stderr only for read commands on a TTY (never while a command may prompt, never with --json).
+    const quietCommand = RAW_COMMANDS.has(command) || PROMPTING_COMMANDS.has(command);
+    const result = quietCommand ? await run() : await withProgress('Working…', run, { json: globals.json });
     if (RAW_COMMANDS.has(command)) return result; // the handler already owns stdout and returns the exit code
     if (globals.json) printJson(result, { write });
-    else write(formatHumanResult(result, { colors }));
+    else write(formatHumanResult(result, { colors, width: ui.width, terse: ui.terse }));
     return result && result.ok === false ? 1 : 0;
   } catch (err) {
     if (err instanceof CliError || !deps.rethrowUnknown) {

@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { parseQuai } from 'quais';
 import { CliError } from './errors.js';
-import { securePath, secureDirectory, atomicPrivateWrite } from './secureFiles.js';
+import { securePath, secureDirectory } from './secureFiles.js';
+import { readPrivateText, writePrivateText, SEALED_PURPOSES, VaultError } from './localVault.js';
 export class SpendGuardError extends CliError {}
 export const ledgerPath = home => join(home, 'spend.json');
 const todayUtc = (now = new Date()) => now.toISOString().slice(0, 10);
@@ -22,7 +23,7 @@ function loadLedger(home) {
     if (directory.stat && !directory.stat.isDirectory()) throw new Error();
     const file = securePath(path, { regularFile: true });
     if (!file.stat) return {};
-    const ledger = JSON.parse(readFileSync(file.path, 'utf8'));
+    const ledger = JSON.parse(readPrivateText(home, SEALED_PURPOSES.spend, file.path));
     if (!object(ledger)) throw new Error();
     for (const [address, entry] of Object.entries(ledger)) {
       if (!/^0x[0-9a-f]{40}$/.test(address) || !object(entry) || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || !uintText(entry.spentWei)) throw new Error();
@@ -39,13 +40,14 @@ function loadLedger(home) {
       }
     }
     return ledger;
-  } catch {
+  } catch (error) {
+    if (error instanceof VaultError) throw new SpendGuardError(error.message);
     throw new SpendGuardError('Spending ledger is unreadable or damaged. Reconcile it against transaction receipts before repairing it; limits have not been reset.');
   }
 }
 function saveLedger(home, ledger) {
-  try { secureDirectory(home); atomicPrivateWrite(ledgerPath(home), JSON.stringify(ledger, null, 2) + '\n', { replace: true }); }
-  catch { throw new SpendGuardError('Spending ledger could not be safely committed. Pending authority has not been reset; reconcile before further writes.'); }
+  try { secureDirectory(home); writePrivateText(home, SEALED_PURPOSES.spend, ledgerPath(home), JSON.stringify(ledger, null, 2) + '\n', { replace: true }); }
+  catch (error) { if (error instanceof VaultError) throw new SpendGuardError(error.message); throw new SpendGuardError('Spending ledger could not be safely committed. Pending authority has not been reset; reconcile before further writes.'); }
 }
 function currentEntry(ledger, address, now) {
   const key = String(address).toLowerCase();
@@ -93,14 +95,23 @@ export function inspectSpendLock(home) {
     return { exists: true, pid: record.pid, startedAt: record.startedAt, unverified: true, unreadable: false };
   } catch { return { exists: true, pid: null, startedAt: null, unverified: true, unreadable: true }; }
 }
+/** True when the user has set at least one cap. Gate for `--yes`: no caps means no unattended sends. */
+export function hasCaps(limits) {
+  return Boolean(limits) && [limits.perTxQuai, limits.dailyQuai].some(x => x !== undefined && x !== null && x !== '');
+}
+const isSet = x => x !== undefined && x !== null;
 export function checkSpend(home, address, amountWei, limits, opts = {}) {
   const value = amount(amountWei);
-  let perTx, daily;
+  limits = limits || {};
+  let perTx = null, daily = null;
   try {
-    if (![limits.perTxQuai, limits.dailyQuai].every(x => /^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/.test(String(x)))) throw new Error();
-    perTx = parseQuai(String(limits.perTxQuai)); daily = parseQuai(String(limits.dailyQuai));
+    if (![limits.perTxQuai, limits.dailyQuai].filter(isSet).every(x => /^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/.test(String(x)))) throw new Error();
+    if (isSet(limits.perTxQuai)) perTx = parseQuai(String(limits.perTxQuai));
+    if (isSet(limits.dailyQuai)) daily = parseQuai(String(limits.dailyQuai));
   } catch { throw new SpendGuardError('Spending limits must be nonnegative decimal QUAI amounts with at most 18 decimals.'); }
-  if (value > perTx) throw new SpendGuardError(`This transaction exceeds the per-transaction limit of ${limits.perTxQuai} QUAI (config limits.perTxQuai).`);
+  // No cap set (2026-11-16): nothing here blocks. The ledger, reservations and pending-authority checks still run elsewhere.
+  if (perTx !== null && value > perTx) throw new SpendGuardError(`This transaction exceeds the per-transaction limit of ${limits.perTxQuai} QUAI (config limits.perTxQuai).`);
+  if (daily === null) return;
   const { spentWei, reservedWei } = getSpentToday(home, address, opts);
   if (spentWei + reservedWei + value > daily) throw new SpendGuardError(`This transaction would exceed the daily limit of ${limits.dailyQuai} QUAI, including unconfirmed reservations. Reconcile pending transactions before retrying.`);
 }

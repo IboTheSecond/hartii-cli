@@ -1,0 +1,18 @@
+=== tokens-empty @ 60 columns (NO_COLOR) ===
+  ▍ Search: zzz
+  ────────────────────────────────────────────
+
+  No tokens match "zzz". Try a shorter name, or paste the
+  0x address.
+
+=== tokens-empty @ 80 columns (NO_COLOR) ===
+  ▍ Search: zzz
+  ────────────────────────────────────────────
+
+  No tokens match "zzz". Try a shorter name, or paste the 0x address.
+
+=== tokens-empty @ 120 columns (NO_COLOR) ===
+  ▍ Search: zzz
+  ────────────────────────────────────────────
+
+  No tokens match "zzz". Try a shorter name, or paste the 0x address.

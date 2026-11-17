@@ -1,0 +1,61 @@
+=== wallet-help @ 60 columns (NO_COLOR) ===
+  ▍ Wallet
+  ────────────────────────────────────────────
+
+  Pick what you want to do:
+
+  hartii wallet new        create an encrypted wallet (you
+                           choose the password)
+  hartii wallet import     bring in a wallet from a
+                           recovery phrase or key
+  hartii wallet list       show your wallets
+  hartii wallet use        switch the wallet other
+                           commands use
+  hartii wallet address    show your receive address (add
+                           --qr for a code)
+  hartii wallet export     show your recovery phrase on a
+                           screen that clears
+  hartii wallet rename     give a wallet a new name
+  hartii wallet remove     delete a wallet from this
+                           computer
+  hartii wallet lock-check  check that your wallet files
+                           are private
+
+  New here? Start with hartii wallet new
+
+=== wallet-help @ 80 columns (NO_COLOR) ===
+  ▍ Wallet
+  ────────────────────────────────────────────
+
+  Pick what you want to do:
+
+  hartii wallet new        create an encrypted wallet (you choose the
+                           password)
+  hartii wallet import     bring in a wallet from a recovery phrase or key
+  hartii wallet list       show your wallets
+  hartii wallet use        switch the wallet other commands use
+  hartii wallet address    show your receive address (add --qr for a code)
+  hartii wallet export     show your recovery phrase on a screen that clears
+  hartii wallet rename     give a wallet a new name
+  hartii wallet remove     delete a wallet from this computer
+  hartii wallet lock-check  check that your wallet files are private
+
+  New here? Start with hartii wallet new
+
+=== wallet-help @ 120 columns (NO_COLOR) ===
+  ▍ Wallet
+  ────────────────────────────────────────────
+
+  Pick what you want to do:
+
+  hartii wallet new        create an encrypted wallet (you choose the password)
+  hartii wallet import     bring in a wallet from a recovery phrase or key
+  hartii wallet list       show your wallets
+  hartii wallet use        switch the wallet other commands use
+  hartii wallet address    show your receive address (add --qr for a code)
+  hartii wallet export     show your recovery phrase on a screen that clears
+  hartii wallet rename     give a wallet a new name
+  hartii wallet remove     delete a wallet from this computer
+  hartii wallet lock-check  check that your wallet files are private
+
+  New here? Start with hartii wallet new

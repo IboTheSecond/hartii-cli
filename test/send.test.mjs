@@ -8,6 +8,7 @@ import { getAddress, Interface } from 'quais';
 import { runSend, SendError } from '../src/commands/send.js';
 import { generateMnemonicAccount, encryptAccount, writeKeystoreFile } from '../src/keystore.js';
 import { saveConfig, loadConfig } from '../src/config.js';
+import { recordPaid } from '../src/contacts.js';
 import { ERC20_ABI } from '../src/abi/erc20.js';
 import { NetworkError } from '../src/network.js';
 import { getSpentToday } from '../src/spendingGuard.js';
@@ -37,7 +38,10 @@ beforeEach(async () => {
   account = generateMnemonicAccount();
   const json = await encryptAccount({ address: account.address, privateKey: account.privateKey }, PASSWORD, { scrypt: SCRYPT_FAST });
   writeKeystoreFile(home, 'default', json);
-  saveConfig(home, { ...loadConfig(home), currentWallet: 'default' });
+  // 2026-11-16: no default caps; --yes needs caps the user set. TO is marked as already paid so these tests keep
+  // exercising the pipeline (new-recipient behaviour has its own tests in safetyLane.test.mjs).
+  saveConfig(home, { ...loadConfig(home), currentWallet: 'default', limits: { perTxQuai: '100', dailyQuai: '500' } });
+  recordPaid(home, 9, TO);
 }, 120_000);
 afterEach(() => {
   rmSync(home, { recursive: true, force: true });

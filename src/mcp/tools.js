@@ -242,8 +242,9 @@ export function buildTools(ctx) {
       handler: async () => {
         const address = c.readAddress();
         const rt = readRuntime(c.base(), { limits: ctx.limits });
-        const spent = getSpentToday(rt.home, address);
-        return { address, network: rt.net.name, writesEnabled: ctx.allowWrites === true, limits: { perTxQuai: rt.limits.perTxQuai, dailyQuai: rt.limits.dailyQuai }, ...(ctx.preset ? { activePreset: presetView(ctx.preset) } : {}), spentTodayQuai: formatAmount(BigInt(spent.spentWei)), reservedQuai: formatAmount(BigInt(spent.reservedWei || 0)) };
+        let spent = null; // sealed and locked spending history is reported as unknown, never as a crash
+        try { spent = getSpentToday(rt.home, address); } catch { spent = null; }
+        return { address, network: rt.net.name, writesEnabled: ctx.allowWrites === true, limits: { perTxQuai: rt.limits.perTxQuai, dailyQuai: rt.limits.dailyQuai }, ...(ctx.preset ? { activePreset: presetView(ctx.preset) } : {}), spentTodayQuai: spent ? formatAmount(BigInt(spent.spentWei)) : null, ...(spent ? {} : { locked: true }), reservedQuai: formatAmount(BigInt(spent.reservedWei || 0)) };
       },
     },
     {

@@ -1,0 +1,46 @@
+=== limits-none @ 60 columns (NO_COLOR) ===
+  ▍ Spending limits  mainnet
+  ────────────────────────────────────────────
+
+  Wallet           no wallet selected
+  Per transaction  no limit set
+  Per day          no limit set
+  Spent today      0 QUAI
+
+  Limits are optional. They only apply once you set them,
+  and then they work on every send and trade.
+
+  Change them:
+    hartii config set limits.perTxQuai <quai>
+    hartii config set limits.dailyQuai <quai>
+
+=== limits-none @ 80 columns (NO_COLOR) ===
+  ▍ Spending limits  mainnet
+  ────────────────────────────────────────────
+
+  Wallet           no wallet selected
+  Per transaction  no limit set
+  Per day          no limit set
+  Spent today      0 QUAI
+
+  Limits are optional. They only apply once you set them, and then they work
+  on every send and trade.
+
+  Change them:
+    hartii config set limits.perTxQuai <quai>
+    hartii config set limits.dailyQuai <quai>
+
+=== limits-none @ 120 columns (NO_COLOR) ===
+  ▍ Spending limits  mainnet
+  ────────────────────────────────────────────
+
+  Wallet           no wallet selected
+  Per transaction  no limit set
+  Per day          no limit set
+  Spent today      0 QUAI
+
+  Limits are optional. They only apply once you set them, and then they work on every send and trade.
+
+  Change them:
+    hartii config set limits.perTxQuai <quai>
+    hartii config set limits.dailyQuai <quai>

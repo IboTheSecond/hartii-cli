@@ -124,7 +124,7 @@ describe('hartii gallery', () => {
     const fetchFn = fakeFetch();
     const a = await run(['gallery', 'item', F.YOUKAI, '5'], { fetchFn });
     expect(a.code).toBe(0);
-    for (const s of [F.OWNER, '3.0', '1.5', 'Background', 'PurpleTooth', `${B}/item/${F.YOUKAI}/5`]) expect(a.out).toContain(s);
+    for (const s of [F.OWNER, '3 QUAI', '1.5 QUAI', 'Background', 'PurpleTooth', `${B}/item/${F.YOUKAI}/5`]) expect(a.out).toContain(s);
     const j = JSON.parse((await run(['gallery', 'item', `${F.YOUKAI}:5`, '--json'], { fetchFn })).out);
     expect(j.owner).toBe(F.OWNER);
     expect(j.listing.priceQuai).toBe('3.0');

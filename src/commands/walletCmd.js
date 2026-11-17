@@ -28,7 +28,9 @@ import {
   checkKeystorePerms,
 } from '../keystore.js';
 import { loadConfig, saveConfig } from '../config.js';
-import { resolvePassword, readHiddenInput, readVisibleInput } from '../prompt.js';
+import { resolvePassword, readHiddenInput, readVisibleInput, resolveNewPassword } from '../prompt.js';
+import { checkNewPassword } from '../onboarding/password.js';
+import { clearBackupPending } from '../onboarding/state.js';
 
 function nextDefaultName(home) {
   const existing = new Set(listWallets(home));
@@ -39,25 +41,11 @@ function nextDefaultName(home) {
   }
 }
 
-async function promptNewPassword(deps) {
-  const env = deps.env || process.env;
-  if (typeof env.HARTII_PASSWORD === 'string' && env.HARTII_PASSWORD !== '') {
-    if (env.HARTII_PASSWORD.length < 8) throw new WalletError('New wallet password must be at least 8 characters.');
-    return resolvePassword(deps);
-  }
-  const promptFn = deps.promptFn || readHiddenInput;
-  const pw1 = await promptFn('New password: ', deps);
-  if (pw1.length < 8) throw new WalletError('Password must be at least 8 characters.');
-  const pw2 = await promptFn('Confirm password: ', deps);
-  if (pw1 !== pw2) throw new WalletError('Passwords do not match.');
-  return pw1;
-}
-
 /** Persists `account` under `name`, switching the config's currentWallet to it (see header: every new/imported wallet becomes the active one — a CLI with no other signal should pick the wallet you just made). */
 async function persistAccount(home, name, account, deps) {
   assertValidWalletName(name);
   loadConfig(home); // refuse corrupted policy before encrypting/writing any wallet
-  const password = await promptNewPassword(deps);
+  const password = await resolveNewPassword(deps);
   // `deps.scrypt` is a TEST-ONLY override (see keystore.js's encryptAccount) — real usage never
   // sets it, so production wallets are always encrypted at the real cost.
   const json = await encryptAccount(account, password, { scrypt: deps.scrypt });
@@ -73,6 +61,14 @@ async function persistAccount(home, name, account, deps) {
  * @returns {Promise<{ name: string, address: string, reminder: string }>}
  */
 export async function walletNew(home, name, deps = {}) {
+  // A person at a terminal gets the guided setup (password strength, recovery phrase shown once on the alternate
+  // screen, 3-word check, safety caps, receive address). Scripts keep the old behaviour: --json, HARTII_PASSWORD,
+  // injected prompts or a non-TTY never show a phrase.
+  if (deps.guided === true || (deps.guided !== false && !deps.json && !deps.promptFn && !(deps.env || process.env).HARTII_PASSWORD && (deps.stdin || process.stdin).isTTY && process.stderr.isTTY)) {
+    const { runPlainSetup } = await import('../onboarding/plain.js');
+    const r = await runPlainSetup(home, { ...deps, mode: 'create', walletName: name });
+    return { name: r.name, address: r.address, reminder: r.backupPending ? 'Back up your recovery phrase soon: run `hartii wallet export`. Hartii CLI is BETA: start with small amounts.' : 'Backup verified. Hartii CLI is BETA: start with small amounts.' };
+  }
   const resolvedName = name || nextDefaultName(home);
   if (walletExists(home, resolvedName)) throw new WalletError(`Wallet "${resolvedName}" already exists.`);
   const account = generateMnemonicAccount();
@@ -160,6 +156,7 @@ export async function walletExport(home, name, deps = {}) {
     // keystore.js's header note on the x-quais extension block) — rebuild the phrase from it.
     result.mnemonic = Mnemonic.fromEntropy(account.mnemonic.entropy).phrase;
   }
+  try { clearBackupPending(home, resolvedName); } catch { /* the reminder is advisory */ }
   return result;
 }
 
@@ -217,4 +214,42 @@ function publicKeystore(home, name) {
   } catch {
     throw new WalletError('Could not read a valid public keystore header. No secret was printed.');
   }
+}
+
+/**
+ * Guided setup only (the TUI and the plain-terminal flow): creates a wallet with a password the caller already
+ * collected and hands the recovery phrase back IN PROCESS to the screen that shows it once. Never routed to
+ * `--json`, the MCP server or any logger; `walletNew` above stays the scriptable path and never returns a phrase.
+ * @returns {Promise<{ name: string, address: string, phrase: string }>}
+ */
+export async function walletCreateGuided(home, { name, password, scrypt } = {}) {
+  const resolvedName = name || nextDefaultName(home);
+  if (walletExists(home, resolvedName)) throw new WalletError(`Wallet "${resolvedName}" already exists.`);
+  const why = checkNewPassword(password);
+  if (why) throw new WalletError(`Password: ${why}`);
+  const account = generateMnemonicAccount();
+  const result = await persistWithPassword(home, resolvedName, account, password, scrypt);
+  return { ...result, phrase: account.mnemonicPhrase };
+}
+
+/** Guided import (phrase or key already collected from a hidden field). Returns no secret. */
+export async function walletImportGuided(home, { kind, secret, password, name, scrypt } = {}) {
+  if (kind !== 'mnemonic' && kind !== 'key') throw new WalletError('Choose a recovery phrase or a private key to import.');
+  const resolvedName = name || nextDefaultName(home);
+  if (walletExists(home, resolvedName)) throw new WalletError(`Wallet "${resolvedName}" already exists.`);
+  const why = checkNewPassword(password);
+  if (why) throw new WalletError(`Password: ${why}`);
+  const account = kind === 'mnemonic' ? accountFromMnemonic(secret) : accountFromPrivateKey(secret);
+  return persistWithPassword(home, resolvedName, account, password, scrypt);
+}
+
+async function persistWithPassword(home, name, account, password, scrypt) {
+  assertValidWalletName(name);
+  loadConfig(home);
+  const json = await encryptAccount(account, password, { scrypt });
+  loadConfig(home);
+  writeKeystoreFile(home, name, json);
+  const cfg = loadConfig(home);
+  saveConfig(home, { ...cfg, currentWallet: name });
+  return { name, address: account.address };
 }

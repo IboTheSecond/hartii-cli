@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { gzipSync } from 'node:zlib';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign as edSign } from 'node:crypto';
+import { releaseMessage, keyIdOf } from '../src/releaseKey.js';
 import { mkdtempSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -9,6 +10,10 @@ import { main } from '../src/cli.js';
 import { compareSemver, versionFromTarball, runUpdate } from '../src/commands/update.js';
 
 const BASE = 'https://hartiilabs.com/downloads/';
+// Throwaway release keys: the CLI trusts exactly one key; tests inject theirs through deps.releaseKey.
+const pair = () => { const { publicKey, privateKey } = generateKeyPairSync('ed25519'); const der = publicKey.export({ format: 'der', type: 'spki' }).toString('base64'); return { privateKey, key: { algorithm: 'ed25519', publicKey: der, keyId: keyIdOf(der) } }; };
+const TEST = pair(), OTHER = pair();
+const signRelease = (sha256, version, who = TEST) => edSign(null, releaseMessage({ sha256, version }), who.privateKey).toString('base64');
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 const ab = (b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.length);
 
@@ -22,14 +27,16 @@ function tgz(version, name = '@hartii/cli') {
 }
 
 // A fake hartiilabs.com/downloads. `tamper` serves different bytes than the published sha256 describes.
-function world({ version = '0.2.3', manifest = true, tamper = false, calls = [] } = {}) {
+function world({ version = '0.2.3', manifest = true, tamper = false, calls = [], signer = TEST, signed = true, sigInManifest = true } = {}) {
   const tar = tgz(version);
   const served = tamper ? tgz(version, '@hartii/cli ') : tar;
   const fetchFn = vi.fn(async (url, init) => {
     calls.push({ url: String(url), init });
     const u = String(url);
     const ok = (extra) => ({ ok: true, status: 200, ...extra });
-    if (u === `${BASE}hartii-cli.json`) return manifest ? ok({ json: async () => ({ version, sha256: sha(tar), url: `${BASE}hartii-cli.tgz` }) }) : { ok: false, status: 404 };
+    const signature = signed ? signRelease(sha(tar), version, signer) : undefined;
+    if (u === `${BASE}hartii-cli.json`) return manifest ? ok({ json: async () => ({ version, sha256: sha(tar), url: `${BASE}hartii-cli.tgz`, ...(sigInManifest && signed ? { signature, keyId: signer.key.keyId } : {}) }) }) : { ok: false, status: 404 };
+    if (u === `${BASE}hartii-cli.tgz.sig`) return signed ? ok({ text: async () => `${signature}\n` }) : { ok: false, status: 404 };
     if (u === `${BASE}hartii-cli.tgz.sha256`) return ok({ text: async () => `${sha(tar)}  hartii-cli.tgz\n` });
     if (u === `${BASE}hartii-cli.tgz`) return ok({ arrayBuffer: async () => ab(served) });
     return { ok: false, status: 404 };
@@ -39,7 +46,7 @@ function world({ version = '0.2.3', manifest = true, tamper = false, calls = [] 
 
 const run = async (argv, deps) => {
   const out = []; const err = [];
-  const code = await main(argv, { env: { HARTII_HOME: mkdtempSync(join(tmpdir(), 'hartii-upd-home-')) }, write: (s) => out.push(s), writeErr: (s) => err.push(s), interactive: false, ...deps });
+  const code = await main(argv, { env: { HARTII_HOME: mkdtempSync(join(tmpdir(), 'hartii-upd-home-')) }, write: (s) => out.push(s), writeErr: (s) => err.push(s), interactive: false, releaseKey: TEST.key, ...deps });
   return { code, out: out.join('\n'), err: err.join('\n') };
 };
 
@@ -67,10 +74,11 @@ describe('hartii update', () => {
       'import {spawnSync} from "node:child_process";',
       'const tar=Buffer.from(' + JSON.stringify(tar.toString('base64')) + ',"base64");',
       'const digest=' + JSON.stringify(sha(tar)) + ';',
-      'const fetchFn=async url=>({ok:true,status:200,json:async()=>({version:"99.1.0",sha256:digest,url:"https://hartiilabs.com/downloads/hartii-cli.tgz"}),arrayBuffer:async()=>tar.buffer.slice(tar.byteOffset,tar.byteOffset+tar.length)});',
+      'const SIG=' + JSON.stringify(signRelease(sha(tar), '99.1.0')) + ';const KEY=' + JSON.stringify(TEST.key) + ';',
+      'const fetchFn=async url=>({ok:true,status:200,json:async()=>({version:"99.1.0",sha256:digest,url:"https://hartiilabs.com/downloads/hartii-cli.tgz",signature:SIG,keyId:KEY.keyId}),arrayBuffer:async()=>tar.buffer.slice(tar.byteOffset,tar.byteOffset+tar.length)});',
       'const installerCode=' + JSON.stringify("process.stdout.write('INSTALLER-PROGRESS\\n')") + ';',
       'const spawnFn=(_cmd,args,opts)=>args.includes("install")?spawnSync(process.execPath,["-e",installerCode],opts):{status:0,stdout:"99.1.0\\n"};',
-      'const result=await runUpdate({yes:true,json:true},{installed:"0.1.0",fetchFn,spawnFn});',
+      'const result=await runUpdate({yes:true,json:true},{installed:"0.1.0",fetchFn,spawnFn,releaseKey:KEY});',
       'process.stdout.write(JSON.stringify(result));',
     ];
     writeFileSync(file, lines.join('\n'));
@@ -116,7 +124,7 @@ describe('hartii update', () => {
     const parent=mkdtempSync(join(tmpdir(),'hartii-short-path-')),temp=join(parent,'RUNNER~1');mkdirSync(temp);
     const {fetchFn,tar}=world({version:'99.1.0'});let installedBytes;
     const spawnFn=vi.fn((cmd,args)=>{if(args.includes('install'))installedBytes=readFileSync(args.at(-1));return {status:0,stdout:'99.1.0\n'};});
-    const result=await runUpdate({yes:true},{tmp:temp,platform:'win32',fetchFn,spawnFn,writeErr:()=>{}});
+    const result=await runUpdate({yes:true},{tmp:temp,platform:'win32',fetchFn,spawnFn,writeErr:()=>{},releaseKey:TEST.key});
     expect(result.updated).toBe(true);expect(installedBytes).toEqual(tar);
     expect(spawnFn).toHaveBeenCalledTimes(2);
     expect(spawnFn.mock.calls[0][1].slice(0,4)).toEqual(['/d','/s','/c','npm.cmd']);
@@ -125,7 +133,7 @@ describe('hartii update', () => {
   it.each(['unsafe&path','unsafe%path','unsafe!path'])('rejects Windows shell metacharacters in temp path %s before invoking npm', async name => {
     const parent=mkdtempSync(join(tmpdir(),'hartii-unsafe-path-')),temp=join(parent,name);mkdirSync(temp);
     const {fetchFn}=world({version:'99.1.0'}),spawnFn=vi.fn();
-    await expect(runUpdate({yes:true},{tmp:temp,platform:'win32',fetchFn,spawnFn,writeErr:()=>{}})).rejects.toThrow(/cannot take safely/);
+    await expect(runUpdate({yes:true},{tmp:temp,platform:'win32',fetchFn,spawnFn,writeErr:()=>{},releaseKey:TEST.key})).rejects.toThrow(/cannot take safely/);
     expect(spawnFn).not.toHaveBeenCalled();
   });
 
@@ -192,10 +200,57 @@ describe('hartii update', () => {
       u = String(u);
       if (u.endsWith('.json')) return { ok: true, status: 200, json: async () => ({ version: '99.1.0', sha256: sha(tar), url: 'https://evil.example/hartii-cli.tgz' }) };
       if (u.endsWith('.sha256')) return { ok: true, status: 200, text: async () => `${sha(tar)}  x\n` };
+      if (u.endsWith('.sig')) return { ok: true, status: 200, text: async () => signRelease(sha(tar), '99.1.0') };
       return { ok: true, status: 200, arrayBuffer: async () => ab(tar) };
     });
     const r = await run(['update', '--check', '--json'], { fetchFn });
     expect(JSON.parse(r.out).source).toBe('sha256-file');
     expect(fetchFn.mock.calls.every(([u]) => String(u).startsWith(BASE))).toBe(true);
+  });
+});
+
+describe('hartii update - signed releases', () => {
+  const attempt = async (worldOpts, deps = {}) => {
+    const { fetchFn } = world({ version: '99.1.0', ...worldOpts });
+    const spawnFn = vi.fn(() => ({ status: 0, stdout: '99.1.0' }));
+    const promise = runUpdate({ yes: true, json: true }, { installed: '0.1.0', fetchFn, spawnFn, releaseKey: TEST.key, tmp: mkdtempSync(join(tmpdir(), 'hartii-sigtest-')), ...deps });
+    return { promise, spawnFn };
+  };
+  it('installs a release signed by the embedded key', async () => {
+    const { promise, spawnFn } = await attempt({});
+    expect(await promise).toMatchObject({ ok: true, updated: true });
+    expect(spawnFn).toHaveBeenCalled();
+  });
+  it('accepts the signature from the .sig file when the manifest carries none', async () => {
+    const { promise } = await attempt({ sigInManifest: false });
+    expect(await promise).toMatchObject({ ok: true, updated: true });
+  });
+  it('refuses an unsigned release and never runs npm', async () => {
+    const { promise, spawnFn } = await attempt({ signed: false });
+    await expect(promise).rejects.toThrow(/not signed/);
+    expect(spawnFn).not.toHaveBeenCalled();
+  });
+  it('refuses a release signed by a different key and never runs npm', async () => {
+    const { promise, spawnFn } = await attempt({ signer: OTHER });
+    await expect(promise).rejects.toThrow(/does not match the Hartii release key/);
+    expect(spawnFn).not.toHaveBeenCalled();
+  });
+  it('refuses a good-looking sha256 on a tarball the signature was not made for', async () => {
+    // Same key, signature over a different version statement: the hash matches the file but the signature does not.
+    const { fetchFn } = world({ version: '99.1.0' });
+    const wrap = vi.fn(async (url, init) => {
+      const res = await fetchFn(url, init);
+      if (String(url).endsWith('hartii-cli.json')) { const m = await res.json(); return { ...res, json: async () => ({ ...m, signature: signRelease(m.sha256, '99.9.9') }) }; }
+      return res;
+    });
+    const spawnFn = vi.fn();
+    await expect(runUpdate({ yes: true }, { installed: '0.1.0', fetchFn: wrap, spawnFn, releaseKey: TEST.key, tmp: mkdtempSync(join(tmpdir(), 'hartii-sigtest-')) })).rejects.toThrow(/does not match/);
+    expect(spawnFn).not.toHaveBeenCalled();
+  });
+  it('the production key is the embedded one: a test-key signature is refused by default', async () => {
+    const { fetchFn } = world({ version: '99.1.0' });
+    const spawnFn = vi.fn();
+    await expect(runUpdate({ yes: true }, { installed: '0.1.0', fetchFn, spawnFn, tmp: mkdtempSync(join(tmpdir(), 'hartii-sigtest-')) })).rejects.toThrow(/does not match the Hartii release key/);
+    expect(spawnFn).not.toHaveBeenCalled();
   });
 });

@@ -49,9 +49,9 @@ describe('walletNew', () => {
   });
 
   it('enforces a minimum password length and a matching confirmation', async () => {
-    await expect(walletCmd.walletNew(home, 'short', deps({ promptFn: vi.fn().mockResolvedValue('abc') }))).rejects.toThrow(/at least 8/);
+    await expect(walletCmd.walletNew(home, 'short', deps({ promptFn: vi.fn().mockResolvedValue('abc') }))).rejects.toThrow(/at least 12/);
     await expect(
-      walletCmd.walletNew(home, 'mismatch', deps({ promptFn: vi.fn().mockResolvedValueOnce('longenough1').mockResolvedValueOnce('longenough2') })),
+      walletCmd.walletNew(home, 'mismatch', deps({ promptFn: vi.fn().mockResolvedValueOnce('longenough-pass1').mockResolvedValueOnce('longenough-pass2') })),
     ).rejects.toThrow(/do not match/);
   });
 

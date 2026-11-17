@@ -1,0 +1,51 @@
+=== tx-reverted @ 60 columns (NO_COLOR) ===
+  ▍ Transaction  mainnet
+  ────────────────────────────────────────────
+
+  Status    Failed (reverted on chain)
+  Hash
+    0xabababababababababababababababababababababababababababababababab
+  Block     10,400,001
+  From      0x0000 0000 0000 0000 0000
+              0000 0000 0000 0000 0d01
+  To        0x0000 0000 0000 0000 0000
+              0000 0000 0000 0000 0D04
+  Value     0 QUAI
+  Gas used  21,000
+  Explorer
+    https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab
+
+  Warning: The transaction was mined but failed, so it did
+           nothing except cost its fee.
+
+=== tx-reverted @ 80 columns (NO_COLOR) ===
+  ▍ Transaction  mainnet
+  ────────────────────────────────────────────
+
+  Status    Failed (reverted on chain)
+  Hash      0xabababababababababababababababababababababababababababababababab
+  Block     10,400,001
+  From      0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+  To        0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0D04
+  Value     0 QUAI
+  Gas used  21,000
+  Explorer
+    https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab
+
+  Warning: The transaction was mined but failed, so it did nothing except cost
+           its fee.
+
+=== tx-reverted @ 120 columns (NO_COLOR) ===
+  ▍ Transaction  mainnet
+  ────────────────────────────────────────────
+
+  Status    Failed (reverted on chain)
+  Hash      0xabababababababababababababababababababababababababababababababab
+  Block     10,400,001
+  From      0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+  To        0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0D04
+  Value     0 QUAI
+  Gas used  21,000
+  Explorer  https://quaiscan.io/tx/0xabababababababababababababababababababababababababababababababab
+
+  Warning: The transaction was mined but failed, so it did nothing except cost its fee.

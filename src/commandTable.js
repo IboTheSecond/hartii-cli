@@ -30,6 +30,9 @@ import { runExtra, EXTRA_COMMANDS, ExtraError } from './commands/extras.js';
 import { runMcp } from './mcp/server.js';
 import { runTrader } from './commands/trader.js';
 import { runDesk } from './commands/desk.js';
+import { runContacts } from './commands/contacts.js';
+import { runVault } from './commands/vault.js';
+import { runQiCli } from './commands/qi.js';
 import { createTraderReader } from './trader/readers.js';
 
 /** ctx = { args, flags, g, deps, env, io, home, write } — see cli.js. */
@@ -65,7 +68,7 @@ const extra = (command) => async (c) => {
   try {
     return await runExtra(command, c.args, {
       opts: { ...readOpts(c), wallet: c.g.wallet, json: c.g.json, yes: c.g.yes },
-      deps: { env: c.env, fetchFn: c.deps.fetchFn, providerFactory: c.deps.providerFactory, noSpawn: c.deps.noSpawn, spawnFn: c.deps.spawnFn, confirmFn: c.deps.confirmFn, interactive: c.deps.interactive, writeErr: c.io.writeErr, updateBase: c.deps.updateBase, tmp: c.deps.tmp },
+      deps: { env: c.env, io: c.io, passwordDeps: c.io.passwordDeps, fetchFn: c.deps.fetchFn, providerFactory: c.deps.providerFactory, noSpawn: c.deps.noSpawn, spawnFn: c.deps.spawnFn, confirmFn: c.deps.confirmFn, interactive: c.deps.interactive, writeErr: c.io.writeErr, updateBase: c.deps.updateBase, tmp: c.deps.tmp, releaseKey: c.deps.releaseKey },
       extraFlags: c.flags,
     });
   } catch (e) {
@@ -74,6 +77,8 @@ const extra = (command) => async (c) => {
 };
 
 export const COMMAND_TABLE = {
+  contacts: c => runContacts({ sub: c.args[0], args: c.args.slice(1), home: c.home, wallet: c.g.wallet }, { passwordDeps: c.io.passwordDeps, now: c.deps.now }),
+  vault: c => runVault({ sub: c.args[0], args: c.args.slice(1), home: c.home }, { passwordDeps: c.io.passwordDeps }),
   desk: c=>runDesk({sub:c.args[0]||'status',args:c.args.slice(1),...writeOpts(c),flags:c.flags,address:typeof c.flags.address==='string'?c.flags.address:undefined},{...c.deps,env:c.env,io:{...c.io,confirmFn:c.deps.confirmFn},passwordDeps:c.io.passwordDeps}),
   trader: c => runTrader({sub:c.args[0] || 'status',...readOpts(c),wallet:c.g.wallet,keyEnv:c.g.keyEnv,json:c.g.json,
     flags:c.flags,profile:c.flags.profile,once:c.flags.once===true,observe:c.flags.observe===true,policyFile:c.flags['policy-file'],fundingTx:c.flags['funding-tx'],
@@ -85,13 +90,13 @@ export const COMMAND_TABLE = {
   receive: (c)=>runReceive({...walletOpts(c),amount:c.flags.amount,memo:c.flags.memo,addressQr:c.flags['address-qr']===true,out:c.flags.out,expiresAt:c.flags.expires===undefined?null:parseReceiveExpiry(c.flags.expires,{now:c.deps.now?new Date(c.deps.now).getTime():Date.now()})}),
   config: (c) => runConfig(c.args, c.home),
   balance: (c) => runBalance({ ...walletOpts(c), tokens: Boolean(c.flags.tokens), address: typeof c.flags.address === 'string' ? c.flags.address : undefined }, readDeps(c)),
-  doctor: (c) => runDoctor(readOpts(c), { fetchFn: c.deps.fetchFn, now: c.deps.now }),
+  doctor: (c) => runDoctor(readOpts(c), { fetchFn: c.deps.fetchFn, now: c.deps.now, env: c.env }),
   tokens: (c) => runTokens({ sub: c.args[0], query: c.args[1], limit: c.flags.limit, home: c.home, network: c.g.network, demo: c.g.demo }, { fetchFn: c.deps.fetchFn }),
   studio: (c) => runStudio({ sub: c.args[0], args: c.args.slice(1), limit: c.flags.limit, open: c.flags.open === true, home: c.home, network: c.g.network, rpc: c.g.rpc, demo: c.g.demo }, { fetchFn: c.deps.fetchFn, now: c.deps.now, spawnFn: c.deps.spawnFn, noSpawn: c.deps.noSpawn }),
   gallery: (c) => runGallery({ sub: c.args[0], args: c.args.slice(1), limit: c.flags.limit, days: c.flags.days, home: c.home, network: c.g.network, rpc: c.g.rpc, demo: c.g.demo }, { fetchFn: c.deps.fetchFn, now: c.deps.now }),
   token: (c) => runToken({ id: c.args[0], ...readOpts(c) }, readDeps(c)),
-  tx: (c) => runTx({ hash: c.args[0], ...readOpts(c) }, { providerFactory: c.deps.providerFactory }),
-  send: writeCmd(runSend, ({ args: [to, amount], flags }) => ({ to, amount, token: flags.token })),
+  tx: (c) => runTx({ hash: c.args[0], ...readOpts(c), wallet: c.g.wallet }, { providerFactory: c.deps.providerFactory, passwordDeps: c.io.passwordDeps }),
+  send: writeCmd(runSend, ({ args: [to, amount], flags }) => ({ to, amount, token: flags.token, newRecipientOk: flags['new-recipient-ok'] === true })),
   buy: writeCmd(runBuy, ({ args: [token, quai], flags }) => ({ token, quai, slippage: flags.slippage })),
   sell: writeCmd(runSell, ({ args: [token, amount], flags }) => ({ token, amount, slippage: flags.slippage })),
   swap: writeCmd(runSwap, ({ args: [tokenIn, tokenOut, amount], flags }) => ({ tokenIn, tokenOut, amount, slippage: flags.slippage })),
@@ -107,10 +112,11 @@ export const COMMAND_TABLE = {
   wall: writeCmd(runWall, ({ args: [sub = 'engrave', message], flags }) => ({
     sub, message: sub === 'engrave' ? message : undefined, n: sub === 'recent' ? message : undefined, color: flags.color, token: flags.token,
   })),
+  qi: runQiCli,
   watch,
   mcp,
   ...Object.fromEntries([...EXTRA_COMMANDS].map((name) => [name, extra(name)])),
 };
 
 /** Handlers that return a process exit code themselves instead of a result to print. */
-export const RAW_COMMANDS = new Set(['watch', 'mcp']);
+export const RAW_COMMANDS = new Set(['watch', 'mcp', 'qi']);

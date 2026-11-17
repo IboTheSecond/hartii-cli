@@ -1,0 +1,30 @@
+=== gas @ 60 columns (NO_COLOR) ===
+  ▍ Network fees  mainnet
+  ────────────────────────────────────────────
+
+  Gas price           44,648.01 gwei
+  Send QUAI           1.7412 QUAI   about 39,000 gas
+  Trade or tool call  11.162 QUAI   about 250,000 gas
+
+  Every write is simulated first, so you see the real fee
+  before you confirm.
+
+=== gas @ 80 columns (NO_COLOR) ===
+  ▍ Network fees  mainnet
+  ────────────────────────────────────────────
+
+  Gas price           44,648.01 gwei
+  Send QUAI           1.7412 QUAI   about 39,000 gas
+  Trade or tool call  11.162 QUAI   about 250,000 gas
+
+  Every write is simulated first, so you see the real fee before you confirm.
+
+=== gas @ 120 columns (NO_COLOR) ===
+  ▍ Network fees  mainnet
+  ────────────────────────────────────────────
+
+  Gas price           44,648.01 gwei
+  Send QUAI           1.7412 QUAI   about 39,000 gas
+  Trade or tool call  11.162 QUAI   about 250,000 gas
+
+  Every write is simulated first, so you see the real fee before you confirm.

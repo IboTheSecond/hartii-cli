@@ -9,6 +9,7 @@ import { assertCyprus1QuaiAddress } from './address.js';
 import { createProvider } from './signer.js';
 import { assertMarketNetwork } from './marketApi.js';
 import { assertToolsNetwork } from './biomeAddresses.js';
+import { unlockLocalData } from './localData.js';
 import { runWrite, WriteError, PreBroadcastError, BroadcastError, transactionIntentDigest } from './writePipeline.js';
 
 export async function withProviderCleanup(deps, operation) {
@@ -27,7 +28,7 @@ export function readRuntime(opts = {}, deps = {}) {
   for (const k of ['perTxQuai', 'dailyQuai']) {
     if (deps.limits?.[k] !== undefined) {
       const parse = (s) => { if (!/^\d+(\.\d{1,18})?$/.test(String(s))) throw new WalletError('Invalid spending limit'); const [a,b='']=String(s).split('.'); return BigInt(a)*10n**18n+BigInt(b.padEnd(18,'0')); };
-      if (parse(deps.limits[k]) < parse(limits[k])) limits[k] = String(deps.limits[k]);
+      if (limits[k] === undefined || parse(deps.limits[k]) < parse(limits[k])) limits[k] = String(deps.limits[k]);
     }
   }
   return { home, cfg, net, limits };
@@ -59,6 +60,19 @@ export async function writeRuntime(opts = {}, deps = {}) {
   const { name, address, envWallet } = resolveSender(runtime.home, opts, deps);
   const from = assertCyprus1QuaiAddress(address);
   let signer;
+  // One password per command: the same answer unlocks the encrypted local data and decrypts the keystore for signing.
+  let passwordPromise, verifiedAccount;
+  const getPassword = () => (passwordPromise ??= resolvePassword({ ...deps.passwordDeps, label: `Password for wallet "${name}": ` }).catch((e) => { passwordPromise = undefined; throw e; }));
+  let unlockPromise;
+  // Called by the write pipeline right before it first touches the spend ledger / paid list. A dry run never creates the
+  // vault; a real run creates it the first time (sealing the existing plain files). --key-env senders use HARTII_PASSWORD only.
+  const unlockData = () => (unlockPromise ??= (async () => {
+    if (envWallet) {
+      const env = deps.env || deps.io?.env || process.env;
+      return unlockLocalData({ home: runtime.home, wallet: opts.wallet, create: false, getPassword: async () => { if (!env.HARTII_PASSWORD) throw new WalletError('Your local data is encrypted. Set HARTII_PASSWORD to the wallet password to use --key-env.'); return env.HARTII_PASSWORD; } });
+    }
+    return unlockLocalData({ home: runtime.home, wallet: name, create: !opts.dryRun, getPassword, onAccount: (a) => { verifiedAccount = a; } });
+  })().catch((e) => { unlockPromise = undefined; throw e; }));
   async function prepareSigner() {
     if (opts.dryRun) { const error = new WalletError('A dry run cannot unlock or sign.'); error.notSubmitted = true; throw error; }
     try {
@@ -66,8 +80,7 @@ export async function writeRuntime(opts = {}, deps = {}) {
         let privateKey;
         if (envWallet) privateKey = envWallet.privateKey;
         else {
-          const password = await resolvePassword({ ...deps.passwordDeps, label: `Password for wallet "${name}": ` });
-          const account = await decryptAccount(readKeystoreFile(runtime.home, name), password);
+          const account = verifiedAccount || await decryptAccount(readKeystoreFile(runtime.home, name), await getPassword());
           if (assertCyprus1QuaiAddress(account.address) !== from) throw new WalletError('Keystore address mismatch.');
           privateKey = account.privateKey;
         }
@@ -148,7 +161,7 @@ export async function writeRuntime(opts = {}, deps = {}) {
       } catch (error) { throw new BroadcastError(error, signedHash, signed); }
     },
   };
-  return { ...runtime, provider, from, wallet, json: opts.json, yes: opts.yes, dryRun: opts.dryRun, io: deps.io };
+  return { ...runtime, provider, from, wallet, unlockData, json: opts.json, yes: opts.yes, dryRun: opts.dryRun, newRecipientOk: opts.newRecipientOk === true, io: deps.io };
 }
 
 /** writeRuntime for the mainnet-only market commands (buy/sell/swap); `deps` comes back pinned to the resolved network. */
@@ -175,7 +188,7 @@ export function managedExitSpend(ctx, details) {
 
 /** runWrite with the runtime's wallet/provider/limits/flags; a WriteError is rethrown as `ErrorClass` (message prefixed) when given. */
 export function writeVia(ctx, params, ErrorClass, prefix) {
-  const run = () => runWrite({ wallet: ctx.wallet, provider: ctx.provider, network: ctx.net, home: ctx.home, limits: ctx.limits, json: ctx.json, yes: ctx.yes, dryRun: ctx.dryRun, io: ctx.io, ...params });
+  const run = () => runWrite({ wallet: ctx.wallet, provider: ctx.provider, network: ctx.net, home: ctx.home, limits: ctx.limits, json: ctx.json, yes: ctx.yes, dryRun: ctx.dryRun, newRecipientOk: ctx.newRecipientOk, unlockData: ctx.unlockData, io: ctx.io, ...params });
   return ErrorClass ? run().catch(error => {
     if (!(error instanceof WriteError)) throw error;
     // Preserve only public transaction outcome fields, so callers can inspect an ambiguous send.

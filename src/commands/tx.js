@@ -1,4 +1,4 @@
-import { redactUrls } from '../output.js';
+import { redactUrls, tagView } from '../output.js';
 import { withProviderCleanup } from '../commandContext.js';
 // packages/hartii-cli/src/commands/tx.js
 //
@@ -12,6 +12,7 @@ import { readRuntime } from '../commandContext.js';
 import { CliError } from '../errors.js';
 import { listSpendReservations, inspectSpendLock } from '../spendingGuard.js';
 import { getHartiiHome } from '../config.js';
+import { tryUnlockForRead } from '../localData.js';
 
 export class TxError extends CliError {}
 
@@ -24,6 +25,7 @@ const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
 async function runTxCore(opts = {}, deps = {}) {
   if(opts.hash==='pending'){
     const home=opts.home||getHartiiHome();
+    if(!(await tryUnlockForRead(home,{wallet:opts.wallet,passwordDeps:deps.passwordDeps})))return {readOnly:true,locked:true,pending:[],count:null,note:'Local spending records are locked. Run it in a terminal and enter the wallet password to see pending reservations.'};
     const pending=listSpendReservations(home);
     return {readOnly:true,pending,count:pending.length,lock:inspectSpendLock(home),note:pending.length?'These local reservations are unresolved; they do not prove a transaction is still pending on chain. Inspect each hash with hartii tx <hash>. Never delete reservations or retry a send without verified receipt and nonce reconciliation.':'No unresolved reservations in this profile.'};
   }
@@ -74,4 +76,4 @@ async function runTxCore(opts = {}, deps = {}) {
   };
 }
 
-export function runTx(opts = {}, deps = {}) { return withProviderCleanup(deps, (runtimeDeps) => runTxCore(opts, runtimeDeps)); }
+export function runTx(opts = {}, deps = {}) { return withProviderCleanup(deps, async (runtimeDeps) => { const result = await runTxCore(opts, runtimeDeps); return Array.isArray(result.pending) ? result : tagView(result, 'tx'); }); }

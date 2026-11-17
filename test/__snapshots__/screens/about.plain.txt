@@ -1,0 +1,36 @@
+=== about @ 60 columns (NO_COLOR) ===
+  ▍ Hartii CLI  0.6.1  BETA
+  ────────────────────────────────────────────
+
+  Node      24.15.0
+  Home      /nonexistent-hartii-home
+  Website   https://hartiilabs.com/cli
+  Docs      https://docs.hartiilabs.com
+  Download
+    https://hartiilabs.com/downloads/hartii-cli.tgz
+
+  BETA software: start with small amounts.
+
+=== about @ 80 columns (NO_COLOR) ===
+  ▍ Hartii CLI  0.6.1  BETA
+  ────────────────────────────────────────────
+
+  Node      24.15.0
+  Home      /nonexistent-hartii-home
+  Website   https://hartiilabs.com/cli
+  Docs      https://docs.hartiilabs.com
+  Download  https://hartiilabs.com/downloads/hartii-cli.tgz
+
+  BETA software: start with small amounts.
+
+=== about @ 120 columns (NO_COLOR) ===
+  ▍ Hartii CLI  0.6.1  BETA
+  ────────────────────────────────────────────
+
+  Node      24.15.0
+  Home      /nonexistent-hartii-home
+  Website   https://hartiilabs.com/cli
+  Docs      https://docs.hartiilabs.com
+  Download  https://hartiilabs.com/downloads/hartii-cli.tgz
+
+  BETA software: start with small amounts.

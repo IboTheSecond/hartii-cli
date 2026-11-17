@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hartii CLI: guided setup and home (fixtures)</title>
+<style>
+:root{color-scheme:dark}body{margin:0;padding:24px 16px;background:#0D0D0E;color:#F2F1F4;font:14px/1.3 system-ui,sans-serif}
+h1{font-size:18px;margin:0 0 16px}h2{font-size:13px;color:#9B98A3;margin:24px 0 6px;font-weight:600}
+pre{margin:0;padding:12px;background:#0D0D0E;border:1px solid #2a2a2e;border-radius:6px;overflow:auto;font:14px/1.2 "Cascadia Mono","SF Mono",Menlo,Consolas,monospace;letter-spacing:0}
+</style></head><body><h1>Hartii CLI: guided setup and home (fixtures)</h1>
+<section><h2>home-80</h2><pre> <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>                                        <span style="color:rgb(242,241,244)">mainnet · cyprus-1</span>  <span style="color:rgb(255,176,32)">DEMO</span> 
+ <span style="color:rgb(155,152,163)">demo  0x000000…000d01</span>          <span style="color:rgb(155,152,163)">▂▂</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(34,197,94)">▃</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(155,152,163)">▃</span><span style="color:rgb(34,197,94)">▂▂</span><span style="color:rgb(155,152,163)">▂</span><span style="color:rgb(34,197,94)">▃</span><span style="color:rgb(155,152,163)">▅</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(155,152,163)">▃▃</span><span style="color:rgb(34,197,94)">▂</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(34,197,94)">▂▄</span><span style="color:rgb(155,152,163)">▃█▅▃</span><span style="color:rgb(34,197,94)">▂</span><span style="color:rgb(102,99,109)">··</span><span style="color:rgb(34,197,94)">▃▆▆</span><span style="color:rgb(155,152,163)">▄</span><span style="color:rgb(34,197,94)">▁▁</span><span style="color:rgb(102,99,109)">·</span> <span style="color:rgb(242,241,244);font-weight:700">#10,412,877 1s</span> 
+<span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────────────</span>
+ <span style="color:rgb(155,152,163)">BALANCE</span>                                            <span style="color:rgb(155,152,163)">≈ 1,435.56 QUAI with tokens</span> 
+ <span style="color:rgb(242,241,244);font-weight:700">▄█</span>     <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">█</span> <span style="color:rgb(242,241,244);font-weight:700">█</span>   <span style="color:rgb(242,241,244);font-weight:700">█▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">█▀▀</span>                                                   
+  <span style="color:rgb(242,241,244);font-weight:700">█</span>   <span style="color:rgb(242,241,244);font-weight:700">▄</span> <span style="color:rgb(242,241,244);font-weight:700">█▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span>   <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">█▀█</span>                                                   
+ <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀</span>  <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span>   <span style="color:rgb(242,241,244);font-weight:700">▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span>  <span style="color:rgb(167,139,250)">QUAI</span>                                             
+                                                                                
+ <span style="color:rgb(167,139,250);font-weight:700">╭──────────────────────────╮</span>  <span style="color:rgb(102,99,109)">╭──────────────────────────╮</span>                     
+ <span style="color:rgb(167,139,250);font-weight:700">│</span><span style="color:rgb(242,241,244);background:rgb(124,58,237);font-weight:700"> › ↓ Receive              </span><span style="color:rgb(167,139,250);font-weight:700">│</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(242,241,244)">  ↑ Send</span>                 <span style="color:rgb(102,99,109)">│</span>                     
+ <span style="color:rgb(167,139,250);font-weight:700">╰──────────────────────────╯</span>  <span style="color:rgb(102,99,109)">╰──────────────────────────╯</span>                     
+                                                                                
+ <span style="color:rgb(155,152,163)">Trade </span> <span style="color:rgb(242,241,244)"> Buy </span> <span style="color:rgb(242,241,244)"> Sell </span> <span style="color:rgb(242,241,244)"> Swap </span>                        <span style="color:rgb(155,152,163)">      </span> <span style="color:rgb(242,241,244)"> Wallets </span> <span style="color:rgb(242,241,244)"> Settings </span>  
+ <span style="color:rgb(155,152,163)">Tools </span> <span style="color:rgb(242,241,244)"> Airdrop </span> <span style="color:rgb(242,241,244)"> OTC </span> <span style="color:rgb(242,241,244)"> Claim </span> <span style="color:rgb(242,241,244)"> Wall </span>                                          
+                                                                                
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">BALANCES</span>  <span style="color:rgb(102,99,109)">──────────</span><span style="color:rgb(155,152,163)"> ≈ 1,435.56 QUAI</span> <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">WATCHLIST</span>  <span style="color:rgb(102,99,109)">─────────────────</span><span style="color:rgb(155,152,163)"> 3 tokens</span> 
+  <span style="color:rgb(242,241,244);font-weight:700">QUAI  </span>                     <span style="color:rgb(242,241,244);font-weight:700">1,234.56</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">DEMO  </span>            <span style="color:rgb(242,241,244)">0.0000186</span> <span style="color:rgb(34,197,94)">▲ +12.4%</span>  
+  <span style="color:rgb(242,241,244)">DEMO  </span>         <span style="color:rgb(242,241,244)">50,000</span>         <span style="color:rgb(155,152,163)">≈ 105</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">HRTI  </span>             <span style="color:rgb(242,241,244)">0.000091</span>  <span style="color:rgb(155,152,163)">▼ -3.2%</span>  
+  <span style="color:rgb(242,241,244)">HRTI  </span>         <span style="color:rgb(242,241,244)">12,000</span>          <span style="color:rgb(155,152,163)">≈ 96</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">CAMEL </span>         <span style="color:rgb(242,241,244)">0.0000000043</span> <span style="color:rgb(34,197,94)">▲ +41.8%</span>  
+                                                                                
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">LIVE TRADES</span>  <span style="color:rgb(102,99,109)">───────────────────────────────────────</span><span style="color:rgb(155,152,163)"> per block · newest first</span> 
+  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,877 </span><span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────</span>  
+  <span style="color:rgb(155,152,163)">12:00:00</span>  <span style="color:rgb(155,152,163)">▼ SELL</span> <span style="color:rgb(242,241,244)">BLOCK  </span>     <span style="color:rgb(242,241,244);font-weight:700">40.8 QUAI</span>   <span style="color:rgb(155,152,163)">122.4K BLOCK</span>  <span style="color:rgb(155,152,163)">0x0000…0d11</span>            
+ <span style="color:rgb(102,99,109)">Tab pane · ←→ action · Enter open</span>                       <span style="color:rgb(102,99,109)">? help · q quit   </span><span style="color:rgb(255,176,32)">DEMO</span> 
+</pre></section>
+<section><h2>setup-welcome-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(167,139,250);font-weight:700">● Start</span>   <span style="color:rgb(102,99,109)">○ Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Welcome to Hartii</span>                                                           
+                                                                                
+    <span style="color:rgb(242,241,244)">Let us set up your wallet. It takes about two minutes and nothing leaves</span>    
+    <span style="color:rgb(242,241,244)">this computer.</span>                                                              
+    <span style="color:rgb(155,152,163)">Hartii CLI is BETA. Start with small amounts.</span>                               
+                                                                                
+    <span style="color:rgb(242,241,244);font-weight:700">› 1  Create a new wallet</span>                                                    
+    <span style="color:rgb(242,241,244)">  2  I already have a wallet (import it)</span>                                    
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">↑↓ choose · Enter continue · Esc quit</span>                                       
+</pre></section>
+<section><h2>setup-import-kind-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(167,139,250);font-weight:700">● Start</span>   <span style="color:rgb(102,99,109)">○ Password</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                   
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">What do you want to import?</span>                                                 
+                                                                                
+    <span style="color:rgb(242,241,244);font-weight:700">› 1  A recovery phrase (12 or 24 words)</span>                                     
+    <span style="color:rgb(242,241,244)">  2  A private key</span>                                                          
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">↑↓ choose · Enter continue · Esc back</span>                                       
+</pre></section>
+<section><h2>setup-import-secret-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(167,139,250);font-weight:700">● Start</span>   <span style="color:rgb(102,99,109)">○ Password</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                   
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Paste your recovery phrase</span>                                                  
+                                                                                
+    <span style="color:rgb(155,152,163)">It stays hidden as you type and is never shown or saved anywhere in</span>         
+    <span style="color:rgb(155,152,163)">plain text.</span>                                                                 
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Recovery phrase</span>                                            <span style="color:rgb(102,99,109)">71 characters</span>    
+    <span style="color:rgb(242,241,244);font-weight:700">› ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••</span><span style="color:rgb(167,139,250);font-weight:700">▏</span>       
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">Enter continue · Esc back</span>                                                   
+</pre></section>
+<section><h2>setup-password-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(167,139,250);font-weight:700">● Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Choose a password</span>                                                           
+                                                                                
+    <span style="color:rgb(155,152,163)">It locks this wallet on this computer. Use at least 12 characters. If</span>       
+    <span style="color:rgb(155,152,163)">you forget it, only your recovery phrase can restore the wallet.</span>            
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Password</span>                                                   <span style="color:rgb(102,99,109)">21 characters</span>    
+    <span style="color:rgb(242,241,244);font-weight:700">› •••••••••••••••••••••</span><span style="color:rgb(167,139,250);font-weight:700">▏</span>                                                    
+                                                                                
+    <span style="color:rgb(34,197,94)">████  strong</span>                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">Enter continue · Esc back</span>                                                   
+</pre></section>
+<section><h2>setup-confirm-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(167,139,250);font-weight:700">● Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Type the password again</span>                                                     
+                                                                                
+    <span style="color:rgb(155,152,163)">Same password, once more, to be sure.</span>                                       
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Confirm password</span>                                           <span style="color:rgb(102,99,109)">13 characters</span>    
+    <span style="color:rgb(242,241,244);font-weight:700">› •••••••••••••</span><span style="color:rgb(167,139,250);font-weight:700">▏</span>                                                            
+                                                                                
+    <span style="color:rgb(240,70,92);font-weight:700">✕ The two passwords do not match. Try again.</span>                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">Enter create wallet · Esc back</span>                                              
+</pre></section>
+<section><h2>setup-creating-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(167,139,250);font-weight:700">● Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Creating your wallet…</span>                                                       
+                                                                                
+    <span style="color:rgb(242,241,244)">⠋ Locking it with your password. This takes a few seconds.</span>                  
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+</pre></section>
+<section><h2>setup-phrase-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(167,139,250);font-weight:700">● Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Your recovery phrase</span>                                                        
+    <span style="color:rgb(242,241,244)">These words are the only way to get your wallet back. Write them on</span>         
+    <span style="color:rgb(242,241,244)">paper, in order. Never type them anywhere else, and nobody from Hartii</span>      
+    <span style="color:rgb(242,241,244)">will ever ask for them.</span>                                                     
+                                                                                
+    <span style="color:rgb(242,241,244);font-weight:700">1   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">5   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">9   abandon</span>                 
+    <span style="color:rgb(242,241,244);font-weight:700">2   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">6   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">10  abandon</span>                 
+    <span style="color:rgb(242,241,244);font-weight:700">3   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">7   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">11  abandon</span>                 
+    <span style="color:rgb(242,241,244);font-weight:700">4   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">8   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">12  about</span>                   
+                                                                                
+    <span style="color:rgb(255,176,32)">Shown once. It is not saved, logged or copied anywhere.</span>                     
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">Enter: I wrote them down</span>                                                    
+</pre></section>
+<section><h2>setup-verify-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(167,139,250);font-weight:700">● Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Check your backup</span>                                                           
+                                                                                
+    <span style="color:rgb(242,241,244)">Type words #3, #7 and #11 from the list you wrote down.</span>                     
+                                                                                
+    <span style="color:rgb(155,152,163)">Word #3</span>     <span style="color:rgb(242,241,244)">  abandon</span>                                                       
+    <span style="color:rgb(167,139,250);font-weight:700">Word #7</span>     <span style="color:rgb(242,241,244);font-weight:700">› ▏</span>                                                             
+    <span style="color:rgb(155,152,163)">Word #11</span>    <span style="color:rgb(242,241,244)">  </span>                                                              
+                                                                                
+    <span style="color:rgb(242,241,244)">  Check my words</span>                                                            
+    <span style="color:rgb(242,241,244)">  Show the phrase again</span>                                                     
+    <span style="color:rgb(155,152,163)">  Back up later</span>                                                             
+                                                                                
+    <span style="color:rgb(240,70,92);font-weight:700">✕ None of the words match. Check your notes, or show the phrase again.</span>      
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">↑↓ move · Enter next · type the words in lower case</span>                         
+</pre></section>
+<section><h2>setup-caps-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(34,197,94)">✓ Backup</span>   <span style="color:rgb(167,139,250);font-weight:700">● Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Set a safety limit?  (recommended)</span>                                          
+                                                                                
+    <span style="color:rgb(155,152,163)">A cap stops one send, or one day of sends, from moving more QUAI than</span>       
+    <span style="color:rgb(155,152,163)">you chose. You can change it any time in Settings.</span>                          
+                                                                                
+    <span style="color:rgb(242,241,244);font-weight:700">› 1  Conservative</span>     <span style="color:rgb(155,152,163)">10 QUAI per send, 50 per day</span>                          
+    <span style="color:rgb(242,241,244)">  2  Normal</span>           <span style="color:rgb(155,152,163)">50 QUAI per send, 250 per day</span>                         
+    <span style="color:rgb(242,241,244)">  3  Degen</span>            <span style="color:rgb(155,152,163)">250 QUAI per send, 1000 per day</span>                       
+    <span style="color:rgb(242,241,244)">  4  Custom amounts</span>                                                         
+    <span style="color:rgb(242,241,244)">  5  Skip for now</span>                                                           
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">↑↓ choose · Enter confirm · Esc skip</span>                                        
+</pre></section>
+<section><h2>setup-caps-custom-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(34,197,94)">✓ Backup</span>   <span style="color:rgb(167,139,250);font-weight:700">● Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Set a safety limit?  (recommended)</span>                                          
+                                                                                
+    <span style="color:rgb(155,152,163)">A cap stops one send, or one day of sends, from moving more QUAI than</span>       
+    <span style="color:rgb(155,152,163)">you chose. You can change it any time in Settings.</span>                          
+                                                                                
+    <span style="color:rgb(167,139,250);font-weight:700">Most per send (QUAI)</span>                                                        
+    <span style="color:rgb(242,241,244);font-weight:700">› 5</span><span style="color:rgb(167,139,250);font-weight:700">▏</span>                                                                        
+                                                                                
+    <span style="color:rgb(155,152,163)">Most per day (QUAI)</span>                                                         
+    <span style="color:rgb(242,241,244)">  20</span>                                                                        
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">Enter next · Esc back</span>                                                       
+</pre></section>
+<section><h2>setup-receive-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(34,197,94)">✓ Backup</span>   <span style="color:rgb(34,197,94)">✓ Safety</span>   <span style="color:rgb(167,139,250);font-weight:700">● Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>   <span style="color:rgb(167,139,250);font-weight:700">Add funds</span>                           
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █▀▀▀▀▀█  ▄  ▀▄▀▄ ▀▄▀  █▀▀▀▀▀█    </span>   <span style="color:rgb(155,152,163)">Your address</span>                        
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ███ █ █▄ █▄▄▀▄▄▄▄▄▄ █ ███ █    </span>   <span style="color:rgb(242,241,244);font-weight:700">0x 0012 3456 7890 1234 5678</span>         
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀▀▀ █ █ ▀█  █▄▄ ▄▀▄ █ ▀▀▀ █    </span>   <span style="color:rgb(242,241,244);font-weight:700">9012 3456 7890 1234 5678</span>            
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀▀▀▀▀▀▀ █▄▀▄▀ ▀▄▀ █▄█ ▀▀▀▀▀▀▀    </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀ ▀▀█▀▀▄▄▄▄▀█▀▄▀▀▀▀▄▀ █▀█▀▀ ▄    </span>   <span style="color:rgb(155,152,163)">Send some QUAI here from an</span>         
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀  ▀█▀▀ ██▄█▄ ██  ▀▄▄▀▀ ▀  █     </span>   <span style="color:rgb(155,152,163)">exchange or another wallet. Only</span>    
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">     █ ▀▀█▀█▀▀▀▄▀▀▄▀▀▀▀▄▀▀▄▀▄▀▀▀▄    </span>   <span style="color:rgb(155,152,163)">the Quai network, Cyprus-1 zone.</span>    
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▄ ▀██▄▀▄▄▀█▀ ▀▀█▀▀█ ██ █▄▀ █     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▄  ▀ ▄▀ ▀ ▄▀▀▀▄ ▀▀▀▄▀▀▄▀▄▀▀▀█    </span>   <span style="color:rgb(167,139,250)">· Waiting for funds…</span>                
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀ ▀▄▀▀█ ▄ ▀▀██ ▀▀ ▄▀ ▄▄ ▀▄     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀ ▀ ▀ ▀ ▄▄▄ ██▄ ▀▀▀▄█▀▀▀█▀▀▀▄    </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █▀▀▀▀▀█ ▄▄▀██  ▀█ ▄▀█ ▀ █▀▀█▄    </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ███ █ █  █▄▄ ▀▀▀▀▄██▀█▀█▀██    </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀▀▀ █ ▀▄▀ ▄▄ ▀▄  ▄▄▄▀▄█  █     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀▀▀▀▀▀▀ ▀ ▀  ▀ ▀▀▀▀  ▀▀▀▀▀▀      </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                       
+                                                                                
+    <span style="color:rgb(102,99,109)">C copy address · Enter skip for now</span>                                         
+</pre></section>
+<section><h2>setup-received-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(34,197,94)">✓ Backup</span>   <span style="color:rgb(34,197,94)">✓ Safety</span>   <span style="color:rgb(167,139,250);font-weight:700">● Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>   <span style="color:rgb(167,139,250);font-weight:700">Funds arrived</span>                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █▀▀▀▀▀█  ▄  ▀▄▀▄ ▀▄▀  █▀▀▀▀▀█    </span>   <span style="color:rgb(155,152,163)">Your address</span>                        
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ███ █ █▄ █▄▄▀▄▄▄▄▄▄ █ ███ █    </span>   <span style="color:rgb(242,241,244);font-weight:700">0x 0012 3456 7890 1234 5678</span>         
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀▀▀ █ █ ▀█  █▄▄ ▄▀▄ █ ▀▀▀ █    </span>   <span style="color:rgb(242,241,244);font-weight:700">9012 3456 7890 1234 5678</span>            
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀▀▀▀▀▀▀ █▄▀▄▀ ▀▄▀ █▄█ ▀▀▀▀▀▀▀    </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀ ▀▀█▀▀▄▄▄▄▀█▀▄▀▀▀▀▄▀ █▀█▀▀ ▄    </span>   <span style="color:rgb(155,152,163)">Send some QUAI here from an</span>         
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀  ▀█▀▀ ██▄█▄ ██  ▀▄▄▀▀ ▀  █     </span>   <span style="color:rgb(155,152,163)">exchange or another wallet. Only</span>    
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">     █ ▀▀█▀█▀▀▀▄▀▀▄▀▀▀▀▄▀▀▄▀▄▀▀▀▄    </span>   <span style="color:rgb(155,152,163)">the Quai network, Cyprus-1 zone.</span>    
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▄ ▀██▄▀▄▄▀█▀ ▀▀█▀▀█ ██ █▄▀ █     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▄  ▀ ▄▀ ▀ ▄▀▀▀▄ ▀▀▀▄▀▀▄▀▄▀▀▀█    </span>   <span style="color:rgb(34,197,94)">✓ Received 5 QUAI</span>                   
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀ ▀▄▀▀█ ▄ ▀▀██ ▀▀ ▄▀ ▄▄ ▀▄     </span>   <span style="color:rgb(155,152,163)">Taking you to your wallet…</span>          
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀ ▀ ▀ ▀ ▄▄▄ ██▄ ▀▀▀▄█▀▀▀█▀▀▀▄    </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █▀▀▀▀▀█ ▄▄▀██  ▀█ ▄▀█ ▀ █▀▀█▄    </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ███ █ █  █▄▄ ▀▀▀▀▄██▀█▀█▀██    </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀▀▀ █ ▀▄▀ ▄▄ ▀▄  ▄▄▄▀▄█  █     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀▀▀▀▀▀▀ ▀ ▀  ▀ ▀▀▀▀  ▀▀▀▀▀▀      </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                       
+    <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                       
+                                                                                
+    <span style="color:rgb(102,99,109)">Enter continue</span>                                                              
+</pre></section>
+<section><h2>setup-error-80</h2><pre>    <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>  <span style="color:rgb(155,152,163)">Set up your wallet</span>                                          
+    <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(167,139,250);font-weight:700">● Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                        
+    <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>    
+                                                                                
+    <span style="color:rgb(240,70,92);font-weight:700">Something went wrong</span>                                                        
+                                                                                
+    <span style="color:rgb(242,241,244)">Could not write the wallet file. Nothing was saved.</span>                         
+    <span style="color:rgb(155,152,163)">Nothing was sent anywhere.</span>                                                  
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    <span style="color:rgb(102,99,109)">Enter try again · Esc quit</span>                                                  
+</pre></section>
+<section><h2>home-120</h2><pre>   <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span>  <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                         <span style="color:rgb(242,241,244);font-weight:700">▄█</span>  <span style="color:rgb(242,241,244);font-weight:700">█▀█</span>    <span style="color:rgb(242,241,244);font-weight:700">█</span> <span style="color:rgb(242,241,244);font-weight:700">█</span> <span style="color:rgb(242,241,244);font-weight:700">▄█</span>  <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span>    <span style="color:rgb(242,241,244);font-weight:700">█▀█</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span>  
+  <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">mainnet · cyprus-1</span>   <span style="color:rgb(255,176,32)">DEMO</span>                            <span style="color:rgb(155,152,163)">BLOCK</span>   <span style="color:rgb(242,241,244);font-weight:700">█</span>  <span style="color:rgb(242,241,244);font-weight:700">█</span> <span style="color:rgb(242,241,244);font-weight:700">█</span>  <span style="color:rgb(242,241,244);font-weight:700">▄</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span>  <span style="color:rgb(242,241,244);font-weight:700">█</span>  <span style="color:rgb(242,241,244);font-weight:700">█▀▀</span>  <span style="color:rgb(242,241,244);font-weight:700">▄</span> <span style="color:rgb(242,241,244);font-weight:700">█▀█</span>  <span style="color:rgb(242,241,244);font-weight:700">█</span>   <span style="color:rgb(242,241,244);font-weight:700">█</span>   
+  <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>      <span style="color:rgb(155,152,163)">demo  0x000000…000d01</span>                               <span style="color:rgb(102,99,109)">1s ago</span>  <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀</span>    <span style="color:rgb(242,241,244);font-weight:700">▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀</span>  <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span>  <span style="color:rgb(242,241,244);font-weight:700">▀</span>   <span style="color:rgb(242,241,244);font-weight:700">▀</span>   
+  <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>     <span style="color:rgb(102,99,109)">terminal wallet for Quai</span>                          <span style="color:rgb(102,99,109)">last 32 blocks</span> <span style="color:rgb(155,152,163)">▂▂</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(34,197,94)">▃</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(155,152,163)">▃</span><span style="color:rgb(34,197,94)">▂▂</span><span style="color:rgb(155,152,163)">▂</span><span style="color:rgb(34,197,94)">▃</span><span style="color:rgb(155,152,163)">▅</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(155,152,163)">▃▃</span><span style="color:rgb(34,197,94)">▂</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(34,197,94)">▂▄</span><span style="color:rgb(155,152,163)">▃█▅▃</span><span style="color:rgb(34,197,94)">▂</span><span style="color:rgb(102,99,109)">··</span><span style="color:rgb(34,197,94)">▃▆▆</span><span style="color:rgb(155,152,163)">▄</span><span style="color:rgb(34,197,94)">▁▁</span><span style="color:rgb(102,99,109)">·</span>  
+<span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────</span>
+                                                                                                                        
+ <span style="color:rgb(155,152,163)">BALANCE</span>                                                                                    <span style="color:rgb(155,152,163)">≈ 1,435.56 QUAI with tokens</span> 
+ <span style="color:rgb(242,241,244);font-weight:700">▄█</span>     <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">█</span> <span style="color:rgb(242,241,244);font-weight:700">█</span>   <span style="color:rgb(242,241,244);font-weight:700">█▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">█▀▀</span>                                                                                           
+  <span style="color:rgb(242,241,244);font-weight:700">█</span>   <span style="color:rgb(242,241,244);font-weight:700">▄</span> <span style="color:rgb(242,241,244);font-weight:700">█▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span>   <span style="color:rgb(242,241,244);font-weight:700">▀▀█</span> <span style="color:rgb(242,241,244);font-weight:700">█▀█</span>                                                                                           
+ <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀</span>  <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span>   <span style="color:rgb(242,241,244);font-weight:700">▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span> <span style="color:rgb(242,241,244);font-weight:700">▀▀▀</span>  <span style="color:rgb(167,139,250)">QUAI</span>                                                                                     
+                                                                                                                        
+ <span style="color:rgb(167,139,250);font-weight:700">╭──────────────────────────╮</span>  <span style="color:rgb(102,99,109)">╭──────────────────────────╮</span>                                                             
+ <span style="color:rgb(167,139,250);font-weight:700">│</span><span style="color:rgb(242,241,244);background:rgb(124,58,237);font-weight:700"> › ↓ Receive              </span><span style="color:rgb(167,139,250);font-weight:700">│</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(242,241,244)">  ↑ Send</span>                 <span style="color:rgb(102,99,109)">│</span>                                                             
+ <span style="color:rgb(167,139,250);font-weight:700">╰──────────────────────────╯</span>  <span style="color:rgb(102,99,109)">╰──────────────────────────╯</span>                                                             
+                                                                                                                        
+ <span style="color:rgb(155,152,163)">Trade </span> <span style="color:rgb(242,241,244)"> Buy </span> <span style="color:rgb(242,241,244)"> Sell </span> <span style="color:rgb(242,241,244)"> Swap </span>                                                                <span style="color:rgb(155,152,163)">      </span> <span style="color:rgb(242,241,244)"> Wallets </span> <span style="color:rgb(242,241,244)"> Settings </span>  
+ <span style="color:rgb(155,152,163)">Tools </span> <span style="color:rgb(242,241,244)"> Airdrop </span> <span style="color:rgb(242,241,244)"> OTC </span> <span style="color:rgb(242,241,244)"> Claim </span> <span style="color:rgb(242,241,244)"> Wall </span>                                                                                  
+                                                                                                                        
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">BALANCES</span>  <span style="color:rgb(102,99,109)">───────────────────</span><span style="color:rgb(155,152,163)"> ≈ 1,435.56 QUAI</span> <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">LIVE TRADES</span>  <span style="color:rgb(102,99,109)">──────────────────────────────</span><span style="color:rgb(155,152,163)"> per block · newest first</span> 
+  <span style="color:rgb(242,241,244);font-weight:700">QUAI  </span>                              <span style="color:rgb(242,241,244);font-weight:700">1,234.56</span>  <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,877 </span><span style="color:rgb(102,99,109)">───────────────────────────────────────────────</span>  
+  <span style="color:rgb(242,241,244)">DEMO  </span>                  <span style="color:rgb(242,241,244)">50,000</span>         <span style="color:rgb(155,152,163)">≈ 105</span>  <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">12:00:00</span>  <span style="color:rgb(155,152,163)">▼ SELL</span> <span style="color:rgb(242,241,244)">BLOCK  </span>     <span style="color:rgb(242,241,244);font-weight:700">40.8 QUAI</span>   <span style="color:rgb(155,152,163)">122.4K BLOCK</span>  <span style="color:rgb(155,152,163)">0x0000…0d11</span>   
+  <span style="color:rgb(242,241,244)">HRTI  </span>                  <span style="color:rgb(242,241,244)">12,000</span>          <span style="color:rgb(155,152,163)">≈ 96</span>  <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:57</span>  <span style="color:rgb(155,152,163)">▼ SELL</span> <span style="color:rgb(242,241,244)">DEMO   </span>      <span style="color:rgb(242,241,244);font-weight:700">3.3 QUAI</span>     <span style="color:rgb(155,152,163)">20.7K DEMO</span>  <span style="color:rgb(155,152,163)">0x0000…0d12</span>   
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,876 </span><span style="color:rgb(102,99,109)">───────────────────────────────────────────────</span>  
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:54</span>  <span style="color:rgb(34,197,94)">▲ BUY </span> <span style="color:rgb(242,241,244)">DEMO   </span>     <span style="color:rgb(242,241,244);font-weight:700">18.4 QUAI</span>    <span style="color:rgb(155,152,163)">193.0K DEMO</span>  <span style="color:rgb(155,152,163)">0x0000…0d13</span>   
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:50</span>  <span style="color:rgb(155,152,163)">▼ SELL</span> <span style="color:rgb(242,241,244)">BLOCK  </span>     <span style="color:rgb(242,241,244);font-weight:700">43.6 QUAI</span>   <span style="color:rgb(155,152,163)">153.7K BLOCK</span>  <span style="color:rgb(155,152,163)">0x0000…0d11</span>   
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,875 </span><span style="color:rgb(102,99,109)">───────────────────────────────────────────────</span>  
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:48</span>  <span style="color:rgb(34,197,94)">▲ BUY </span> <span style="color:rgb(242,241,244)">DEMO   </span>     <span style="color:rgb(242,241,244);font-weight:700">28.2 QUAI</span>    <span style="color:rgb(155,152,163)">132.1K DEMO</span>  <span style="color:rgb(155,152,163)">0x0000…0d12</span>   
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:45</span>  <span style="color:rgb(34,197,94)">▲ BUY </span> <span style="color:rgb(242,241,244)">HRTI   </span>     <span style="color:rgb(242,241,244);font-weight:700">10.2 QUAI</span>    <span style="color:rgb(155,152,163)">107.7K HRTI</span>  <span style="color:rgb(155,152,163)">0x0000…0d13</span>   
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">WATCHLIST</span>  <span style="color:rgb(102,99,109)">─────────────────────────</span><span style="color:rgb(155,152,163)"> 3 tokens</span> <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,874 </span><span style="color:rgb(102,99,109)">───────────────────────────────────────────────</span>  
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">DEMO  </span>                    <span style="color:rgb(242,241,244)">0.0000186</span> <span style="color:rgb(34,197,94)">▲ +12.4%</span>  <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:40</span>  <span style="color:rgb(34,197,94)">▲ BUY </span> <span style="color:rgb(242,241,244)">BLOCK  </span>      <span style="color:rgb(242,241,244);font-weight:700">2.1 QUAI</span>     <span style="color:rgb(155,152,163)">7.4K BLOCK</span>  <span style="color:rgb(155,152,163)">0x0000…0d11</span>   
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">HRTI  </span>                     <span style="color:rgb(242,241,244)">0.000091</span>  <span style="color:rgb(155,152,163)">▼ -3.2%</span>  <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:36</span>  <span style="color:rgb(155,152,163)">▼ SELL</span> <span style="color:rgb(242,241,244)">CAMEL  </span>      <span style="color:rgb(242,241,244);font-weight:700">3.3 QUAI</span>    <span style="color:rgb(155,152,163)">21.0K CAMEL</span>  <span style="color:rgb(155,152,163)">0x0000…0d12</span>   
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">CAMEL </span>                 <span style="color:rgb(242,241,244)">0.0000000043</span> <span style="color:rgb(34,197,94)">▲ +41.8%</span>  <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,873 </span><span style="color:rgb(102,99,109)">───────────────────────────────────────────────</span>  
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:31</span>  <span style="color:rgb(34,197,94)">▲ BUY </span> <span style="color:rgb(242,241,244)">HRTI   </span>     <span style="color:rgb(242,241,244);font-weight:700">47.2 QUAI</span>    <span style="color:rgb(155,152,163)">522.7K HRTI</span>  <span style="color:rgb(155,152,163)">0x0000…0d13</span>   
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:27</span>  <span style="color:rgb(34,197,94)">▲ BUY </span> <span style="color:rgb(242,241,244)">DEMO   </span>     <span style="color:rgb(242,241,244);font-weight:700">13.5 QUAI</span>    <span style="color:rgb(155,152,163)">110.5K DEMO</span>  <span style="color:rgb(155,152,163)">0x0000…0d11</span>   
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,872 </span><span style="color:rgb(102,99,109)">───────────────────────────────────────────────</span>  
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:23</span>  <span style="color:rgb(155,152,163)">▼ SELL</span> <span style="color:rgb(242,241,244)">DEMO   </span>     <span style="color:rgb(242,241,244);font-weight:700">41.3 QUAI</span>    <span style="color:rgb(155,152,163)">199.1K DEMO</span>  <span style="color:rgb(155,152,163)">0x0000…0d12</span>   
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:19</span>  <span style="color:rgb(34,197,94)">▲ BUY </span> <span style="color:rgb(242,241,244)">BLOCK  </span>     <span style="color:rgb(242,241,244);font-weight:700">43.7 QUAI</span>   <span style="color:rgb(155,152,163)">144.4K BLOCK</span>  <span style="color:rgb(155,152,163)">0x0000…0d13</span>   
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,871 </span><span style="color:rgb(102,99,109)">───────────────────────────────────────────────</span>  
+                                                <span style="color:rgb(102,99,109)">│</span>  <span style="color:rgb(155,152,163)">11:59:16</span>  <span style="color:rgb(34,197,94)">▲ BUY </span> <span style="color:rgb(242,241,244)">HRTI   </span>     <span style="color:rgb(242,241,244);font-weight:700">45.6 QUAI</span>    <span style="color:rgb(155,152,163)">160.5K HRTI</span>  <span style="color:rgb(155,152,163)">0x0000…0d11</span>   
+ <span style="color:rgb(102,99,109)">Tab pane · ←→ action · Enter open</span>                                                               <span style="color:rgb(102,99,109)">? help · q quit   </span><span style="color:rgb(255,176,32)">DEMO</span> 
+</pre></section>
+<section><h2>setup-welcome-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(167,139,250);font-weight:700">● Start</span>   <span style="color:rgb(102,99,109)">○ Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Welcome to Hartii</span>                                                                               
+                                                                                                                        
+                        <span style="color:rgb(242,241,244)">Let us set up your wallet. It takes about two minutes and nothing leaves</span>                        
+                        <span style="color:rgb(242,241,244)">this computer.</span>                                                                                  
+                        <span style="color:rgb(155,152,163)">Hartii CLI is BETA. Start with small amounts.</span>                                                   
+                                                                                                                        
+                        <span style="color:rgb(242,241,244);font-weight:700">› 1  Create a new wallet</span>                                                                        
+                        <span style="color:rgb(242,241,244)">  2  I already have a wallet (import it)</span>                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">↑↓ choose · Enter continue · Esc quit</span>                                                           
+</pre></section>
+<section><h2>setup-import-kind-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(167,139,250);font-weight:700">● Start</span>   <span style="color:rgb(102,99,109)">○ Password</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                                       
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">What do you want to import?</span>                                                                     
+                                                                                                                        
+                        <span style="color:rgb(242,241,244);font-weight:700">› 1  A recovery phrase (12 or 24 words)</span>                                                         
+                        <span style="color:rgb(242,241,244)">  2  A private key</span>                                                                              
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">↑↓ choose · Enter continue · Esc back</span>                                                           
+</pre></section>
+<section><h2>setup-import-secret-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(167,139,250);font-weight:700">● Start</span>   <span style="color:rgb(102,99,109)">○ Password</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                                       
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Paste your recovery phrase</span>                                                                      
+                                                                                                                        
+                        <span style="color:rgb(155,152,163)">It stays hidden as you type and is never shown or saved anywhere in</span>                             
+                        <span style="color:rgb(155,152,163)">plain text.</span>                                                                                     
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Recovery phrase</span>                                            <span style="color:rgb(102,99,109)">71 characters</span>                        
+                        <span style="color:rgb(242,241,244);font-weight:700">› ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••</span><span style="color:rgb(167,139,250);font-weight:700">▏</span>                           
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">Enter continue · Esc back</span>                                                                       
+</pre></section>
+<section><h2>setup-password-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(167,139,250);font-weight:700">● Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Choose a password</span>                                                                               
+                                                                                                                        
+                        <span style="color:rgb(155,152,163)">It locks this wallet on this computer. Use at least 12 characters. If</span>                           
+                        <span style="color:rgb(155,152,163)">you forget it, only your recovery phrase can restore the wallet.</span>                                
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Password</span>                                                   <span style="color:rgb(102,99,109)">21 characters</span>                        
+                        <span style="color:rgb(242,241,244);font-weight:700">› •••••••••••••••••••••</span><span style="color:rgb(167,139,250);font-weight:700">▏</span>                                                                        
+                                                                                                                        
+                        <span style="color:rgb(34,197,94)">████  strong</span>                                                                                    
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">Enter continue · Esc back</span>                                                                       
+</pre></section>
+<section><h2>setup-confirm-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(167,139,250);font-weight:700">● Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Type the password again</span>                                                                         
+                                                                                                                        
+                        <span style="color:rgb(155,152,163)">Same password, once more, to be sure.</span>                                                           
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Confirm password</span>                                           <span style="color:rgb(102,99,109)">13 characters</span>                        
+                        <span style="color:rgb(242,241,244);font-weight:700">› •••••••••••••</span><span style="color:rgb(167,139,250);font-weight:700">▏</span>                                                                                
+                                                                                                                        
+                        <span style="color:rgb(240,70,92);font-weight:700">✕ The two passwords do not match. Try again.</span>                                                    
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">Enter create wallet · Esc back</span>                                                                  
+</pre></section>
+<section><h2>setup-creating-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(167,139,250);font-weight:700">● Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Creating your wallet…</span>                                                                           
+                                                                                                                        
+                        <span style="color:rgb(242,241,244)">⠋ Locking it with your password. This takes a few seconds.</span>                                      
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+</pre></section>
+<section><h2>setup-phrase-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(167,139,250);font-weight:700">● Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Your recovery phrase</span>                                                                            
+                        <span style="color:rgb(242,241,244)">These words are the only way to get your wallet back. Write them on</span>                             
+                        <span style="color:rgb(242,241,244)">paper, in order. Never type them anywhere else, and nobody from Hartii</span>                          
+                        <span style="color:rgb(242,241,244)">will ever ask for them.</span>                                                                         
+                                                                                                                        
+                        <span style="color:rgb(242,241,244);font-weight:700">1   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">5   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">9   abandon</span>                                     
+                        <span style="color:rgb(242,241,244);font-weight:700">2   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">6   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">10  abandon</span>                                     
+                        <span style="color:rgb(242,241,244);font-weight:700">3   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">7   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">11  abandon</span>                                     
+                        <span style="color:rgb(242,241,244);font-weight:700">4   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">8   abandon</span>             <span style="color:rgb(242,241,244);font-weight:700">12  about</span>                                       
+                                                                                                                        
+                        <span style="color:rgb(255,176,32)">Shown once. It is not saved, logged or copied anywhere.</span>                                         
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">Enter: I wrote them down</span>                                                                        
+</pre></section>
+<section><h2>setup-verify-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(167,139,250);font-weight:700">● Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Check your backup</span>                                                                               
+                                                                                                                        
+                        <span style="color:rgb(242,241,244)">Type words #3, #7 and #11 from the list you wrote down.</span>                                         
+                                                                                                                        
+                        <span style="color:rgb(155,152,163)">Word #3</span>     <span style="color:rgb(242,241,244)">  abandon</span>                                                                           
+                        <span style="color:rgb(167,139,250);font-weight:700">Word #7</span>     <span style="color:rgb(242,241,244);font-weight:700">› ▏</span>                                                                                 
+                        <span style="color:rgb(155,152,163)">Word #11</span>    <span style="color:rgb(242,241,244)">  </span>                                                                                  
+                                                                                                                        
+                        <span style="color:rgb(242,241,244)">  Check my words</span>                                                                                
+                        <span style="color:rgb(242,241,244)">  Show the phrase again</span>                                                                         
+                        <span style="color:rgb(155,152,163)">  Back up later</span>                                                                                 
+                                                                                                                        
+                        <span style="color:rgb(240,70,92);font-weight:700">✕ None of the words match. Check your notes, or show the phrase again.</span>                          
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">↑↓ move · Enter next · type the words in lower case</span>                                             
+</pre></section>
+<section><h2>setup-caps-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(34,197,94)">✓ Backup</span>   <span style="color:rgb(167,139,250);font-weight:700">● Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Set a safety limit?  (recommended)</span>                                                              
+                                                                                                                        
+                        <span style="color:rgb(155,152,163)">A cap stops one send, or one day of sends, from moving more QUAI than</span>                           
+                        <span style="color:rgb(155,152,163)">you chose. You can change it any time in Settings.</span>                                              
+                                                                                                                        
+                        <span style="color:rgb(242,241,244);font-weight:700">› 1  Conservative</span>     <span style="color:rgb(155,152,163)">10 QUAI per send, 50 per day</span>                                              
+                        <span style="color:rgb(242,241,244)">  2  Normal</span>           <span style="color:rgb(155,152,163)">50 QUAI per send, 250 per day</span>                                             
+                        <span style="color:rgb(242,241,244)">  3  Degen</span>            <span style="color:rgb(155,152,163)">250 QUAI per send, 1000 per day</span>                                           
+                        <span style="color:rgb(242,241,244)">  4  Custom amounts</span>                                                                             
+                        <span style="color:rgb(242,241,244)">  5  Skip for now</span>                                                                               
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">↑↓ choose · Enter confirm · Esc skip</span>                                                            
+</pre></section>
+<section><h2>setup-caps-custom-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(34,197,94)">✓ Backup</span>   <span style="color:rgb(167,139,250);font-weight:700">● Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Set a safety limit?  (recommended)</span>                                                              
+                                                                                                                        
+                        <span style="color:rgb(155,152,163)">A cap stops one send, or one day of sends, from moving more QUAI than</span>                           
+                        <span style="color:rgb(155,152,163)">you chose. You can change it any time in Settings.</span>                                              
+                                                                                                                        
+                        <span style="color:rgb(167,139,250);font-weight:700">Most per send (QUAI)</span>                                                                            
+                        <span style="color:rgb(242,241,244);font-weight:700">› 5</span><span style="color:rgb(167,139,250);font-weight:700">▏</span>                                                                                            
+                                                                                                                        
+                        <span style="color:rgb(155,152,163)">Most per day (QUAI)</span>                                                                             
+                        <span style="color:rgb(242,241,244)">  20</span>                                                                                            
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">Enter next · Esc back</span>                                                                           
+</pre></section>
+<section><h2>setup-receive-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(34,197,94)">✓ Backup</span>   <span style="color:rgb(34,197,94)">✓ Safety</span>   <span style="color:rgb(167,139,250);font-weight:700">● Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>   <span style="color:rgb(167,139,250);font-weight:700">Add funds</span>                                               
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █▀▀▀▀▀█  ▄  ▀▄▀▄ ▀▄▀  █▀▀▀▀▀█    </span>   <span style="color:rgb(155,152,163)">Your address</span>                                            
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ███ █ █▄ █▄▄▀▄▄▄▄▄▄ █ ███ █    </span>   <span style="color:rgb(242,241,244);font-weight:700">0x 0012 3456 7890 1234 5678</span>                             
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀▀▀ █ █ ▀█  █▄▄ ▄▀▄ █ ▀▀▀ █    </span>   <span style="color:rgb(242,241,244);font-weight:700">9012 3456 7890 1234 5678</span>                                
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀▀▀▀▀▀▀ █▄▀▄▀ ▀▄▀ █▄█ ▀▀▀▀▀▀▀    </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀ ▀▀█▀▀▄▄▄▄▀█▀▄▀▀▀▀▄▀ █▀█▀▀ ▄    </span>   <span style="color:rgb(155,152,163)">Send some QUAI here from an</span>                             
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀  ▀█▀▀ ██▄█▄ ██  ▀▄▄▀▀ ▀  █     </span>   <span style="color:rgb(155,152,163)">exchange or another wallet. Only</span>                        
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">     █ ▀▀█▀█▀▀▀▄▀▀▄▀▀▀▀▄▀▀▄▀▄▀▀▀▄    </span>   <span style="color:rgb(155,152,163)">the Quai network, Cyprus-1 zone.</span>                        
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▄ ▀██▄▀▄▄▀█▀ ▀▀█▀▀█ ██ █▄▀ █     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▄  ▀ ▄▀ ▀ ▄▀▀▀▄ ▀▀▀▄▀▀▄▀▄▀▀▀█    </span>   <span style="color:rgb(167,139,250)">· Waiting for funds…</span>                                    
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀ ▀▄▀▀█ ▄ ▀▀██ ▀▀ ▄▀ ▄▄ ▀▄     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀ ▀ ▀ ▀ ▄▄▄ ██▄ ▀▀▀▄█▀▀▀█▀▀▀▄    </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █▀▀▀▀▀█ ▄▄▀██  ▀█ ▄▀█ ▀ █▀▀█▄    </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ███ █ █  █▄▄ ▀▀▀▀▄██▀█▀█▀██    </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀▀▀ █ ▀▄▀ ▄▄ ▀▄  ▄▄▄▀▄█  █     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀▀▀▀▀▀▀ ▀ ▀  ▀ ▀▀▀▀  ▀▀▀▀▀▀      </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                                           
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">C copy address · Enter skip for now</span>                                                             
+</pre></section>
+<section><h2>setup-received-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(34,197,94)">✓ Password</span>   <span style="color:rgb(34,197,94)">✓ Backup</span>   <span style="color:rgb(34,197,94)">✓ Safety</span>   <span style="color:rgb(167,139,250);font-weight:700">● Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>   <span style="color:rgb(167,139,250);font-weight:700">Funds arrived</span>                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █▀▀▀▀▀█  ▄  ▀▄▀▄ ▀▄▀  █▀▀▀▀▀█    </span>   <span style="color:rgb(155,152,163)">Your address</span>                                            
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ███ █ █▄ █▄▄▀▄▄▄▄▄▄ █ ███ █    </span>   <span style="color:rgb(242,241,244);font-weight:700">0x 0012 3456 7890 1234 5678</span>                             
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀▀▀ █ █ ▀█  █▄▄ ▄▀▄ █ ▀▀▀ █    </span>   <span style="color:rgb(242,241,244);font-weight:700">9012 3456 7890 1234 5678</span>                                
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀▀▀▀▀▀▀ █▄▀▄▀ ▀▄▀ █▄█ ▀▀▀▀▀▀▀    </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀ ▀▀█▀▀▄▄▄▄▀█▀▄▀▀▀▀▄▀ █▀█▀▀ ▄    </span>   <span style="color:rgb(155,152,163)">Send some QUAI here from an</span>                             
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀  ▀█▀▀ ██▄█▄ ██  ▀▄▄▀▀ ▀  █     </span>   <span style="color:rgb(155,152,163)">exchange or another wallet. Only</span>                        
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">     █ ▀▀█▀█▀▀▀▄▀▀▄▀▀▀▀▄▀▀▄▀▄▀▀▀▄    </span>   <span style="color:rgb(155,152,163)">the Quai network, Cyprus-1 zone.</span>                        
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▄ ▀██▄▀▄▄▀█▀ ▀▀█▀▀█ ██ █▄▀ █     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▄  ▀ ▄▀ ▀ ▄▀▀▀▄ ▀▀▀▄▀▀▄▀▄▀▀▀█    </span>   <span style="color:rgb(34,197,94)">✓ Received 5 QUAI</span>                                       
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀ ▀▄▀▀█ ▄ ▀▀██ ▀▀ ▄▀ ▄▄ ▀▄     </span>   <span style="color:rgb(155,152,163)">Taking you to your wallet…</span>                              
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀ ▀ ▀ ▀ ▄▄▄ ██▄ ▀▀▀▄█▀▀▀█▀▀▀▄    </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █▀▀▀▀▀█ ▄▄▀██  ▀█ ▄▀█ ▀ █▀▀█▄    </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ███ █ █  █▄▄ ▀▀▀▀▄██▀█▀█▀██    </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    █ ▀▀▀ █ ▀▄▀ ▄▄ ▀▄  ▄▄▄▀▄█  █     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">    ▀▀▀▀▀▀▀ ▀ ▀  ▀ ▀▀▀▀  ▀▀▀▀▀▀      </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                                           
+                        <span style="color:rgb(0,0,0);background:rgb(255,255,255)">                                     </span>                                                           
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">Enter continue</span>                                                                                  
+</pre></section>
+<section><h2>setup-error-120</h2><pre>                          <span style="color:rgb(167,139,250)">▄▄</span>  <span style="color:rgb(167,139,250)">▄▄</span>    <span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(124,58,237);background:rgb(242,241,244)">▀</span><span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▄</span>   <span style="color:rgb(124,58,237);font-weight:700">H A R T I I</span> <span style="color:#0D0D0E;background:rgb(255,176,32);font-weight:700"> BETA </span>                                                          
+                         <span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span><span style="color:rgb(167,139,250);background:rgb(124,58,237)">▀▀▀▀</span><span style="color:rgb(124,58,237)">▄</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span><span style="color:rgb(124,58,237)">▀▀▀</span>   <span style="color:rgb(242,241,244)">Set up your wallet</span>                                                          
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀▀▀▀▀▀▀▀▀▀▀</span><span style="color:rgb(124,58,237)">▀</span>                                                                                  
+                         <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>    <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span> <span style="color:rgb(124,58,237);background:rgb(124,58,237)">▀▀</span>                                                                                 
+                        <span style="color:rgb(34,197,94)">✓ Start</span>   <span style="color:rgb(167,139,250);font-weight:700">● Password</span>   <span style="color:rgb(102,99,109)">○ Backup</span>   <span style="color:rgb(102,99,109)">○ Safety</span>   <span style="color:rgb(102,99,109)">○ Funds</span>                                            
+                        <span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────────────────</span>                        
+                                                                                                                        
+                        <span style="color:rgb(240,70,92);font-weight:700">Something went wrong</span>                                                                            
+                                                                                                                        
+                        <span style="color:rgb(242,241,244)">Could not write the wallet file. Nothing was saved.</span>                                             
+                        <span style="color:rgb(155,152,163)">Nothing was sent anywhere.</span>                                                                      
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                                                                                                                        
+                        <span style="color:rgb(102,99,109)">Enter try again · Esc quit</span>                                                                      
+</pre></section>
+<section><h2>home-60</h2><pre> <span style="color:rgb(124,58,237);font-weight:700">∩∩</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>                          <span style="color:rgb(242,241,244)">mainnet · cyprus-1</span> 
+ <span style="color:rgb(155,152,163)">demo  0x0000…0d01</span>    <span style="color:rgb(155,152,163)">▅</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(155,152,163)">▃▃</span><span style="color:rgb(34,197,94)">▂</span><span style="color:rgb(102,99,109)">·</span><span style="color:rgb(34,197,94)">▂▄</span><span style="color:rgb(155,152,163)">▃█▅▃</span><span style="color:rgb(34,197,94)">▂</span><span style="color:rgb(102,99,109)">··</span><span style="color:rgb(34,197,94)">▃▆▆</span><span style="color:rgb(155,152,163)">▄</span><span style="color:rgb(34,197,94)">▁▁</span><span style="color:rgb(102,99,109)">·</span> <span style="color:rgb(242,241,244);font-weight:700">#10,412,877 1s</span> 
+<span style="color:rgb(102,99,109)">────────────────────────────────────────────────────────────</span>
+ <span style="color:rgb(155,152,163)">BALANCE</span>                        <span style="color:rgb(155,152,163)">≈ 1,435.56 QUAI with tokens</span> 
+ <span style="color:rgb(242,241,244);font-weight:700">1,234.56</span> <span style="color:rgb(167,139,250)">QUAI</span>                                              
+                                                            
+ <span style="color:rgb(167,139,250);font-weight:700">╭──────────────────────────╮</span>  <span style="color:rgb(102,99,109)">╭──────────────────────────╮</span> 
+ <span style="color:rgb(167,139,250);font-weight:700">│</span><span style="color:rgb(242,241,244);background:rgb(124,58,237);font-weight:700"> › ↓ Receive              </span><span style="color:rgb(167,139,250);font-weight:700">│</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(242,241,244)">  ↑ Send</span>                 <span style="color:rgb(102,99,109)">│</span> 
+ <span style="color:rgb(167,139,250);font-weight:700">╰──────────────────────────╯</span>  <span style="color:rgb(102,99,109)">╰──────────────────────────╯</span> 
+                                                            
+ <span style="color:rgb(155,152,163)">Trade </span> <span style="color:rgb(242,241,244)"> Buy </span> <span style="color:rgb(242,241,244)"> Sell </span> <span style="color:rgb(242,241,244)"> Swap </span>                                 
+ <span style="color:rgb(155,152,163)">Tools </span> <span style="color:rgb(242,241,244)"> Airdrop </span> <span style="color:rgb(242,241,244)"> OTC </span> <span style="color:rgb(242,241,244)"> Claim </span> <span style="color:rgb(242,241,244)"> Wall </span>                      
+ <span style="color:rgb(155,152,163)">More  </span> <span style="color:rgb(242,241,244)"> Wallets </span> <span style="color:rgb(242,241,244)"> Settings </span>                                
+                                                            
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">BALANCES</span>  <span style="color:rgb(155,152,163)"> ≈ 1,435.56 QUAI</span> <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">WATCHLIST</span>  <span style="color:rgb(102,99,109)">───────</span><span style="color:rgb(155,152,163)"> 3 tokens</span> 
+  <span style="color:rgb(242,241,244);font-weight:700">QUAI  </span>           <span style="color:rgb(242,241,244);font-weight:700">1,234.56</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">DEMO  </span>            <span style="color:rgb(34,197,94)">▲ +12.4%</span>  
+  <span style="color:rgb(242,241,244)">DEMO  </span>             <span style="color:rgb(242,241,244)">50,000</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">HRTI  </span>             <span style="color:rgb(155,152,163)">▼ -3.2%</span>  
+  <span style="color:rgb(242,241,244)">HRTI  </span>             <span style="color:rgb(242,241,244)">12,000</span>  <span style="color:rgb(102,99,109)">│</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">CAMEL </span>            <span style="color:rgb(34,197,94)">▲ +41.8%</span>  
+                                                            
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">LIVE TRADES</span>  <span style="color:rgb(102,99,109)">───────────────────</span><span style="color:rgb(155,152,163)"> per block · newest first</span> 
+  <span style="color:rgb(102,99,109)">──</span><span style="color:rgb(155,152,163)"> block 10,412,877 </span><span style="color:rgb(102,99,109)">────────────────────────────────────</span>  
+  <span style="color:rgb(155,152,163)">▼ SELL</span> <span style="color:rgb(242,241,244)">BLOCK  </span>     <span style="color:rgb(242,241,244);font-weight:700">40.8 QUAI</span>  <span style="color:rgb(155,152,163)">0x0000…0d11</span>                 
+  <span style="color:rgb(155,152,163)">▼ SELL</span> <span style="color:rgb(242,241,244)">DEMO   </span>      <span style="color:rgb(242,241,244);font-weight:700">3.3 QUAI</span>  <span style="color:rgb(155,152,163)">0x0000…0d12</span>                 
+                                            <span style="color:rgb(102,99,109)">? help · q quit</span> 
+</pre></section>
+<section><h2>home-80-ascii</h2><pre> <span style="color:rgb(124,58,237);font-weight:700">nn</span> <span style="color:rgb(124,58,237);font-weight:700">HARTII</span> <span style="color:rgb(255,176,32);font-weight:700">BETA</span>                                        <span style="color:rgb(242,241,244)">mainnet . cyprus-1</span>  <span style="color:rgb(255,176,32)">DEMO</span> 
+ <span style="color:rgb(155,152,163)">demo  0x000000~000d01</span>          <span style="color:rgb(155,152,163)">..</span><span style="color:rgb(102,99,109)">.</span><span style="color:rgb(34,197,94)">:</span><span style="color:rgb(102,99,109)">.</span><span style="color:rgb(155,152,163)">:</span><span style="color:rgb(34,197,94)">..</span><span style="color:rgb(155,152,163)">.</span><span style="color:rgb(34,197,94)">:</span><span style="color:rgb(155,152,163)">=</span><span style="color:rgb(102,99,109)">.</span><span style="color:rgb(155,152,163)">::</span><span style="color:rgb(34,197,94)">.</span><span style="color:rgb(102,99,109)">.</span><span style="color:rgb(34,197,94)">._</span><span style="color:rgb(155,152,163)">:#=:</span><span style="color:rgb(34,197,94)">.</span><span style="color:rgb(102,99,109)">..</span><span style="color:rgb(34,197,94)">:++</span><span style="color:rgb(155,152,163)">_</span><span style="color:rgb(34,197,94)">__</span><span style="color:rgb(102,99,109)">.</span> <span style="color:rgb(242,241,244);font-weight:700">#10,412,877 1s</span> 
+<span style="color:rgb(102,99,109)">--------------------------------------------------------------------------------</span>
+ <span style="color:rgb(155,152,163)">BALANCE</span>                                            <span style="color:rgb(155,152,163)">~ 1,435.56 QUAI with tokens</span> 
+ <span style="color:rgb(242,241,244);font-weight:700">_#</span>     <span style="color:rgb(242,241,244);font-weight:700">^^#</span> <span style="color:rgb(242,241,244);font-weight:700">^^#</span> <span style="color:rgb(242,241,244);font-weight:700">#</span> <span style="color:rgb(242,241,244);font-weight:700">#</span>   <span style="color:rgb(242,241,244);font-weight:700">#^^</span> <span style="color:rgb(242,241,244);font-weight:700">#^^</span>                                                   
+  <span style="color:rgb(242,241,244);font-weight:700">#</span>   <span style="color:rgb(242,241,244);font-weight:700">_</span> <span style="color:rgb(242,241,244);font-weight:700">#^^</span> <span style="color:rgb(242,241,244);font-weight:700">^^#</span> <span style="color:rgb(242,241,244);font-weight:700">^^#</span>   <span style="color:rgb(242,241,244);font-weight:700">^^#</span> <span style="color:rgb(242,241,244);font-weight:700">#^#</span>                                                   
+ <span style="color:rgb(242,241,244);font-weight:700">^^^</span> <span style="color:rgb(242,241,244);font-weight:700">^</span>  <span style="color:rgb(242,241,244);font-weight:700">^^^</span> <span style="color:rgb(242,241,244);font-weight:700">^^^</span>   <span style="color:rgb(242,241,244);font-weight:700">^</span> <span style="color:rgb(242,241,244);font-weight:700">^</span> <span style="color:rgb(242,241,244);font-weight:700">^^^</span> <span style="color:rgb(242,241,244);font-weight:700">^^^</span>  <span style="color:rgb(167,139,250)">QUAI</span>                                             
+                                                                                
+ <span style="color:rgb(167,139,250);font-weight:700">+--------------------------+</span>  <span style="color:rgb(102,99,109)">+--------------------------+</span>                     
+ <span style="color:rgb(167,139,250);font-weight:700">|</span><span style="color:rgb(242,241,244);background:rgb(124,58,237);font-weight:700"> &gt; v Receive              </span><span style="color:rgb(167,139,250);font-weight:700">|</span>  <span style="color:rgb(102,99,109)">|</span> <span style="color:rgb(242,241,244)">  ^ Send</span>                 <span style="color:rgb(102,99,109)">|</span>                     
+ <span style="color:rgb(167,139,250);font-weight:700">+--------------------------+</span>  <span style="color:rgb(102,99,109)">+--------------------------+</span>                     
+                                                                                
+ <span style="color:rgb(155,152,163)">Trade </span> <span style="color:rgb(242,241,244)"> Buy </span> <span style="color:rgb(242,241,244)"> Sell </span> <span style="color:rgb(242,241,244)"> Swap </span>                        <span style="color:rgb(155,152,163)">      </span> <span style="color:rgb(242,241,244)"> Wallets </span> <span style="color:rgb(242,241,244)"> Settings </span>  
+ <span style="color:rgb(155,152,163)">Tools </span> <span style="color:rgb(242,241,244)"> Airdrop </span> <span style="color:rgb(242,241,244)"> OTC </span> <span style="color:rgb(242,241,244)"> Claim </span> <span style="color:rgb(242,241,244)"> Wall </span>                                          
+                                                                                
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">BALANCES</span>  <span style="color:rgb(102,99,109)">----------</span><span style="color:rgb(155,152,163)"> ~ 1,435.56 QUAI</span> <span style="color:rgb(102,99,109)">|</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">WATCHLIST</span>  <span style="color:rgb(102,99,109)">-----------------</span><span style="color:rgb(155,152,163)"> 3 tokens</span> 
+  <span style="color:rgb(242,241,244);font-weight:700">QUAI  </span>                     <span style="color:rgb(242,241,244);font-weight:700">1,234.56</span>  <span style="color:rgb(102,99,109)">|</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">DEMO  </span>            <span style="color:rgb(242,241,244)">0.0000186</span> <span style="color:rgb(34,197,94)">^ +12.4%</span>  
+  <span style="color:rgb(242,241,244)">DEMO  </span>         <span style="color:rgb(242,241,244)">50,000</span>         <span style="color:rgb(155,152,163)">~ 105</span>  <span style="color:rgb(102,99,109)">|</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">HRTI  </span>             <span style="color:rgb(242,241,244)">0.000091</span>  <span style="color:rgb(155,152,163)">v -3.2%</span>  
+  <span style="color:rgb(242,241,244)">HRTI  </span>         <span style="color:rgb(242,241,244)">12,000</span>          <span style="color:rgb(155,152,163)">~ 96</span>  <span style="color:rgb(102,99,109)">|</span> <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(242,241,244)">CAMEL </span>         <span style="color:rgb(242,241,244)">0.0000000043</span> <span style="color:rgb(34,197,94)">^ +41.8%</span>  
+                                                                                
+ <span style="color:rgb(167,139,250);font-weight:700"> </span><span style="color:rgb(155,152,163)">LIVE TRADES</span>  <span style="color:rgb(102,99,109)">---------------------------------------</span><span style="color:rgb(155,152,163)"> per block . newest first</span> 
+  <span style="color:rgb(102,99,109)">--</span><span style="color:rgb(155,152,163)"> block 10,412,877 </span><span style="color:rgb(102,99,109)">--------------------------------------------------------</span>  
+  <span style="color:rgb(155,152,163)">12:00:00</span>  <span style="color:rgb(155,152,163)">v SELL</span> <span style="color:rgb(242,241,244)">BLOCK  </span>     <span style="color:rgb(242,241,244);font-weight:700">40.8 QUAI</span>   <span style="color:rgb(155,152,163)">122.4K BLOCK</span>  <span style="color:rgb(155,152,163)">0x0000~0d11</span>            
+ <span style="color:rgb(102,99,109)">Tab pane . &lt;&gt; action . Enter open</span>                       <span style="color:rgb(102,99,109)">? help . q quit   </span><span style="color:rgb(255,176,32)">DEMO</span> 
+</pre></section>
+</body></html>

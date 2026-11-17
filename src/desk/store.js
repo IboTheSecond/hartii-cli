@@ -1,7 +1,8 @@
-import {readFileSync,readdirSync,openSync,writeFileSync,fsyncSync,closeSync,unlinkSync,fstatSync,lstatSync} from 'node:fs';
+import {readdirSync,openSync,writeFileSync,fsyncSync,closeSync,unlinkSync,fstatSync,lstatSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {createHash} from 'node:crypto';
-import {securePath,secureDirectory,atomicPrivateWrite} from '../secureFiles.js';
+import {securePath,secureDirectory} from '../secureFiles.js';
+import {readPrivateText,writePrivateText,deskPurpose,VaultError} from '../localVault.js';
 import {transactionIntentDigest} from '../writePipeline.js';
 import {DeskError,hash,normalizeAuthority} from './model.js';
 
@@ -13,18 +14,19 @@ function identity(id){requireThat(typeof id==='string'&&/^\d{8}-[a-f0-9]{64}$/.t
 const immutable=r=>({schemaVersion:r.schemaVersion,id:r.id,intentDigest:r.intentDigest,chainId:r.chainId,venue:r.venue,transaction:r.transaction,trade:r.trade,quote:r.quote});
 export function summarizeDecision(r){return {id:r.id,createdAt:r.createdAt,kind:r.trade.kind,action:r.quote.action,phase:r.phase,txHash:r.txHash,broadcastMayHaveStarted:r.broadcastMayHaveStarted,status:['reviewed','signed'].includes(r.phase)?r.phase:r.outcome?.status??(r.broadcastMayHaveStarted?'unresolved':r.phase),outcomeReason:r.outcome?.reason??null,gasCeilingWei:r.quote.gasCeilingWei,gasFeeWei:r.outcome?.gasFeeWei??null,output:r.outcome?.output??null,observations:r.observations.length};}
 export class DeskStore{
-  constructor(home){requireThat(typeof home==='string'&&home.length>0,'A local CLI home is required.');this.root=join(resolve(home),'desk','mainnet');}
+  constructor(home){requireThat(typeof home==='string'&&home.length>0,'A local CLI home is required.');this.home=resolve(home);this.root=join(resolve(home),'desk','mainnet');}
   directory(day){const root=secureDirectory(this.root);return secureDirectory(join(root,dayKey(day)));}
   path(id){identity(id);return join(this.directory(id.slice(0,8)),id+'.json');}
   get(id){
-    const file=this.path(id),checked=securePath(file,{regularFile:true});requireThat(checked.stat&&checked.stat.size<=2*1024*1024,'Decision is missing or exceeds the local record limit.');
-    let doc;try{doc=JSON.parse(readFileSync(file,'utf8'));}catch{throw new DeskError('Decision file is not readable JSON.');}
+    const file=this.path(id),checked=securePath(file,{regularFile:true});requireThat(checked.stat&&checked.stat.size<=3*1024*1024,'Decision is missing or exceeds the local record limit.');
+    // The journal is sealed with the wallet password once the local data vault exists (src/localVault.js).
+    let doc;try{doc=JSON.parse(readPrivateText(this.home,deskPurpose(this.home,file),file));}catch(e){if(e instanceof VaultError)throw new DeskError(e.message);throw new DeskError('Decision file is not readable JSON.');}
     requireThat(doc?.format==='hartii-desk-decision/v1'&&doc.record?.id===id&&doc.sha256===digest(doc.record),'Decision integrity check failed; no evidence was accepted.');
     const r=doc.record;requireThat(r.schemaVersion===1&&r.chainId===9&&r.intentDigest==='0x'+id.slice(9),'Decision identity is invalid.');normalizeAuthority(r.transaction);requireThat(['reviewed','signed','broadcast-possible','observed'].includes(r.phase)&&Array.isArray(r.observations)&&r.observations.length<=100,'Decision lifecycle is invalid.');if(r.txHash!==null)hash(r.txHash);
     return r;
   }
   write(record,replace=false){
-    const text=JSON.stringify({format:'hartii-desk-decision/v1',sha256:digest(record),record},null,2)+'\n';requireThat(Buffer.byteLength(text)<=2*1024*1024,'Decision exceeds the 2 MiB record limit.');atomicPrivateWrite(this.path(record.id),text,{replace});return record;
+    const text=JSON.stringify({format:'hartii-desk-decision/v1',sha256:digest(record),record},null,2)+'\n';requireThat(Buffer.byteLength(text)<=2*1024*1024,'Decision exceeds the 2 MiB record limit.');try{writePrivateText(this.home,deskPurpose(this.home,this.path(record.id)),this.path(record.id),text,{replace});}catch(e){if(e instanceof VaultError)throw new DeskError(e.message);throw e;}return record;
   }
   locked(id,fn){
     const file=this.path(id)+'.lock';let fd;

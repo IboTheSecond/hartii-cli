@@ -7,6 +7,7 @@ import { decodeMessage, encodeMessage, GLOBAL_CHANNEL, curveChannel } from '../.
 import { resolveToken, MarketError } from '../marketApi.js';
 import { DEMO_TRADE_FRAMES, DEMO_NETWORK } from '../demoFixtures.js';
 import { CliError, rethrowAs } from '../errors.js';
+import * as F from '../format.js';
 
 export class WatchError extends CliError {}
 
@@ -19,11 +20,15 @@ function wsUrl(apiBase, channel) {
 
 function frameLine(msg) {
   const d = Object.fromEntries(Object.entries(msg.data || {}).map(([k,v]) => [k,safeTerminalText(v)]));
+  const sym = d.symbol || F.shortAddress(d.tokenAddress) || '?';
+  const when = Number.isFinite(Number(msg.ts)) ? `${new Date(Number(msg.ts)).toISOString().slice(11, 19)}  ` : '';
+  // Human feed: readable amounts, short addresses (one line per event). The full values stay in --json.
   if (msg.type === 'trade') {
-    return `[${d.symbol || d.tokenAddress || '?'}] ${String(d.side || '?').toUpperCase()} quai=${d.quaiAmount} token=${d.tokenAmount} trader=${d.trader} tx=${d.txHash}`;
+    const side = String(d.side || '?').toUpperCase().padEnd(4);
+    return `${when}${side} ${F.amount(d.tokenAmount, { symbol: sym })}  for ${F.amount(d.quaiAmount, { symbol: 'QUAI' })}  by ${F.shortAddress(d.trader)}  tx ${F.shortAddress(d.txHash, 10, 6)}`;
   }
   if (msg.type === 'burn') {
-    return `[${d.symbol || d.tokenAddress || '?'}] BURN token=${d.tokenAmount} by=${d.trader} tx=${d.txHash}`;
+    return `${when}BURN ${F.amount(d.tokenAmount, { symbol: sym })}  by ${F.shortAddress(d.trader)}  tx ${F.shortAddress(d.txHash, 10, 6)}`;
   }
   return `[${msg.channel}] ${msg.type} ${JSON.stringify(d)}`;
 }

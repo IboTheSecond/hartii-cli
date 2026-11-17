@@ -1,0 +1,24 @@
+    [0;1;38;2;124;58;237m∩∩[0m [0;1;38;2;124;58;237mHARTII[0m [0;1;38;2;255;176;32mBETA[0m  [0;38;2;155;152;163mSet up your wallet[0m                                          
+    [0;38;2;34;197;94m✓ Start[0m   [0;38;2;34;197;94m✓ Password[0m   [0;38;2;34;197;94m✓ Backup[0m   [0;1;38;2;167;139;250m● Safety[0m   [0;38;2;102;99;109m○ Funds[0m                        
+    [0;38;2;102;99;109m────────────────────────────────────────────────────────────────────────[0m    
+                                                                                
+    [0;1;38;2;167;139;250mSet a safety limit?  (recommended)[0m                                          
+                                                                                
+    [0;38;2;155;152;163mA cap stops one send, or one day of sends, from moving more QUAI than[0m       
+    [0;38;2;155;152;163myou chose. You can change it any time in Settings.[0m                          
+                                                                                
+    [0;1;38;2;242;241;244m› 1  Conservative[0m     [0;38;2;155;152;163m10 QUAI per send, 50 per day[0m                          
+    [0;38;2;242;241;244m  2  Normal[0m           [0;38;2;155;152;163m50 QUAI per send, 250 per day[0m                         
+    [0;38;2;242;241;244m  3  Degen[0m            [0;38;2;155;152;163m250 QUAI per send, 1000 per day[0m                       
+    [0;38;2;242;241;244m  4  Custom amounts[0m                                                         
+    [0;38;2;242;241;244m  5  Skip for now[0m                                                           
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+    [0;38;2;102;99;109m↑↓ choose · Enter confirm · Esc skip[0m                                        

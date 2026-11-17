@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-11-17
+
+One setup fix and a docs patch.
+
+- **Setup no longer misses a fast deposit.** "Waiting for funds" took its baseline from the first balance check after the screen opened, so funds that landed before that check (up to 4 s) left it waiting forever. A wallet created in setup now starts from zero, and a reading for another wallet is ignored. An imported wallet still uses its first reading, so funds it already holds are not shown as received.
+- README brought up to 0.6.0: no default spending caps (`none` clears a cap), the plain review and new-payee check, signed updates (key id 3f0f68fc9ba1a619), encrypted local files, `contacts`, `vault enroll`, `qi`, `ui.terse`, and how `hartii mcp` caps combine with yours (no config caps: the MCP caps apply; with config caps the lower wins).
+- `hartii qi ?` printed a broken character: `src/help.js` carried one cp1252 byte. Fixed, and `test/sourceEncoding.test.mjs` now fails on any shipped file that is not valid UTF-8.
+- `hartii config ?` lists `ui.terse` and that `none` clears a cap.
+
+## [0.6.0] — 2026-11-17
+
+Built from the owner's 21 answers of 2026-11-16 (scan and spec: newcomers first; safety, then ease). Still BETA.
+
+- **Guided first run.** `hartii` with no wallet opens setup instead of an empty dashboard: create or import, a password of at least 12 characters, the recovery phrase shown once on a screen that is cleared afterwards, a check of 3 random words (or "back up later", which leaves a reminder and a `B` key on the home screen), an optional spending-cap step, then the receive screen that waits for funds. `hartii init` and `hartii wallet new` on a terminal run the same flow; scripts and `--json` stay non-interactive and never show the phrase. `wallet export` is unchanged.
+- **No default spending caps.** Caps exist only when you set them (setup recommends it; `hartii config set limits.perTxQuai <n>` / `limits.dailyQuai`, `none` clears). A cap you set works as before. `--yes` is refused unless caps are set, so nothing is sent without a preview. The MCP server still requires its own caps.
+- **Plain-sentence review** before every send ("You send 2.5 QUAI to …", fee and total rounded up, warnings, "Nothing is sent until you confirm"); `--details` adds the technical fields; `--terse` or `hartii config set ui.terse true` keeps one line per result. JSON output is unchanged.
+- **Warnings that never block:** slippage above 10%, a token picked by ticker instead of address, a fee bigger than the amount, a new recipient, a look-alike address.
+- **New payee check:** for an address never paid from this computer, type its last 4 characters (also in the dashboard). Unattended sends to a new address need `--yes --new-recipient-ok`; a look-alike address is never allowed unattended. Agent (`hartii mcp`) sends can only go to addresses this computer has already paid: pay a new address once from the terminal first (the agent's dry run still works).
+- **Contacts:** `hartii contacts add|list|remove|rename`, `hartii send <name> <amount>`; after a send to a new address you can save it.
+- **Encrypted local files:** the spending ledger, the paid list, contacts and the desk journal are sealed with the wallet password once you make a real send; `hartii vault enroll <wallet>` adds a wallet with a different password. The watchlist stays readable (public token list). Read commands show sealed data as locked when no password can be asked.
+- **Signed updates:** releases are signed with ed25519; `hartii update` verifies the signature against the key built into the CLI (key id 3f0f68fc9ba1a619) before npm runs and refuses unsigned or changed releases. The package ships an `npm-shrinkwrap.json`.
+- **`hartii qi`** (BETA, Orchard testnet first): `address`, `balance`, `notes`, `receive`, `send <payment-code|qi-address> <amount>`. Needs a wallet made from a recovery phrase; smallest-note selection; only receipt status 1 counts; an unclear outcome is never retried; addresses are never reused. Mainnet sends need `--network mainnet --allow-mainnet-qi`. Proven on Orchard on 2026-11-17 (tx 0x00ca0087…c95f).
+- **New look:** Hartii Labs black-and-white with violet as the one accent and red only for danger; wallet-first home (balance, Receive, Send; trade and tools one step away); LED camel and numerals with subtle motion (`HARTII_REDUCED_MOTION=1` turns it off); works at 60, 80 and 120 columns; ASCII fallback for older consoles (`HARTII_ASCII=1`); `NO_COLOR` respected.
+- **Readable screens:** one formatter for amounts (no raw wei or base units in human views), designed views for balance, whoami, networks, gas, limits, token, tokens, tx, block, config, about and init; `doctor` ends with one verdict and the fix command for each failure, and warns when the wallet folder is outside your user profile; bare `hartii wallet` lists its subcommands; `limits` works without a wallet.
+- **Smaller fixes:** the watchlist is written atomically and never through a link; swap no longer falls back to the Hartii proxy when you set your own `--rpc`; the chain-id check refuses redirects; Windows hardens a new wallet folder; a test fails the build if the CLI contacts a server outside the published list.
+
 ## [0.5.0] — 2026-11-12
 
 - Constraint Desk / Fill Ledger beta commands: watch-only position context, swap preview, individually confirmed guarded swaps, private decision journal, canonical receipt observations and self-contained HTML/JSON exports.

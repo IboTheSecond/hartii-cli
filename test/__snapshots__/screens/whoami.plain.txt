@@ -1,0 +1,27 @@
+=== whoami @ 60 columns (NO_COLOR) ===
+  ▍ Your wallet  mainnet
+  ────────────────────────────────────────────
+
+  Name     main
+  Address  0x0000 0000 0000 0000 0000
+             0000 0000 0000 0000 0d01
+  Copy     0x0000000000000000000000000000000000000d01
+  Home     /home/me/.hartii
+
+=== whoami @ 80 columns (NO_COLOR) ===
+  ▍ Your wallet  mainnet
+  ────────────────────────────────────────────
+
+  Name     main
+  Address  0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+  Copy     0x0000000000000000000000000000000000000d01
+  Home     /home/me/.hartii
+
+=== whoami @ 120 columns (NO_COLOR) ===
+  ▍ Your wallet  mainnet
+  ────────────────────────────────────────────
+
+  Name     main
+  Address  0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+  Copy     0x0000000000000000000000000000000000000d01
+  Home     /home/me/.hartii

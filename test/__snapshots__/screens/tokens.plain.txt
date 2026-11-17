@@ -1,0 +1,33 @@
+=== tokens @ 60 columns (NO_COLOR) ===
+  ▍ Trending tokens
+  ────────────────────────────────────────────
+
+  TOKEN  PRICE (QUAI)  HOLDERS  24H VOLUME  PHASE
+  DEMO      0.0000186       42       1,200  active
+    0x0000000000000000000000000000000000000d02
+  HRTI       0.000091    1,337      45,000  graduated
+    0x0000000000000000000000000000000000000d03
+
+  Details: hartii token <symbol or address>
+
+=== tokens @ 80 columns (NO_COLOR) ===
+  ▍ Trending tokens
+  ────────────────────────────────────────────
+
+  TOKEN  PRICE (QUAI)  HOLDERS  24H VOLUME  PHASE
+  DEMO      0.0000186       42       1,200  active
+    0x0000000000000000000000000000000000000d02
+  HRTI       0.000091    1,337      45,000  graduated
+    0x0000000000000000000000000000000000000d03
+
+  Details: hartii token <symbol or address>
+
+=== tokens @ 120 columns (NO_COLOR) ===
+  ▍ Trending tokens
+  ────────────────────────────────────────────
+
+  TOKEN  PRICE (QUAI)  HOLDERS  24H VOLUME  PHASE      ADDRESS
+  DEMO      0.0000186       42       1,200  active     0x0000000000000000000000000000000000000d02
+  HRTI       0.000091    1,337      45,000  graduated  0x0000000000000000000000000000000000000d03
+
+  Details: hartii token <symbol or address>

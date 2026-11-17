@@ -5,11 +5,14 @@
 // buffer serialises to ANSI (the real terminal) or to plain text (the snapshot tests).
 import { sgr } from './theme.js';
 import { safeTerminalText } from '../output.js';
+import { asciiChar } from './glyphs.js';
 
 export class Screen {
-  constructor(cols, rows) {
+  /** @param {{ ascii?: boolean }} [opts] ascii: serialise every glyph as a single ASCII column (legacy console fallback) */
+  constructor(cols, rows, opts = {}) {
     this.cols = cols;
     this.rows = rows;
+    this.ascii = Boolean(opts.ascii);
     this.cells = Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({ ch: ' ', st: null })));
   }
 
@@ -58,18 +61,20 @@ export class Screen {
 
   /** Plain text frame, trailing spaces trimmed — used by the snapshot tests. */
   toPlain() {
-    return this.cells.map((row) => row.map((c) => c.ch).join('').replace(/\s+$/, '')).join('\n');
+    const g = this.ascii ? asciiChar : (c) => c;
+    return this.cells.map((row) => row.map((c) => g(c.ch)).join('').replace(/\s+$/, '')).join('\n');
   }
 
   /** ANSI frame: one string per row, style changes only where they happen, always ends reset. */
   toAnsiRows(depth = 'truecolor') {
+    const g = this.ascii ? asciiChar : (c) => c;
     return this.cells.map((row) => {
       let out = '';
       let cur = '';
       for (const c of row) {
         const want = sgr(c.st, depth);
         if (want !== cur) { out += want ? `\u001b[0;${want}m` : '\u001b[0m'; cur = want; }
-        out += c.ch;
+        out += g(c.ch);
       }
       return cur ? `${out}\u001b[0m` : out;
     });

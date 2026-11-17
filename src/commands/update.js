@@ -3,7 +3,10 @@
 // `hartii update` (alias `upgrade`): check hartiilabs.com for a newer CLI and, on request, install it.
 // Security posture: same-origin HTTPS only, redirect:'error', timeouts, a size cap, the tarball is checked
 // against the published sha256 BEFORE npm ever sees it, and npm is given a fixed argv with our own temp
-// file path -- nothing downloaded is ever interpolated into a shell string. Never called from the MCP server
+// file path -- nothing downloaded is ever interpolated into a shell string.
+// Signed releases (2026-11-16): the tarball's ed25519 signature is verified against the ONE key embedded in this CLI
+// (src/releaseKey.js) before npm runs. An unsigned, mismatched or wrongly-signed download is refused, with no override.
+// The sha256 alone proves nothing: whoever can replace the file on the site can replace the hash beside it. Never called from the MCP server
 // (the MCP surface has no update tool; it stays read-only).
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -14,6 +17,7 @@ import { join } from 'node:path';
 import { CliError } from '../errors.js';
 import { PKG_VERSION } from '../version.js';
 import { confirm } from '../prompt.js';
+import { verifyRelease } from '../releaseKey.js';
 
 export class UpdateError extends CliError {}
 
@@ -101,7 +105,7 @@ async function discover(fetchFn, base) {
     const res = await fetchLimited(fetchFn, new URL('hartii-cli.json', base).href);
     const m = await res.json();
     const url = sameOriginUrl(m?.url, base);
-    if (parseSemver(m?.version) && SHA_RE.test(String(m?.sha256)) && url) return { version: String(m.version), sha256: m.sha256, url, source: 'manifest' };
+    if (parseSemver(m?.version) && SHA_RE.test(String(m?.sha256)) && url) return { version: String(m.version), sha256: m.sha256, url, source: 'manifest', signature: typeof m.signature === 'string' ? m.signature : undefined, keyId: typeof m.keyId === 'string' ? m.keyId : undefined };
   } catch { /* fall through to the .sha256 file */ }
   const tgz = new URL('hartii-cli.tgz', base).href;
   const res = await fetchLimited(fetchFn, `${tgz}.sha256`);
@@ -133,6 +137,15 @@ export async function runUpdate(o, deps = {}) {
     const inside = versionFromTarball(buf);
     if (info.version && inside !== info.version) throw new UpdateError(`The tarball is ${inside} but the manifest says ${info.version}. Refusing to install.`);
     info.version = inside;
+    // Signature check: the manifest may carry it; otherwise the .sig file next to the tarball. Both come from the same
+    // site, which is fine: only the embedded key decides. Missing or invalid means refuse.
+    let signature = info.signature;
+    if (!signature) {
+      const sigUrl = sameOriginUrl(`${info.url}.sig`, base);
+      try { if (sigUrl) signature = String(await (await fetchLimited(fetchFn, sigUrl)).text()).trim(); } catch { /* treated as unsigned below */ }
+    }
+    if (!signature) throw new UpdateError(`This release is not signed (no ${new URL(info.url).pathname.split('/').pop()}.sig). Refusing to install an unsigned update.`);
+    if (!verifyRelease({ sha256: info.sha256, version: inside, signature, keyId: info.keyId }, deps.releaseKey)) throw new UpdateError('The release signature does not match the Hartii release key built into this CLI. Refusing to install.');
   };
   if (!info.version) await download(); // fallback path: the version is only knowable from the tarball
 
@@ -155,7 +168,7 @@ export async function runUpdate(o, deps = {}) {
   try {
     if (platform === 'win32' && !SAFE_WIN_PATH.test(file)) throw new UpdateError(`Temp path ${file} has characters npm.cmd cannot take safely. Run: ${manual}`);
     writeFileSync(file, buf, { mode: 0o600 });
-    say(`Verified sha256 ${info.sha256.slice(0, 12)}... Installing with npm...`);
+    say(`Verified release signature and sha256 ${info.sha256.slice(0, 12)}... Installing with npm...`);
     const [npmCmd, npmArgs] = wrap(platform, 'npm', ['install', '-g', file], process.env);
     // Installer progress belongs to diagnostics; stdout is reserved for the
     // command result, including when a real child writes directly to its fd.

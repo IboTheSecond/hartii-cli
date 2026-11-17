@@ -1,0 +1,61 @@
+=== init @ 60 columns (NO_COLOR) ===
+  ▍ Welcome to Hartii
+  ────────────────────────────────────────────
+
+  BETA The Hartii terminal wallet is beta software; start
+        with small amounts.
+
+  ✓ done   Node 24.15.0
+  ○ to do  Wallet: none yet
+  ✓ done   Network: mainnet
+
+  Next steps
+  1. hartii wallet new
+     create your encrypted wallet (you choose the
+     password)
+  2. hartii doctor
+     check RPC, chain id and API
+  3. hartii ui --demo
+     tour the full-screen UI on fixture data
+  4. hartii help
+     every command (also: hartii ?)
+
+=== init @ 80 columns (NO_COLOR) ===
+  ▍ Welcome to Hartii
+  ────────────────────────────────────────────
+
+  BETA The Hartii terminal wallet is beta software; start with small amounts.
+
+  ✓ done   Node 24.15.0
+  ○ to do  Wallet: none yet
+  ✓ done   Network: mainnet
+
+  Next steps
+  1. hartii wallet new
+     create your encrypted wallet (you choose the password)
+  2. hartii doctor
+     check RPC, chain id and API
+  3. hartii ui --demo
+     tour the full-screen UI on fixture data
+  4. hartii help
+     every command (also: hartii ?)
+
+=== init @ 120 columns (NO_COLOR) ===
+  ▍ Welcome to Hartii
+  ────────────────────────────────────────────
+
+  BETA The Hartii terminal wallet is beta software; start with small amounts.
+
+  ✓ done   Node 24.15.0
+  ○ to do  Wallet: none yet
+  ✓ done   Network: mainnet
+
+  Next steps
+  1. hartii wallet new
+     create your encrypted wallet (you choose the password)
+  2. hartii doctor
+     check RPC, chain id and API
+  3. hartii ui --demo
+     tour the full-screen UI on fixture data
+  4. hartii help
+     every command (also: hartii ?)

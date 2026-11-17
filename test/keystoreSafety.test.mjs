@@ -68,7 +68,7 @@ describe('wallet local boundaries', () => {
     expect(walletLockCheck(home, 'alice').permsOk).toBeNull();
   });
   it('a weak environment password cannot create a new wallet file', async () => {
-    await expect(walletNew(home, 'alice', { env: { HARTII_PASSWORD: 'weak' }, scrypt: { N: 2, r: 1, p: 1 }, writeErr: vi.fn() })).rejects.toThrow(/at least 8/);
+    await expect(walletNew(home, 'alice', { env: { HARTII_PASSWORD: 'weak' }, scrypt: { N: 2, r: 1, p: 1 }, writeErr: vi.fn() })).rejects.toThrow(/at least 12/);
     expect(existsSync(join(home, 'keystore', 'alice.json'))).toBe(false);
   });
   it('doctor reports existing Windows ACLs unverified with mocked reads only', async () => {

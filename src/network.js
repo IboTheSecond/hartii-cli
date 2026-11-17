@@ -70,6 +70,7 @@ async function rpcChainId(rpcUrl, method, fetchFn) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: [] }),
     signal: AbortSignal.timeout(CHAIN_ID_TIMEOUT_MS),
+    redirect: 'error', // a redirected RPC could answer for a different chain or host
   });
   const json = await res.json();
   if (!json || json.error || !json.result) throw new Error(json?.error?.message || `${method} returned no result`);

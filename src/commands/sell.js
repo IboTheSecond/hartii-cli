@@ -5,7 +5,7 @@ import { withProviderCleanup, marketRuntime, writeVia, managedExitSpend } from '
 import { checkSpend } from '../spendingGuard.js';
 import { parseAmount, formatAmount } from '../amount.js';
 import { readErc20, ensureAllowance, approvalStop } from '../toolKit.js';
-import { quoteAndBuildSell, parseSlippageBps, resolveCurveToken, divergenceSummary, quoteAs } from '../trade.js';
+import { tradeWarnings, quoteAndBuildSell, parseSlippageBps, resolveCurveToken, divergenceSummary, quoteAs } from '../trade.js';
 import { DEMO_ADDRESS, DEMO_NETWORK, DEMO_TOKEN, DEMO_CURVE_META } from '../demoFixtures.js';
 import { localQuote } from '../curveQuote.js';
 import { CliError } from '../errors.js';
@@ -44,6 +44,7 @@ async function runSellCore(opts, deps = {}) {
   let quote = await quoteAs(SellError, 'sell', () => quoteAndBuildSell(provider, curveAddress, amount, slippageBps));
 
   const managedSpend=managedExitSpend(ctx,{action:'sell',token:tokenAddress,spender:curveAddress,units:amount.toString()});
+  await ctx.unlockData?.();
   checkSpend(home, fromAddress, managedSpend ?? quote.grossOnChain, limits, { now: deps.io?.now });
   const plannedTrade = { action: `Sell ${label}`, tokensIn: formatAmount(amount, token.decimals), expectedQuaiOut: formatAmount(quote.expectedOut), minQuaiOut: formatAmount(quote.minQuaiOut), feeQuai: formatAmount(quote.grossOnChain - quote.expectedOut), feeBps: String(quote.meta.feeBps), curveAddress };
   // Approval, through the SAME write pipeline, as its own confirmed tx — only when short. A dry run
@@ -80,6 +81,7 @@ async function runSellCore(opts, deps = {}) {
     spendWei: managedSpend ?? quote.grossOnChain,
     action: `Sell ${label}`,
     extraSummary,
+    warnings: tradeWarnings({ slippageBps, tickers: [opts.token] }),
   }, SellError);
 }
 

@@ -13,6 +13,8 @@ import { buildTools } from '../mcp/tools.js';
 import { createProvider } from '../signer.js';
 import { NETWORKS } from '../network.js';
 import { getSpentToday } from '../spendingGuard.js';
+import { tryUnlockForRead } from '../localData.js';
+import { runGuidedInit } from '../onboarding/plain.js';
 import { formatAmount } from '../amount.js';
 import { quaiscanTxUrl, quaiscanAddressUrl } from '../quaiscan.js';
 import { assertCyprus1QuaiAddress } from '../address.js';
@@ -22,6 +24,7 @@ import { readGasPrice } from '../gasPrice.js';
 import { fmtPrice } from '../tui/format.js';
 import { CliError, rethrowAs } from '../errors.js';
 import { runUpdate } from './update.js';
+import { tagView } from '../output.js';
 
 // Same major as package.json "engines.node" (>=22); test/everyday.test.mjs keeps the two in step.
 export const MIN_NODE_MAJOR = 22;
@@ -44,7 +47,15 @@ async function getJson(url, fetchFn) {
 
 function clamp(n, d, max) { const v = Number(n); return Number.isInteger(v) && v >= 1 ? Math.min(v, max) : d; }
 
+const EXTRA_VIEWS = { price: 'price', holders: 'list', trades: 'list', block: 'block', gas: 'gas', open: 'open', limits: 'limits', networks: 'networks', whoami: 'whoami', init: 'init', about: 'about', version: 'about' };
+
+/** Runs one everyday command and tags the result with the human view that renders it (JSON is unchanged). */
 export async function runExtra(command, args, ctx) {
+  const result = await runExtraCore(command, args, ctx);
+  return EXTRA_VIEWS[command] && result && typeof result === 'object' && !Array.isArray(result) ? tagView(result, EXTRA_VIEWS[command]) : result;
+}
+
+async function runExtraCore(command, args, ctx) {
   const { opts, deps, extraFlags } = ctx;
   const rt = () => readRuntime(opts, deps);
   if (opts.demo && ['price', 'quote', 'holders', 'trades', 'block', 'gas'].includes(command)) return demoExtra(command, args);
@@ -110,8 +121,13 @@ export async function runExtra(command, args, ctx) {
     }
     case 'limits': {
       const r = rt();
-      const { address } = resolveWalletAddress(r.home, opts.wallet);
-      const spent = getSpentToday(r.home, address);
+      // Limits are readable without a wallet: the caps are profile settings, spending is per wallet.
+      let address = null;
+      try { address = resolveWalletAddress(r.home, opts.wallet).address; } catch { /* no wallet yet */ }
+      // Spending history is sealed once the local data vault exists: ask once on a terminal, otherwise show it as locked.
+      const open = address ? await tryUnlockForRead(r.home, { wallet: opts.wallet, passwordDeps: deps.passwordDeps }) : true;
+      if (address && !open) return { wallet: address, network: r.net.name, perTxQuai: r.limits.perTxQuai, dailyQuai: r.limits.dailyQuai, locked: true, spentTodayQuai: null, reservedQuai: null, note: 'Spending history is locked. Run it in a terminal and enter the wallet password to see it.' };
+      const spent = address ? getSpentToday(r.home, address) : { spentWei: 0n, reservedWei: 0n };
       return { wallet: address, network: r.net.name, perTxQuai: r.limits.perTxQuai, dailyQuai: r.limits.dailyQuai, spentTodayQuai: formatAmount(BigInt(spent.spentWei)), reservedQuai: formatAmount(BigInt(spent.reservedWei || 0)), change: 'hartii config set limits.perTxQuai <quai>  |  limits.dailyQuai <quai>' };
     }
     case 'networks': {
@@ -128,6 +144,8 @@ export async function runExtra(command, args, ctx) {
       const r = rt();
       let wallets = [];
       try { wallets = walletList(r.home); } catch { /* no keystore dir yet */ }
+      // A person at a terminal with no wallet yet gets the guided setup (create or import, backup check, caps, receive).
+      if (!wallets.length && !opts.json && deps.interactive === true && deps.io) return runGuidedInit(r.home, deps.io);
       const current = wallets.find((x) => x.current);
       const steps = [];
       if (!wallets.length) steps.push('hartii wallet new            create your encrypted wallet (you choose the password)');
@@ -138,7 +156,7 @@ export async function runExtra(command, args, ctx) {
       return { status: 'BETA — the Hartii terminal wallet is beta software; start with small amounts.', node: process.versions.node, nodeOk: nodeMeetsEngines(process.versions.node), home: r.home, homeExists: existsSync(r.home), network: r.net.name, wallets: wallets.length, currentWallet: current?.name ?? null, address: current?.address ?? null, nextSteps: steps };
     }
     case 'update':
-      return runUpdate({ check: extraFlags.check === true, json: opts.json === true, yes: opts.yes === true }, { fetchFn: deps.fetchFn, spawnFn: deps.spawnFn, confirmFn: deps.confirmFn, interactive: deps.interactive, writeErr: deps.writeErr, base: deps.updateBase, tmp: deps.tmp });
+      return runUpdate({ check: extraFlags.check === true, json: opts.json === true, yes: opts.yes === true }, { fetchFn: deps.fetchFn, spawnFn: deps.spawnFn, confirmFn: deps.confirmFn, interactive: deps.interactive, writeErr: deps.writeErr, base: deps.updateBase, tmp: deps.tmp, releaseKey: deps.releaseKey });
     case 'about':
     case 'version':
       return { name: '@hartii/cli', version: PKG_VERSION, status: 'BETA', node: process.versions.node, home: rt().home, site: 'https://hartiilabs.com/cli', docs: 'https://docs.hartiilabs.com', download: 'https://hartiilabs.com/downloads/hartii-cli.tgz' };

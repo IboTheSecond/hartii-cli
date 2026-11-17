@@ -1,0 +1,26 @@
+=== whoami-none @ 60 columns (NO_COLOR) ===
+  ▍ Your wallet  mainnet
+  ────────────────────────────────────────────
+
+  You do not have a wallet yet.
+
+  Create one: hartii wallet new
+  Or take the guided tour: hartii init
+
+=== whoami-none @ 80 columns (NO_COLOR) ===
+  ▍ Your wallet  mainnet
+  ────────────────────────────────────────────
+
+  You do not have a wallet yet.
+
+  Create one: hartii wallet new
+  Or take the guided tour: hartii init
+
+=== whoami-none @ 120 columns (NO_COLOR) ===
+  ▍ Your wallet  mainnet
+  ────────────────────────────────────────────
+
+  You do not have a wallet yet.
+
+  Create one: hartii wallet new
+  Or take the guided tour: hartii init

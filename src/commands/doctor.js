@@ -14,6 +14,7 @@ import { resolveRuntimeNetwork } from '../network.js';
 import { isCyprus1QuaiAddress } from '../address.js';
 import { checkKeystorePerms, keystorePath, readKeystoreFile } from '../keystore.js';
 import { getHartiiHome, loadConfig } from '../config.js';
+import { homeLocationWarning } from '../secureFiles.js';
 import { demoDoctorChecks } from '../demoFixtures.js';
 
 const API_BASE = 'https://hartiilabs.com';
@@ -99,6 +100,9 @@ export async function runDoctor(opts = {}, deps = {}) {
   } else {
     checks.push({ name: 'addressLedger', ok: true, detail: 'no current wallet set — run `hartii wallet use <name>`' });
   }
+
+  // Where the wallet files live: outside the user profile, other accounts on this computer may read them.
+  { const warn = homeLocationWarning(home, { env: deps.env || process.env }); checks.push(warn ? { name: 'homeLocation', ok: false, detail: warn } : { name: 'homeLocation', ok: true, detail: 'wallet files are inside your user profile' }); }
 
   // 5. API reachable.
   try {

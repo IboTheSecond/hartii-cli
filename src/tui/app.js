@@ -9,8 +9,12 @@ import { ACTIONS, fieldsFor, validateAll, commandFor } from './forms.js';
 import { S } from './theme.js';
 import { stripAnsi } from '../output.js';
 import { assertCyprus1QuaiAddress } from '../address.js';
+import { SetupFlow } from '../onboarding/flow.js';
+import { renderSetup } from './setup.js';
+import { COUNT_UP_MS } from './home.js';
 
-const SENSITIVE_NOTE = 'Keys stay in the encrypted keystore. Create or import wallets with the CLI so recovery phrases are never drawn on this screen.';
+const POLL_FUNDS_MS = 4000;
+const RECEIVED_HOLD_MS = 3200;
 
 export class TuiApp {
   /**
@@ -20,14 +24,27 @@ export class TuiApp {
    * @param {object} init.deps { runCommand(fn, opts, io) -> result, listWallets(), useWallet(name), saveSettings(values), loadSettings(), addWatch(ref), removeWatch(ref), refresh(), quit(), now() }
    * @param {boolean} [init.demo]
    */
-  constructor({ data, size, deps = {}, demo = false }) {
-    this.data = { ...data, ui: defaultUi() };
+  constructor({ data, size, deps = {}, demo = false, ascii = false, motion = true }) {
+    this.data = { ...data, ui: defaultUi(), ascii: Boolean(ascii), motion: motion !== false };
+    this.setup = null; // SetupFlow while the guided setup (or a backup check) is on screen
+    this.clearNext = false; // ask the terminal layer for a full clear (after the recovery phrase page)
+    this.lastSetupStep = null;
+    this.lastFundsPoll = 0;
+    this.deps = deps;
+    try { this.data.backupPending = this.computeBackupPending(); } catch { this.data.backupPending = false; }
     this.size = size;
     this.deps = deps;
     this.demo = demo;
     this.quitRequested = false;
     this.dirty = true;
     this.pending = null; // { resolve, reject } for password / confirm overlays
+    if (!demo && deps.setup?.autoStart && !data.wallet && !(deps.listWallets?.() || []).length) this.startSetup();
+  }
+
+  computeBackupPending() {
+    const pending = this.deps.backupPending?.() || [];
+    const cur = this.data.wallet?.name;
+    return Boolean(cur && pending.includes(cur));
   }
 
   get ui() { return this.data.ui; }
@@ -35,7 +52,13 @@ export class TuiApp {
   invalidate() { this.dirty = true; this.onChange?.(); }
 
   setData(patch) {
+    const before = this.data.quaiWei;
     Object.assign(this.data, patch);
+    if (patch.quaiWei != null && before != null && this.data.motion) {
+      try { if (BigInt(patch.quaiWei) > BigInt(before)) this.ui.countUp = { fromWei: String(before), at: this.now() }; } catch { /* not a number: no animation */ }
+    }
+    if (this.setup) { this.setup.onBalance(this.data.quaiWei, this.data.wallet?.address); this.afterSetupChange(); }
+    if (patch.wallet !== undefined) { try { this.data.backupPending = this.computeBackupPending(); } catch { /* advisory */ } }
     const o = this.ui.overlay;
     if (o?.type === 'receive' && !this.sameReceiveWallet(o)) this.closeOverlay();
     this.invalidate();
@@ -43,8 +66,85 @@ export class TuiApp {
   resize(cols, rows) { this.size = { cols, rows }; this.invalidate(); }
   status(text, kind = 'info') { this.ui.status = text ? { text, kind } : null; this.invalidate(); }
 
+  /** True while something on screen is mid-animation (the terminal layer redraws faster only then). */
+  animating() {
+    if (this.setup) return Boolean(this.data.motion && ['creating', 'receive', 'received'].includes(this.setup.step));
+    const cu = this.ui.countUp;
+    return Boolean(this.data.motion && cu && this.now() - cu.at < COUNT_UP_MS + 100);
+  }
+
+  /** Called by the terminal layer on a timer: funds polling during setup, the received hold, count-up expiry. */
+  tick() {
+    const now = this.now();
+    if (this.setup) {
+      const f = this.setup;
+      if (f.step === 'receive' && now - this.lastFundsPoll >= POLL_FUNDS_MS) { this.lastFundsPoll = now; this.deps.refresh?.(); }
+      if (f.step === 'received' && f.receivedAt && now - f.receivedAt >= RECEIVED_HOLD_MS) f.finish();
+      this.afterSetupChange();
+    }
+    const cu = this.ui.countUp;
+    if (cu && now - cu.at >= COUNT_UP_MS) this.ui.countUp = null;
+  }
+
+  /** One-shot: true if the terminal must be fully cleared before the next frame, then false again. */
+  consumeClear() { const c = this.clearNext; this.clearNext = false; return c; }
+
   frame() {
+    if (this.setup) return renderSetup(this.setup, { cols: this.size.cols, rows: this.size.rows, now: this.now(), motion: this.data.motion, ascii: this.data.ascii });
     return renderFrame({ ...this.data, now: this.now() }, this.size.cols, this.size.rows);
+  }
+
+  // ---------------------------------------------------------------- guided setup
+  startSetup() {
+    const effects = this.deps.setup?.effects;
+    if (!effects) return false;
+    this.setup = new SetupFlow({ effects: { ...effects, activate: (name) => { effects.activate?.(name); this.deps.useWallet?.(name); }, copyText: (t) => this.deps.copyText?.(t) }, now: () => this.now() });
+    this.lastSetupStep = this.setup.step;
+    this.invalidate();
+    return true;
+  }
+
+  afterSetupChange() {
+    const f = this.setup;
+    if (!f) return;
+    if (this.lastSetupStep === 'phrase' && f.step !== 'phrase') this.clearNext = true; // the recovery phrase page is gone: wipe the terminal
+    this.lastSetupStep = f.step;
+    if (f.quitRequested) { f.abort(); this.clearNext = true; this.setup = null; this.quit(); return; }
+    if (f.step === 'done') {
+      const backup = f.mode === 'backup';
+      this.setup = null; this.clearNext = true;
+      this.data.backupPending = this.computeBackupPending();
+      this.deps.refresh?.();
+      this.status(backup ? 'Backup checked. Thank you.' : f.backupPending ? 'Wallet ready. Remember to back up your recovery phrase.' : 'Your wallet is ready.', backup || !f.backupPending ? 'ok' : 'info');
+    }
+    this.invalidate();
+  }
+
+  async setupKey(k) {
+    const f = this.setup;
+    const r = f.key(k);
+    this.invalidate();
+    if (r?.then) { try { await r; } catch { /* the flow records its own errors */ } }
+    this.afterSetupChange();
+  }
+
+  /** The home banner action: unlock the wallet with its password, show the phrase once, check 3 words. */
+  async startBackup() {
+    const cur = this.data.wallet;
+    if (!cur || !this.deps.setup?.effects?.revealPhrase) return;
+    let phrase;
+    try {
+      const password = await this.askPassword(`Password for wallet "${cur.name}"`);
+      phrase = await this.deps.setup.effects.revealPhrase({ name: cur.name, password });
+    } catch (e) {
+      this.closeOverlay();
+      if (String(e?.message) !== 'Aborted.') this.status(String(e?.message || e).slice(0, 100), 'error');
+      return;
+    }
+    this.closeOverlay();
+    this.setup = SetupFlow.forBackup({ effects: this.deps.setup.effects, name: cur.name, address: cur.address, phrase, now: () => this.now() });
+    this.lastSetupStep = 'phrase';
+    this.invalidate();
   }
 
   // ---------------------------------------------------------------- keys
@@ -52,10 +152,12 @@ export class TuiApp {
   key(k) {
     const o = this.ui.overlay;
     if (k.ctrl && k.name === 'c') return this.quit();
+    if (this.setup) return this.setupKey(k);
     if (o) return this.overlayKey(o, k);
     const name = k.name;
     if (k.str === 'q') return this.quit();
     if (k.str === '?') { this.ui.overlay = { type: 'help' }; return this.invalidate(); }
+    if (k.str === 'b' && this.data.backupPending && !o) { this.startBackup(); return undefined; }
     if (k.str === 'r') { this.deps.refresh?.(); this.status('Refreshing…'); return undefined; }
     if (name === 'tab') return this.cycleFocus(k.shift ? -1 : 1);
     const focus = this.ui.focus;
@@ -92,6 +194,7 @@ export class TuiApp {
 
   quit() {
     this.quitRequested = true;
+    if (this.setup) { this.setup.abort(); this.setup = null; this.clearNext = true; }
     if (this.ui.overlay?.type === 'receive') this.closeOverlay();
     if (this.pending) { this.pending.reject?.(new Error('Aborted.')); this.pending = null; }
     this.deps.quit?.();
@@ -308,7 +411,8 @@ export class TuiApp {
     try {
       await this.deps.saveSettings?.(o.values);
       this.closeOverlay();
-      this.status(`Saved: ${o.values.network}, per-tx ${o.values.perTxQuai} QUAI, daily ${o.values.dailyQuai} QUAI`, 'ok');
+      const cap = (x) => (String(x ?? '').trim() ? `${String(x).trim()} QUAI` : 'no cap');
+      this.status(`Saved: ${o.values.network}, per-tx ${cap(o.values.perTxQuai)}, daily ${cap(o.values.dailyQuai)}`, 'ok');
       this.deps.refresh?.();
     } catch (e) {
       o.fields.find((f) => f.key === 'perTxQuai').error = String(e.message || e).slice(0, 100);
@@ -328,6 +432,23 @@ export class TuiApp {
         const lines = summary.splice(0).join('\n').split('\n').filter((l) => l.trim()).map((text, i) => ({ text, st: i === 0 ? S.title : S.ink }));
         this.pending = { resolve, reject };
         this.ui.overlay = { type: 'confirm', title: 'Confirm', lines, footer: 'y  confirm and sign     n  cancel' };
+        this.invalidate();
+      }),
+      // New payee (writePipeline): the same scrolled review first, then the last 4 characters typed by hand.
+      // Any cancel resolves '' so the pipeline aborts with "recipient-not-confirmed" and nothing is sent.
+      typedConfirmFn: (question) => new Promise((resolve) => {
+        const lines = summary.splice(0).join('\n').split('\n').filter((l) => l.trim()).map((text, i) => ({ text, st: i === 0 ? S.title : S.ink }));
+        const label = String(question || 'Type the last 4 characters of the address').replace(/:\s*$/, '');
+        this.pending = {
+          resolve: (ok) => {
+            if (!ok) { resolve(''); return; }
+            this.pending = { resolve: (value) => resolve(String(value ?? '')), reject: () => resolve('') };
+            this.ui.overlay = { type: 'prompt', title: 'New recipient', fields: [{ label, value: '', mask: false }], index: 0, keepOpen: true };
+            this.invalidate();
+          },
+          reject: () => resolve(''),
+        };
+        this.ui.overlay = { type: 'confirm', title: 'Confirm', lines, footer: 'y  continue to the recipient check     n  cancel' };
         this.invalidate();
       }),
     };
@@ -354,7 +475,7 @@ export class TuiApp {
       const msg = String(e?.message || e);
       const txHash = typeof e?.txHash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(e.txHash) ? e.txHash : null;
       const status = e?.status === 'reverted' ? 'reverted' : e?.status === 'unconfirmed' || txHash ? 'unconfirmed' : 'failed';
-      const lines = msg.split('\n').map(text => ({ text, st: status === 'unconfirmed' ? S.warn : S.down }));
+      const lines = msg.split('\n').map(text => ({ text, st: status === 'unconfirmed' ? S.warn : S.danger }));
       if (status === 'unconfirmed') lines.push({ text: 'Outcome unknown — do not resend. Check the transaction first.', st: S.warn });
       if (txHash) lines.push({ text: `tx ${txHash}`, st: S.ink }, { text: `Check status: hartii tx ${txHash}`, st: S.muted });
       this.ui.overlay = { type: 'result', title: `${title} — ${status}`, lines, footer: 'Esc close' };
@@ -380,7 +501,8 @@ export class TuiApp {
   openWallets() {
     const wallets = this.deps.listWallets?.() || [];
     if (!wallets.length) {
-      this.ui.overlay = { type: 'result', title: 'Wallets', lines: [{ text: 'No wallets yet.', st: S.warn }, { text: 'Run `hartii wallet new` or `hartii wallet import` in a shell.', st: S.ink }, { text: SENSITIVE_NOTE, st: S.muted }], footer: 'Esc close' };
+      if (this.startSetup()) return undefined;
+      this.ui.overlay = { type: 'result', title: 'Wallets', lines: [{ text: 'No wallets yet.', st: S.warn }, { text: 'Run `hartii wallet new` or `hartii wallet import` in a shell.', st: S.ink }], footer: 'Esc close' };
       return this.invalidate();
     }
     const o = {

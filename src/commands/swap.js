@@ -11,7 +11,7 @@ import { deadlineTimestamp } from '../../vendor/src/utils/deadline.js';
 import { HARTIISWAP_ROUTER_ABI } from '../abi/hartiiSwapRouter.js';
 import { hartiiSwapAddresses } from '../liveAddresses.js';
 import { resolveToken, MarketError } from '../marketApi.js';
-import { parseSlippageBps } from '../trade.js';
+import { parseSlippageBps, tradeWarnings } from '../trade.js';
 import { reserveFeeWei } from '../gasReserve.js';
 import { readErc20, ensureAllowance, approvalStop } from '../toolKit.js';
 import { DEMO_ADDRESS, DEMO_NETWORK } from '../demoFixtures.js';
@@ -39,7 +39,8 @@ async function erc20Side(address, provider, from) {
 }
 
 const readBalance = (side, provider, from) => (side.kind === 'native'
-  ? resilientRead(() => provider.getBalance(from), { method: 'quai_getBalance', params: [from, 'latest'] }).then(BigInt)
+  // No method/params: a failed read of the user's own RPC is never retried against hartiilabs.com (it would leak the address).
+  ? resilientRead(() => provider.getBalance(from), { primaryAttempts: 2 }).then(BigInt)
   : side.balance);
 
 /**
@@ -156,6 +157,7 @@ async function runSwapCore(opts, deps = {}, approvedCtx = null) {
   }
   const managedSpend=managedExitSpend(ctx,{action:sideIn.kind==='erc20' && sideOut.kind==='native'?'sell':'swap',token:sideIn.address,spender:router,units:amountInWei.toString()});
   if(managedSpend!==null)spendWei=managedSpend;
+  await ctx.unlockData?.();
   checkSpend(home, fromAddress, spendWei, limits, {now:deps.io?.now});
   const rawQuote = {
     assetInAddress: sideIn.kind === 'native' ? 'native' : sideIn.address,
@@ -196,6 +198,7 @@ async function runSwapCore(opts, deps = {}, approvedCtx = null) {
     to, data, value, spendWei,
     action: plannedTrade.action,
     extraSummary,
+    warnings: tradeWarnings({ slippageBps, tickers: [opts.tokenIn, opts.tokenOut] }),
   }, SwapError);
 }
 

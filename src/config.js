@@ -14,7 +14,9 @@ import { securePath, atomicPrivateWrite } from './secureFiles.js';
 
 export class ConfigError extends CliError {}
 
-export const DEFAULT_LIMITS = { perTxQuai: '100', dailyQuai: '500' };
+// 2026-11-16 (owner): NO default spending caps. `limits` holds only the caps the user chose; an empty object means
+// no per-transaction and no daily cap. A cap that is set behaves exactly as before.
+export const DEFAULT_LIMITS = Object.freeze({});
 
 /** @param {NodeJS.ProcessEnv} [env] */
 export function getHartiiHome(env = process.env) {
@@ -30,20 +32,20 @@ const DECIMAL_LIMIT = /^\d{1,78}(\.\d{1,18})?$/;
 const CANONICAL_LIMIT = /^(?:0|[1-9]\d{0,77})(?:\.\d{1,18})?$/;
 const plainObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 function validateConfig(value) {
-  if (!plainObject(value) || Object.keys(value).some(key => !['network', 'currentWallet', 'limits'].includes(key)) || !['mainnet', 'orchard'].includes(value.network) || !plainObject(value.limits) || Object.keys(value.limits).some(key => !['perTxQuai', 'dailyQuai'].includes(key)) || !['perTxQuai', 'dailyQuai'].every(key => typeof value.limits[key] === 'string' && DECIMAL_LIMIT.test(value.limits[key]))) {
-    throw new ConfigError('Config is malformed or has unsupported fields. Restore valid network and explicit decimal spending caps; defaults were not substituted.');
+  if (!plainObject(value) || Object.keys(value).some(key => !['network', 'currentWallet', 'limits', 'ui'].includes(key)) || (value.ui !== undefined && (!plainObject(value.ui) || Object.keys(value.ui).some(key => key !== 'terse') || (value.ui.terse !== undefined && typeof value.ui.terse !== 'boolean'))) || !['mainnet', 'orchard'].includes(value.network) || !(value.limits === undefined || plainObject(value.limits)) || Object.keys(value.limits || {}).some(key => !['perTxQuai', 'dailyQuai'].includes(key)) || !['perTxQuai', 'dailyQuai'].every(key => value.limits?.[key] === undefined || (typeof value.limits[key] === 'string' && DECIMAL_LIMIT.test(value.limits[key])))) {
+    throw new ConfigError('Config is malformed or has unsupported fields. Restore a valid network and, if you set spending caps, explicit decimal caps; nothing was substituted.');
   }
   if (value.currentWallet !== null && value.currentWallet !== undefined) {
     try { assertValidWalletName(value.currentWallet); } catch { throw new ConfigError('Config contains an invalid wallet selection.'); }
   }
-  return { network: value.network, currentWallet: value.currentWallet ?? null, limits: { perTxQuai: value.limits.perTxQuai, dailyQuai: value.limits.dailyQuai } };
+  return { network: value.network, currentWallet: value.currentWallet ?? null, ...(value.ui && value.ui.terse !== undefined ? { ui: { terse: value.ui.terse } } : {}), limits: Object.fromEntries(['perTxQuai', 'dailyQuai'].filter(key => value.limits?.[key] !== undefined).map(key => [key, value.limits[key]])) };
 }
 
 function defaultConfig() {
   return {
     network: 'mainnet',
     currentWallet: null,
-    limits: { ...DEFAULT_LIMITS },
+    limits: {},
   };
 }
 
@@ -90,7 +92,7 @@ export function configGet(cfg, key) {
     .reduce((acc, part) => (acc === undefined || acc === null ? undefined : acc[part]), cfg);
 }
 
-const SETTABLE_KEYS = new Set(['network', 'currentWallet', 'limits.perTxQuai', 'limits.dailyQuai']);
+const SETTABLE_KEYS = new Set(['network', 'currentWallet', 'limits.perTxQuai', 'limits.dailyQuai', 'ui.terse']);
 
 /**
  * Dotted-path set, returning a NEW config object (never mutates `cfg`). Only ever touches one of
@@ -106,6 +108,12 @@ export function configSet(cfg, key, value) {
   }
   const checked = validateConfig(cfg);
   const next = { ...checked, limits: { ...checked.limits } };
+  if (key === 'ui.terse') {
+    const v = String(value).toLowerCase();
+    if (v !== 'true' && v !== 'false') throw new ConfigError('ui.terse must be true or false.');
+    next.ui = { terse: v === 'true' };
+    return next;
+  }
   if (key === 'network') {
     const v = String(value).toLowerCase();
     if (v !== 'mainnet' && v !== 'orchard') throw new ConfigError('network must be "mainnet" or "orchard".');
@@ -116,6 +124,7 @@ export function configSet(cfg, key, value) {
   } else if (key === 'limits.perTxQuai' || key === 'limits.dailyQuai') {
     // Same shape the spending guard accepts (<= 18 decimals): a limit the guard cannot parse would
     // otherwise refuse EVERY later write with a confusing error.
+    if (['none', 'off', ''].includes(String(value).toLowerCase())) { delete next.limits[key.split('.')[1]]; return next; } // clear a cap
     if (/^0\d/.test(String(value))) throw new ConfigError(`${key} must not have leading zeros (use "50", not "050").`);
     if (!CANONICAL_LIMIT.test(String(value))) throw new ConfigError(`${key} must be a plain decimal QUAI amount with at most 18 decimals and 78 whole digits.`);
     next.limits[key.split('.')[1]] = String(value);

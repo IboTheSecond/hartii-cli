@@ -1,4 +1,5 @@
 import { withProviderCleanup } from '../commandContext.js';
+import { tagView } from '../output.js';
 // packages/hartii-cli/src/commands/token.js
 //
 // `hartii token <addr|ticker>` — one token's detail: price reference, live curve state,
@@ -79,4 +80,4 @@ async function runTokenCore(opts = {}, deps = {}) {
   };
 }
 
-export function runToken(opts = {}, deps = {}) { return withProviderCleanup(deps, (runtimeDeps) => runTokenCore(opts, runtimeDeps)); }
+export function runToken(opts = {}, deps = {}) { return withProviderCleanup(deps, async (runtimeDeps) => tagView(await runTokenCore(opts, runtimeDeps), 'token')); }

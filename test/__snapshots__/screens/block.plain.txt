@@ -1,0 +1,17 @@
+=== block @ 60 columns (NO_COLOR) ===
+  ▍ Latest block  mainnet
+  ────────────────────────────────────────────
+
+  10,412,877
+
+=== block @ 80 columns (NO_COLOR) ===
+  ▍ Latest block  mainnet
+  ────────────────────────────────────────────
+
+  10,412,877
+
+=== block @ 120 columns (NO_COLOR) ===
+  ▍ Latest block  mainnet
+  ────────────────────────────────────────────
+
+  10,412,877

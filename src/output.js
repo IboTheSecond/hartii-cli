@@ -53,6 +53,7 @@ export function makeColors(opts = {}) {
   const wrap = (code) => (s) => (enabled ? `\u001b[${code}m${s}\u001b[0m` : String(s));
   return {
     enabled,
+    get depth() { return enabled ? colorDepth({ env: opts.env, isTTY: true }) : 0; },
     bold: wrap(CODES.bold),
     dim: wrap(CODES.dim),
     red: wrap(CODES.red),
@@ -139,4 +140,138 @@ export function redactUrls(text) {
       return `${u.protocol}//${u.host}${path}${u.search || u.hash ? '?***' : ''}`;
     } catch { return '[redacted-url]'; }
   });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hartii look (2026-11-16): Labs black-and-white base, violet as the one accent, red only for danger.
+// Truecolor with a 256 then 16 colour fallback; NO_COLOR gives plain text. Meaning never depends on
+// colour alone: callers always pair a colour with a word or a symbol.
+// ---------------------------------------------------------------------------------------------
+
+/** The colour tokens, from the shared brief. */
+export const TOKENS = {
+  text: '#F2F1F4', muted: '#9B98A3', dim: '#66636D', surface: '#141416', background: '#0D0D0E',
+  accent: '#7C3AED', accentBright: '#A78BFA', accentDark: '#6D28D9',
+  danger: '#F0465C', ok: '#22C55E', warn: '#FFB020',
+};
+
+/** 24 (truecolor), 8-bit 256, or 4-bit 16. Not a TTY or NO_COLOR: 0. */
+export function colorDepth(opts = {}) {
+  const env = opts.env || process.env;
+  if (!colorEnabled(opts)) return 0;
+  const force = typeof env.FORCE_COLOR === 'string' ? env.FORCE_COLOR : '';
+  if (force === '1') return 4;
+  if (force === '2') return 8;
+  if (force === '3') return 24;
+  const ct = String(env.COLORTERM || '').toLowerCase();
+  if (ct === 'truecolor' || ct === '24bit' || env.WT_SESSION || /^(vscode|iTerm\.app|WezTerm|ghostty)$/i.test(env.TERM_PROGRAM || '')) return 24;
+  if (/256color|-direct$/i.test(env.TERM || '')) return 8;
+  return 4;
+}
+
+const hexRgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+function to256([r, g, b]) {
+  if (Math.abs(r - g) < 10 && Math.abs(g - b) < 10) {
+    const avg = Math.round((r + g + b) / 3);
+    if (avg < 8) return 16;
+    if (avg > 248) return 231;
+    return 232 + Math.round(((avg - 8) / 247) * 23);
+  }
+  const c = (v) => Math.round((v / 255) * 5);
+  return 16 + 36 * c(r) + 6 * c(g) + c(b);
+}
+const SIXTEEN = { text: '97', muted: '37', dim: '90', accent: '35', accentBright: '95', accentDark: '35', danger: '91', ok: '92', warn: '93' };
+
+/**
+ * The themed palette. `depth` 0 returns identity functions. Every style closes only what it opened
+ * (39 for colour, 22 for weight) so styles nest without cancelling each other.
+ */
+export function makeTheme(opts = {}) {
+  const depth = opts.depth !== undefined ? opts.depth : colorDepth(opts);
+  const on = depth > 0;
+  const fg = (name) => {
+    if (!on) return (s) => String(s);
+    const open = depth >= 24 ? `38;2;${hexRgb(TOKENS[name]).join(';')}` : depth >= 8 ? `38;5;${to256(hexRgb(TOKENS[name]))}` : SIXTEEN[name];
+    return (s) => `\u001b[${open}m${s}\u001b[39m`;
+  };
+  const weight = (on_, off) => (s) => (on ? `\u001b[${on_}m${s}\u001b[${off}m` : String(s));
+  const theme = { enabled: on, depth, bold: weight(1, 22) };
+  for (const name of ['text', 'muted', 'dim', 'accent', 'accentBright', 'accentDark', 'danger', 'ok', 'warn']) theme[name] = fg(name);
+  // `dim` is the colour token; the SGR "faint" weight lives under its own name.
+  theme.faint = weight(2, 22);
+  return theme;
+}
+
+/** Length of `s` on screen: ANSI colour removed, wide/emoji not special-cased (Hartii output is Latin + box drawing). */
+export function visibleLength(s) {
+  return Array.from(stripAnsi(s)).length;
+}
+
+/** Word-wrap plain or coloured text to `width` columns; splits an over-long word. Keeps leading `indent`. */
+export function wrapText(s, width, { indent = '', hang = indent } = {}) {
+  const words = String(s).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = indent;
+  let lead = true;
+  const room = (pre) => Math.max(10, width - visibleLength(pre));
+  for (const w of words) {
+    const test = lead ? line + w : `${line} ${w}`;
+    if (visibleLength(test) <= width || lead) {
+      if (lead && visibleLength(test) > width) {
+        const chars = Array.from(stripAnsi(w));
+        const max = room(indent);
+        for (let i = 0; i < chars.length; i += max) lines.push(`${i ? hang : indent}${chars.slice(i, i + max).join('')}`);
+        line = hang; lead = true;
+        continue;
+      }
+      line = test; lead = false;
+    } else {
+      lines.push(line);
+      line = hang + w; lead = false;
+    }
+  }
+  if (!lead || !lines.length) lines.push(line);
+  return lines;
+}
+
+const VIEW = Symbol.for('hartii.view');
+/** Mark a command result with the human view that should render it. Invisible to JSON, spread and Object.keys. */
+export function tagView(result, name) {
+  if (result && typeof result === 'object') Object.defineProperty(result, VIEW, { value: name, enumerable: false, configurable: true });
+  return result;
+}
+export const viewOf = (result) => (result && typeof result === 'object' ? result[VIEW] : undefined);
+
+/**
+ * A small progress line on stderr for waits longer than `delayMs` (default 300). Only on a TTY, never with --json
+ * or NO_COLOR-agnostic animation: a plain `label…` that is rewritten in place and cleared when done.
+ */
+export async function withProgress(label, fn, { stream = process.stderr, json = false, delayMs = 300, tty = Boolean(process.stderr && process.stderr.isTTY), frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'] } = {}) {
+  if (json || !tty) return fn();
+  let timer = null;
+  let ticker = null;
+  let shown = false;
+  let i = 0;
+  const draw = () => { stream.write(`\r${frames[i++ % frames.length]} ${label}`); shown = true; };
+  timer = setTimeout(() => { draw(); ticker = setInterval(draw, 90); }, delayMs);
+  try { return await fn(); } finally {
+    clearTimeout(timer);
+    if (ticker) clearInterval(ticker);
+    if (shown) stream.write(`\r${' '.repeat(visibleLength(label) + 2)}\r`);
+  }
+}
+
+/**
+ * Presentation options for one invocation: `--terse` (or config `ui.terse`) keeps one line per result,
+ * `--details` shows the technical block under a review, width is the terminal width (60/80/120 all work).
+ * Pure: pass `cfg` (loaded config), the parsed extra flags and the stdout stream.
+ */
+export function uiOptions({ flags = {}, cfg = {}, stdout = process.stdout } = {}) {
+  const cfgTerse = cfg?.ui?.terse === true || cfg?.ui?.terse === 'true';
+  const columns = Number(stdout && stdout.columns);
+  return {
+    terse: flags.terse === true || (flags.terse === undefined && cfgTerse),
+    details: flags.details === true,
+    width: Number.isFinite(columns) && columns > 0 ? columns : 80,
+  };
 }

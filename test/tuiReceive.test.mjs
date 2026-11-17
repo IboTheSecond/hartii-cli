@@ -162,7 +162,10 @@ describe('QR geometry and all-action reachability', () => {
   it.each([60, 80, 120])('shows the selected action instead of an invisible button at %s columns', cols => {
     for (let i = 0; i < rendering.MENU.length; i++) {
       const data = { ...demoState(NOW), ui: { focus: 'actions', menu: i }, now: NOW };
-      expect(rendering.renderFrame(data, cols, 24).toPlain().split('\n')[22]).toContain(rendering.MENU[i]);
+      // the home screen marks the selected action without colour: a "›" on the big buttons, [brackets] on the chips
+      const name = rendering.MENU[i];
+      const text = rendering.renderFrame(data, cols, 24).toPlain();
+      expect(text).toMatch(i < 2 ? new RegExp(`›\\s*\\S\\s+${name}`) : new RegExp(`\\[${name}\\]`));
     }
   });
 });

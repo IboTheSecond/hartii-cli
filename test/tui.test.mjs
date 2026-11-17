@@ -86,7 +86,8 @@ describe('frame invariants', () => {
     const none = frame(80, 24).toAnsiRows('none').join('');
     expect(none).not.toMatch(/38;|48;/);
     const tc = frame(80, 24).toAnsiRows('truecolor').join('');
-    expect(tc).toMatch(/38;2;229;36;59/); // the Hartii red signal exists in the frame
+    expect(tc).toMatch(/38;2;167;139;250/); // the violet accent exists in the frame
+    expect(tc).not.toMatch(/240;70;92/); // red is reserved for danger: a healthy home frame has none
     expect(colorDepth({ NO_COLOR: '1' })).toBe('none');
     expect(colorDepth({ COLORTERM: 'truecolor' })).toBe('truecolor');
   });
@@ -102,7 +103,9 @@ describe('frame invariants', () => {
     const f = frame(120, 40, { focus: 'trades', menu: 2 });
     expect(f.toPlain()).toContain('▌LIVE TRADES');
     const ansi = f.toAnsiRows('truecolor').join('\n');
-    expect(ansi).toMatch(/48;2;229;36;59/); // actions bar is unfocused => no red bg
+    const rowOf = (fr, re) => { const i = fr.toPlain().split('\n').findIndex(t => re.test(t)); return fr.toAnsiRows('truecolor')[i]; };
+    expect(rowOf(f, /Trade/)).not.toMatch(/48;2;124;58;237/); // the action chips are unfocused => no accent bg
+    expect(rowOf(frame(120, 40, { focus: 'actions', menu: 2 }), /Trade/)).toMatch(/48;2;124;58;237/); // the focused action wears the accent
   });
 });
 

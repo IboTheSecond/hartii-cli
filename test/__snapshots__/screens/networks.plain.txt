@@ -1,0 +1,37 @@
+=== networks @ 60 columns (NO_COLOR) ===
+  ▍ Networks
+  ────────────────────────────────────────────
+
+  NETWORK    STATUS     CHAIN
+  ● mainnet  active         9
+    node  https://rpc.quai.network/cyprus1
+    trading & tools  yes
+    orchard  available  15000
+    node  https://orchard.rpc.quai.network/cyprus1
+    trading & tools  no
+
+  Switch with `hartii config set network <name>` or
+  `--network <name>` on any command.
+
+=== networks @ 80 columns (NO_COLOR) ===
+  ▍ Networks
+  ────────────────────────────────────────────
+
+  NETWORK    STATUS     CHAIN  NODE
+  ● mainnet  active         9  https://rpc.quai.network/cyprus1
+    trading & tools  yes
+    orchard  available  15000  https://orchard.rpc.quai.network/cyprus1
+    trading & tools  no
+
+  Switch with `hartii config set network <name>` or `--network <name>` on any
+  command.
+
+=== networks @ 120 columns (NO_COLOR) ===
+  ▍ Networks
+  ────────────────────────────────────────────
+
+  NETWORK    STATUS     CHAIN  TRADING & TOOLS  NODE
+  ● mainnet  active         9  yes              https://rpc.quai.network/cyprus1
+    orchard  available  15000  no               https://orchard.rpc.quai.network/cyprus1
+
+  Switch with `hartii config set network <name>` or `--network <name>` on any command.

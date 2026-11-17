@@ -64,7 +64,8 @@ describe('P1: send all to a fresh address must not brick the wallet', () => {
   it('reserves gas from the real value-bearing estimate and the send is accepted', async () => {
     const account = generateMnemonicAccount();
     writeKeystoreFile(home, 'default', await encryptAccount({ address: account.address, privateKey: account.privateKey }, PASSWORD, { scrypt: { N: 2, r: 1, p: 1 } }));
-    saveConfig(home, { ...loadConfig(home), currentWallet: 'default' });
+    // 2026-11-16: no default caps; --yes needs caps the user set, and a never-paid recipient needs --new-recipient-ok.
+    saveConfig(home, { ...loadConfig(home), currentWallet: 'default', limits: { perTxQuai: '100', dailyQuai: '500' } });
     const node = fakeNode({ balance: 10n * ONE });
     const wallet = { ...node.wallet, getAddress: async () => account.address };
     wallet.sendTransaction = vi.fn(async (tx) => {
@@ -73,7 +74,7 @@ describe('P1: send all to a fresh address must not brick the wallet', () => {
       return { hash: HASH, wait: async () => ({ status: 1, hash: HASH }) };
     });
     const chainFetch = vi.fn(async () => ({ json: async () => ({ result: '0x9' }) }));
-    const result = await runSend({ home, to: FRESH, amount: 'all', yes: true }, { fetchFn: chainFetch, providerFactory: () => node.provider, walletFactory: key => offlineWallet(key,node.provider,wallet.sendTransaction), passwordDeps: { env: { HARTII_PASSWORD: PASSWORD } } });
+    const result = await runSend({ home, to: FRESH, amount: 'all', yes: true, newRecipientOk: true }, { fetchFn: chainFetch, providerFactory: () => node.provider, walletFactory: key => offlineWallet(key,node.provider,wallet.sendTransaction), passwordDeps: { env: { HARTII_PASSWORD: PASSWORD } } });
     expect(result.ok).toBe(true);
     expect(wallet.sendTransaction).toHaveBeenCalledTimes(1);
     expect(getSpentToday(home, account.address).reservedWei).toBe(0n);
@@ -128,13 +129,13 @@ describe('--key-env: dry run resolves the same sender as the real run', () => {
     const keystoreAccount = generateMnemonicAccount();
     const envAccount = generateMnemonicAccount();
     writeKeystoreFile(home, 'default', await encryptAccount({ address: keystoreAccount.address, privateKey: keystoreAccount.privateKey }, PASSWORD, { scrypt: { N: 2, r: 1, p: 1 } }));
-    saveConfig(home, { ...loadConfig(home), currentWallet: 'default' });
+    saveConfig(home, { ...loadConfig(home), currentWallet: 'default', limits: { perTxQuai: '100', dailyQuai: '500' } });
     const env = { HARTII_TEST_KEY: envAccount.privateKey };
     const node = fakeNode({ balance: 50n * ONE });
     const signed = [];
     const walletFactory = key => offlineWallet(key,node.provider,async tx => { signed.push(tx); return { hash: HASH, wait: async () => ({ status: 1, hash: HASH }), ...tx }; });
     const deps = { fetchFn: async () => ({ json: async () => ({ result: '0x9' }) }), providerFactory: () => node.provider, walletFactory, env, io: { write: () => {}, writeErr: () => {}, env } };
-    const base = { home, to: TO, amount: '1', keyEnv: 'HARTII_TEST_KEY', yes: true, json: true };
+    const base = { home, to: TO, amount: '1', keyEnv: 'HARTII_TEST_KEY', yes: true, newRecipientOk: true, json: true };
     const dry = await runSend({ ...base, dryRun: true }, deps);
     const real = await runSend(base, deps);
     expect(dry.summary.from).toBe(envAccount.address);

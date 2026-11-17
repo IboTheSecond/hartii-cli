@@ -115,3 +115,26 @@ export function parseSlippageBps(input, fallbackPct = 3) {
   }
   return Math.round(pct * 100);
 }
+
+// ---- Warn, never block (owner 2026-11-16): trading inputs have no hard limits, but risky ones are flagged in red. ----
+export const SLIPPAGE_WARN_BPS = 1000; // above 10%
+const ADDRESS_INPUT = /^0x[0-9a-fA-F]{40}$/;
+/** True when the user named a token by ticker/name instead of by address (QUAI/WQUAI are the native pair, not tickers to confuse). */
+export const isTickerInput = (input) => {
+  const raw = String(input ?? '').trim();
+  return raw !== '' && !ADDRESS_INPUT.test(raw) && !['quai', 'wquai'].includes(raw.toLowerCase());
+};
+/**
+ * Warnings for summary.warnings: slippage above 10% (danger) and a token picked by ticker (warn).
+ * @param {{ slippageBps?: number, tickers?: string[] }} o tickers = the user inputs that were ticker names
+ */
+export function tradeWarnings({ slippageBps, tickers = [] } = {}) {
+  const out = [];
+  if (Number.isFinite(slippageBps) && slippageBps > SLIPPAGE_WARN_BPS) {
+    out.push({ level: 'danger', code: 'slippage-high', text: `Slippage is ${(slippageBps / 100).toString()}%, above 10%. You may receive much less than quoted. The trade is still allowed.` });
+  }
+  for (const t of tickers.filter(isTickerInput)) {
+    out.push({ level: 'warn', code: 'token-by-ticker', text: `You picked "${String(t).replace(/[^\x20-\x7e]/g, '?').slice(0, 24)}" by name, not by address. Names are not unique: check the token address below is the one you mean.` });
+  }
+  return out;
+}

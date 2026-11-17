@@ -1,0 +1,42 @@
+=== limits @ 60 columns (NO_COLOR) ===
+  ▍ Spending limits  mainnet
+  ────────────────────────────────────────────
+
+  Wallet           0x0000 0000 0000 0000 0000
+                     0000 0000 0000 0000 0d01
+  Per transaction  50 QUAI
+  Per day          200 QUAI
+  Spent today      12.5 QUAI
+  Left today       187.5 QUAI
+
+  Change them:
+    hartii config set limits.perTxQuai <quai>
+    hartii config set limits.dailyQuai <quai>
+
+=== limits @ 80 columns (NO_COLOR) ===
+  ▍ Spending limits  mainnet
+  ────────────────────────────────────────────
+
+  Wallet           0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+  Per transaction  50 QUAI
+  Per day          200 QUAI
+  Spent today      12.5 QUAI
+  Left today       187.5 QUAI
+
+  Change them:
+    hartii config set limits.perTxQuai <quai>
+    hartii config set limits.dailyQuai <quai>
+
+=== limits @ 120 columns (NO_COLOR) ===
+  ▍ Spending limits  mainnet
+  ────────────────────────────────────────────
+
+  Wallet           0x0000 0000 0000 0000 0000 0000 0000 0000 0000 0d01
+  Per transaction  50 QUAI
+  Per day          200 QUAI
+  Spent today      12.5 QUAI
+  Left today       187.5 QUAI
+
+  Change them:
+    hartii config set limits.perTxQuai <quai>
+    hartii config set limits.dailyQuai <quai>

@@ -1,4 +1,5 @@
-import { safeTerminalText, redactUrls } from './output.js';
+import { redactUrls } from './output.js';
+import { renderReview } from './review.js';
 // packages/hartii-cli/src/writePipeline.js
 //
 // The ONE path every write command (send, and later buy/sell/swap/airdrop/otc/claim/wall) goes
@@ -17,7 +18,9 @@ import { createHash } from 'node:crypto';
 import { resilientRead } from '../vendor/packages/agent-mcp/src/rpcClient.js';
 import { readGasPrice } from './gasPrice.js';
 import { classifyError } from '../vendor/packages/agent-mcp/src/errors.js';
-import { checkSpend, withSpendLock, reserveSpend, markSpendHash, settleSpend, assertNoPendingSpend } from './spendingGuard.js';
+import { checkSpend, withSpendLock, reserveSpend, markSpendHash, settleSpend, assertNoPendingSpend, hasCaps } from './spendingGuard.js';
+import { hasPaid, knownAddresses, lookalikeOf, recordPaid, findContactByAddress, lastFour } from './contacts.js';
+import { readVisibleInput } from './prompt.js';
 import { NETWORKS } from './network.js';
 import { quaiscanTxUrl } from './quaiscan.js';
 import { confirm as defaultConfirm } from './prompt.js';
@@ -185,6 +188,13 @@ async function runWriteLocked(ctx, from) {
   const confirmFn = io.confirmFn || defaultConfirm;
   const now = io.now;
 
+  // Hard rule: no send without a preview. --yes skips the prompt ONLY when the user has set spending caps.
+  if (yes && !dryRun && !hasCaps(limits)) {
+    throw new WriteError('--yes skips the review step, so it needs spending caps you set yourself. Set one first, for example: hartii config set limits.perTxQuai 25  (and limits.dailyQuai 100). Or leave --yes off and confirm each send.');
+  }
+  // Encrypted local data (spend ledger, paid list) is unlocked here, once, where the wallet password is asked.
+  await ctx.unlockData?.();
+
   if (!Object.hasOwn(NETWORKS, network.name) || BigInt(network.chainId) !== BigInt(NETWORKS[network.name].chainId)) throw new WriteError('Invalid selected network authority.');
   // Dry runs enforce the same pending-authority and chain checks as a real run, so a dry run never reports success a real run would refuse.
   assertNoPendingSpend(home, from, network.chainId);
@@ -296,16 +306,41 @@ async function runWriteLocked(ctx, from) {
     dataBytes: (data.length - 2) / 2,
   };
 
-  printSummary(summary, { write: json ? (io.writeErr || ((s) => process.stderr.write(s + '\n'))) : write, json, colors: io.colors });
+  // ---- warnings (shared contract: summary.warnings = [{ level, code, text }]) ----
+  const warnings = [...(ctx.warnings || [])];
+  if (spendWei > 0n && feeWei > spendWei) warnings.push({ level: 'danger', code: 'fee-exceeds-value', text: `The network fee (${formatAmount(feeWei)} QUAI) is more than the value you are sending (${formatAmount(spendWei)} QUAI).` });
+  const payee = ctx.recipient ? payeeCheck(home, network.chainId, ctx.recipient) : null;
+  if (payee) {
+    if (payee.isNew) warnings.push({ level: 'danger', code: 'new-recipient', text: payee.contact ? `You have never paid this address from this computer, although it is saved as "${payee.contact.name}".` : 'NEW recipient: you have never paid this address from this computer.' });
+    if (payee.lookalike) warnings.push({ level: 'danger', code: 'address-lookalike', text: `This address starts and ends like ${payee.lookalike.label} but is a different address. Scammers send tiny payments from look-alike addresses so you copy the wrong one. Check every character.` });
+  }
+  if (warnings.length) summary.warnings = warnings;
+  if (payee?.contact) summary.recipientContact = payee.contact.name;
+
+  printSummary(summary, { write: json ? (io.writeErr || ((s) => process.stderr.write(s + '\n'))) : write, json, colors: io.colors, details: ctx.details ?? io.details, terse: io.terse, width: io.width, dryRun });
 
   if (dryRun) {
     return { ok: true, dryRun: true, summary: jsonSafe(summary) };
   }
 
+  const needsTyped = Boolean(payee && (payee.isNew || payee.lookalike));
+  if (yes && needsTyped) {
+    if (payee.lookalike) throw new WriteError('Refusing to send unattended: this recipient looks like a different address you already know (possible address-poisoning). Run it again without --yes, in a terminal, and check the address.');
+    if (!ctx.newRecipientOk) throw new WriteError('This recipient has never been paid from this computer. Unattended sends to a new recipient need --new-recipient-ok together with --yes (and spending caps).');
+  }
   if (!yes) {
-    const proceed = await confirmFn('Proceed?', io);
-    if (!proceed) {
-      return { ok: false, aborted: true, summary: jsonSafe(summary) };
+    if (needsTyped) {
+      // New payee: a y/N is too easy to tap through. Type the last 4 characters of the address instead.
+      const ask = io.typedConfirmFn || ((q) => readVisibleInput(q, io));
+      const interactive = io.interactive ?? (io.typedConfirmFn ? true : Boolean(process.stdin.isTTY && process.stdout.isTTY));
+      if (!interactive) throw new WriteError('This recipient is new and there is no terminal to confirm it. Run it in a terminal and type the last 4 characters of the address, or pass --yes --new-recipient-ok (needs spending caps).');
+      const typed = String(await ask(`New recipient. To confirm, type the last 4 characters of ${ctx.recipient}: `, io) ?? '').trim().toLowerCase();
+      if (typed !== lastFour(ctx.recipient)) return { ok: false, aborted: true, summary: jsonSafe(summary), reason: 'recipient-not-confirmed' };
+    } else {
+      const proceed = await confirmFn('Proceed?', io);
+      if (!proceed) {
+        return { ok: false, aborted: true, summary: jsonSafe(summary) };
+      }
     }
   }
 
@@ -373,16 +408,24 @@ async function runWriteLocked(ctx, from) {
   // Successful writes charge guarded value plus gas; reverts above charge gas only.
   settleSpend(home, from, reservation, {confirmed:true,chargedWei:spendWei+minedFee(receipt,gasLimit,gasPrice),now});
 
+  // Confirmed receipt only: remember the recipient as paid (a failure to save never turns a sent payment into an error).
+  let paidListSaved;
+  if (ctx.recipient) { try { recordPaid(home, network.chainId, ctx.recipient, { now: io.now }); } catch { paidListSaved = false; } }
   const quaiscanUrl = quaiscanTxUrl(network.name, sent.hash);
-  return { ok: true, txHash: sent.hash, status: 'success', quaiscanUrl, summary: jsonSafe(summary), receipt: {status:1,blockNumber:receipt.blockNumber ?? null,transactionHash:receipt.hash || receipt.transactionHash || sent.hash,gasUsed:receipt.gasUsed == null ? null : String(receipt.gasUsed)} };
+  return { ok: true, txHash: sent.hash, status: 'success', quaiscanUrl, ...(payee?.isNew ? { newRecipient: ctx.recipient } : {}), ...(paidListSaved === false ? { paidListSaved } : {}), summary: jsonSafe(summary), receipt: {status:1,blockNumber:receipt.blockNumber ?? null,transactionHash:receipt.hash || receipt.transactionHash || sent.hash,gasUsed:receipt.gasUsed == null ? null : String(receipt.gasUsed)} };
 }
 
-function printSummary(summary, { write, json, colors }) {
+function payeeCheck(home, chainId, recipient) {
+  const address = assertCyprus1QuaiAddress(recipient);
+  const isNew = !hasPaid(home, chainId, address);
+  const lookalike = lookalikeOf(address, knownAddresses(home, chainId));
+  return { address, isNew, lookalike, contact: findContactByAddress(home, address) };
+}
+
+function printSummary(summary, { write, json, colors, details, terse, width, dryRun }) {
   if (json) {
     write(JSON.stringify({ summary: jsonSafe(summary) }, null, 2));
     return;
   }
-  const c = colors || { bold: (s) => s, dim: (s) => s, purple: (s) => s };
-  const lines = [c.bold(safeTerminalText(summary.action)), ...Object.entries(summary).filter(([k]) => k !== 'action').map(([k, v]) => `  ${c.dim(k)}: ${safeTerminalText(v)}`)];
-  write(lines.join('\n'));
+  write(renderReview(summary, { details: details === true, terse: terse === true, dryRun: dryRun === true, color: Boolean(colors?.enabled), depth: colors?.depth, width: width ?? (process.stdout.columns || 80) }));
 }

@@ -3,7 +3,7 @@ import { withAddr } from '../output.js';
 import { withProviderCleanup, marketRuntime, writeVia } from '../commandContext.js';
 import { parseAmount, formatAmount } from '../amount.js';
 import { resilientRead } from '../../vendor/packages/agent-mcp/src/rpcClient.js';
-import { quoteAndBuildBuy, parseSlippageBps, resolveCurveToken, divergenceSummary, quoteAs } from '../trade.js';
+import { tradeWarnings, quoteAndBuildBuy, parseSlippageBps, resolveCurveToken, divergenceSummary, quoteAs } from '../trade.js';
 import { DEMO_ADDRESS, DEMO_NETWORK, DEMO_TOKEN, DEMO_CURVE_META } from '../demoFixtures.js';
 import { reserveFeeWei } from '../gasReserve.js';
 import { localQuote } from '../curveQuote.js';
@@ -85,6 +85,7 @@ async function runBuyCore(opts, deps = {}) {
     value: quote.valueWei,
     action: `Buy ${withAddr(tokenInfo.symbol, tokenAddress)}`,
     extraSummary,
+    warnings: tradeWarnings({ slippageBps, tickers: [opts.token] }),
   }, BuyError);
 }
 
