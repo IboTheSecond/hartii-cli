@@ -28,7 +28,8 @@ import {
   checkKeystorePerms,
 } from '../keystore.js';
 import { loadConfig, saveConfig } from '../config.js';
-import { resolvePassword, readHiddenInput, readVisibleInput, resolveNewPassword } from '../prompt.js';
+import { removeWalletSlot } from '../localVault.js';
+import { resolvePassword, readHiddenInput, readVisibleInput, resolveNewPassword, requireInteractiveTerminal, promptPasswordOnTerminal } from '../prompt.js';
 import { checkNewPassword } from '../onboarding/password.js';
 import { clearBackupPending } from '../onboarding/state.js';
 
@@ -141,6 +142,7 @@ export async function walletExport(home, name, deps = {}) {
   if (!resolvedName) throw new WalletError('No wallet selected. Pass a name: `hartii wallet export <name>`.');
   if (!walletExists(home, resolvedName)) throw new WalletError(`No wallet named "${resolvedName}".`);
 
+  requireInteractiveTerminal(deps, 'Exporting a recovery phrase or private key');
   const confirmFn = deps.confirmTypedFn || readVisibleInput;
   const typed = await confirmFn(`Type "${resolvedName}" to confirm exporting its private key/mnemonic: `, deps);
   if (String(typed).trim() !== resolvedName) {
@@ -148,7 +150,8 @@ export async function walletExport(home, name, deps = {}) {
   }
 
   const json = readKeystoreFile(home, resolvedName);
-  const password = await resolvePassword({ ...deps, label: `Password for wallet "${resolvedName}": ` });
+  // Always a hidden prompt on the terminal: HARTII_PASSWORD and --key-env never unlock an export.
+  const password = await promptPasswordOnTerminal(`Password for wallet "${resolvedName}": `, deps);
   const account = await decryptAccount(json, password);
   const result = { name: resolvedName, address: account.address, privateKey: account.privateKey };
   if (account.mnemonic) {
@@ -175,6 +178,7 @@ export async function walletRemove(home, name, deps = {}) {
   if (!name) throw new WalletError('Usage: hartii wallet remove <name>');
   if (!walletExists(home, name)) throw new WalletError(`No wallet named "${name}".`);
   loadConfig(home); // refuse corrupted policy before destructive confirmation
+  requireInteractiveTerminal(deps, 'Removing a wallet');
   const confirmFn = deps.confirmTypedFn || readVisibleInput;
   const typed = await confirmFn(`Type "${name}" to confirm PERMANENTLY removing this wallet's local keystore file: `, deps);
   if (String(typed).trim() !== name) {
@@ -182,8 +186,10 @@ export async function walletRemove(home, name, deps = {}) {
   }
   const cfg = loadConfig(home);
   removeKeystoreFile(home, name);
+  let vaultSlot = 'none';
+  try { const r = removeWalletSlot(home, name); vaultSlot = r.removed ? 'removed' : r.retired ? 'retired' : 'none'; } catch { vaultSlot = 'unreadable'; }
   if (cfg.currentWallet === name) saveConfig(home, { ...cfg, currentWallet: null });
-  return { name, removed: true };
+  return { name, removed: true, vaultSlot };
 }
 
 /** `wallet lock-check <name>` — confirms the keystore file is present, well-formed, and owner-only permissioned. Never needs a password. */

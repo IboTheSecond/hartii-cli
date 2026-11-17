@@ -53,38 +53,19 @@ export function resolveSender(home, opts = {}, deps = {}) {
   return { name, address, envWallet: undefined };
 }
 
-export async function writeRuntime(opts = {}, deps = {}) {
-  const runtime = readRuntime(opts, deps);
-  await assertChainId(runtime.net.rpcUrl, runtime.net.chainId, { fetchFn: deps.fetchFn });
-  const provider = (deps.providerFactory || createProvider)(runtime.net.rpcUrl);
-  const { name, address, envWallet } = resolveSender(runtime.home, opts, deps);
-  const from = assertCyprus1QuaiAddress(address);
+/**
+ * The ONE offline-signing wallet every write goes through: signs the fully reviewed transaction locally, re-decodes the
+ * signed bytes against the review, re-checks chain and nonce, then broadcasts explicitly. Used by writeRuntime and by
+ * the Qi payment-notice (R3-F4), so no write lane has its own signing path.
+ */
+export function buildReviewedWallet({ provider, from, chainId, getPrivateKey, walletFactory, io, dryRun = false }) {
   let signer;
-  // One password per command: the same answer unlocks the encrypted local data and decrypts the keystore for signing.
-  let passwordPromise, verifiedAccount;
-  const getPassword = () => (passwordPromise ??= resolvePassword({ ...deps.passwordDeps, label: `Password for wallet "${name}": ` }).catch((e) => { passwordPromise = undefined; throw e; }));
-  let unlockPromise;
-  // Called by the write pipeline right before it first touches the spend ledger / paid list. A dry run never creates the
-  // vault; a real run creates it the first time (sealing the existing plain files). --key-env senders use HARTII_PASSWORD only.
-  const unlockData = () => (unlockPromise ??= (async () => {
-    if (envWallet) {
-      const env = deps.env || deps.io?.env || process.env;
-      return unlockLocalData({ home: runtime.home, wallet: opts.wallet, create: false, getPassword: async () => { if (!env.HARTII_PASSWORD) throw new WalletError('Your local data is encrypted. Set HARTII_PASSWORD to the wallet password to use --key-env.'); return env.HARTII_PASSWORD; } });
-    }
-    return unlockLocalData({ home: runtime.home, wallet: name, create: !opts.dryRun, getPassword, onAccount: (a) => { verifiedAccount = a; } });
-  })().catch((e) => { unlockPromise = undefined; throw e; }));
   async function prepareSigner() {
-    if (opts.dryRun) { const error = new WalletError('A dry run cannot unlock or sign.'); error.notSubmitted = true; throw error; }
+    if (dryRun) { const error = new WalletError('A dry run cannot unlock or sign.'); error.notSubmitted = true; throw error; }
     try {
       if (!signer) {
-        let privateKey;
-        if (envWallet) privateKey = envWallet.privateKey;
-        else {
-          const account = verifiedAccount || await decryptAccount(readKeystoreFile(runtime.home, name), await getPassword());
-          if (assertCyprus1QuaiAddress(account.address) !== from) throw new WalletError('Keystore address mismatch.');
-          privateKey = account.privateKey;
-        }
-        signer = deps.walletFactory ? deps.walletFactory(privateKey, provider) : new Wallet(privateKey, provider);
+        const privateKey = await getPrivateKey();
+        signer = walletFactory ? walletFactory(privateKey, provider) : new Wallet(privateKey, provider);
       }
       const actual = assertCyprus1QuaiAddress(typeof signer.getAddress === 'function' ? await signer.getAddress() : signer.address);
       if (actual.toLowerCase() !== from.toLowerCase()) throw new WalletError('Signing account does not match the reviewed wallet metadata.');
@@ -99,12 +80,12 @@ export async function writeRuntime(opts = {}, deps = {}) {
     getAddress: async () => from,
     prepareSigner,
     sendTransaction: async (tx, controls = {}) => {
-      if (opts.dryRun) throw new WalletError('A dry run cannot sign.');
+      if (dryRun) throw new WalletError('A dry run cannot sign.');
       const request = structuredClone(tx);
       const intent = transactionIntentDigest(request);
       let signed, signedHash;
       try {
-        if (request.chainId === undefined || BigInt(request.chainId) !== BigInt(runtime.net.chainId)) throw new WalletError('Refusing to sign: transaction chain id does not match the selected network.');
+        if (request.chainId === undefined || BigInt(request.chainId) !== BigInt(chainId)) throw new WalletError('Refusing to sign: transaction chain id does not match the selected network.');
         if (!['from','to','data','value','gasLimit','gasPrice','nonce'].every(field => request[field] !== undefined)) throw new WalletError('Refusing to sign: complete reviewed transaction authority is required.');
         if (assertCyprus1QuaiAddress(request.from).toLowerCase() !== from.toLowerCase()) throw new WalletError('Refusing to sign: sender does not match the reviewed account.');
         assertCyprus1QuaiAddress(request.to);
@@ -127,20 +108,20 @@ export async function writeRuntime(opts = {}, deps = {}) {
         }
         // Trusted in-process hosts may persist the public hash before permitting dispatch.
         // Never supply signed bytes or keys. CLI argv and MCP input cannot install this hook.
-        if (deps.io?.onSignedTransaction !== undefined) {
-          if (typeof deps.io.onSignedTransaction !== 'function') throw new WalletError('Invalid local signing continuation.');
-          await deps.io.onSignedTransaction({ txHash: signedHash, transaction: structuredClone(request) });
+        if (io?.onSignedTransaction !== undefined) {
+          if (typeof io.onSignedTransaction !== 'function') throw new WalletError('Invalid local signing continuation.');
+          await io.onSignedTransaction({ txHash: signedHash, transaction: structuredClone(request) });
         }
         if (typeof provider.getNetwork !== 'function') throw new WalletError('Refusing to sign: RPC chain cannot be verified.');
         const live = BigInt((await provider.getNetwork()).chainId);
-        if (live !== BigInt(runtime.net.chainId)) throw new WalletError(`Refusing to sign: RPC reports chain ${live}, expected ${runtime.net.chainId}.`);
+        if (live !== BigInt(chainId)) throw new WalletError(`Refusing to sign: RPC reports chain ${live}, expected ${chainId}.`);
         const pendingNonce = await provider.getTransactionCount(from, 'pending');
         if (!Number.isSafeInteger(pendingNonce) || pendingNonce !== request.nonce) throw new WalletError('Refusing to sign: wallet nonce changed; review fresh transaction terms.');
         if (intent !== transactionIntentDigest(request)) throw new WalletError('Refusing to sign: reviewed transaction authority changed.');
         controls.validateBeforeSubmit?.();
-        if(deps.io?.onBroadcastStarted!==undefined) {
-          if(typeof deps.io.onBroadcastStarted!=='function')throw new WalletError('Invalid local broadcast marker.');
-          const result=deps.io.onBroadcastStarted({txHash:signedHash});
+        if(io?.onBroadcastStarted!==undefined) {
+          if(typeof io.onBroadcastStarted!=='function')throw new WalletError('Invalid local broadcast marker.');
+          const result=io.onBroadcastStarted({txHash:signedHash});
           if(result && typeof result.then==='function')throw new WalletError('Local broadcast marker must be synchronous.');
         }
       } catch (error) {
@@ -161,6 +142,37 @@ export async function writeRuntime(opts = {}, deps = {}) {
       } catch (error) { throw new BroadcastError(error, signedHash, signed); }
     },
   };
+  return wallet;
+}
+
+export async function writeRuntime(opts = {}, deps = {}) {
+  const runtime = readRuntime(opts, deps);
+  await assertChainId(runtime.net.rpcUrl, runtime.net.chainId, { fetchFn: deps.fetchFn });
+  const provider = (deps.providerFactory || createProvider)(runtime.net.rpcUrl);
+  const { name, address, envWallet } = resolveSender(runtime.home, opts, deps);
+  const from = assertCyprus1QuaiAddress(address);
+  // One password per command: the same answer unlocks the encrypted local data and decrypts the keystore for signing.
+  let passwordPromise, verifiedAccount;
+  const getPassword = () => (passwordPromise ??= resolvePassword({ ...deps.passwordDeps, label: `Password for wallet "${name}": ` }).catch((e) => { passwordPromise = undefined; throw e; }));
+  let unlockPromise;
+  // Called by the write pipeline right before it first touches the spend ledger / paid list. A dry run never creates the
+  // vault; a real run creates it the first time (sealing the existing plain files). --key-env senders use HARTII_PASSWORD only.
+  const unlockData = () => (unlockPromise ??= (async () => {
+    if (envWallet) {
+      const env = deps.env || deps.io?.env || process.env;
+      return unlockLocalData({ home: runtime.home, wallet: opts.wallet, create: false, getPassword: async () => { if (!env.HARTII_PASSWORD) throw new WalletError('Your local data is encrypted. Set HARTII_PASSWORD to the wallet password to use --key-env.'); return env.HARTII_PASSWORD; } });
+    }
+    return unlockLocalData({ home: runtime.home, wallet: name, create: !opts.dryRun, getPassword, onAccount: (a) => { verifiedAccount = a; } });
+  })().catch((e) => { unlockPromise = undefined; throw e; }));
+  const wallet = buildReviewedWallet({
+    provider, from, chainId: runtime.net.chainId, dryRun: opts.dryRun, walletFactory: deps.walletFactory, io: deps.io,
+    getPrivateKey: async () => {
+      if (envWallet) return envWallet.privateKey;
+      const account = verifiedAccount || await decryptAccount(readKeystoreFile(runtime.home, name), await getPassword());
+      if (assertCyprus1QuaiAddress(account.address) !== from) throw new WalletError('Keystore address mismatch.');
+      return account.privateKey;
+    },
+  });
   return { ...runtime, provider, from, wallet, unlockData, json: opts.json, yes: opts.yes, dryRun: opts.dryRun, newRecipientOk: opts.newRecipientOk === true, io: deps.io };
 }
 

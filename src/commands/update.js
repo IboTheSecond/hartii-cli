@@ -24,6 +24,7 @@ export class UpdateError extends CliError {}
 export const DOWNLOAD_BASE = 'https://hartiilabs.com/downloads/';
 const SHA_RE = /^[0-9a-f]{64}$/;
 const MAX_TARBALL_BYTES = 50 * 1024 * 1024;
+export const MAX_UNPACKED_BYTES = 200 * 1024 * 1024; // a real package unpacks to a few MB; anything near this is a gzip bomb
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
 
 /** Parse "x.y.z[-pre]" or return null. */
@@ -53,7 +54,9 @@ export function compareSemver(a, b) {
 
 /** Read package/package.json out of an in-memory .tgz (npm pack layout). */
 export function versionFromTarball(buf) {
-  const tar = gunzipSync(buf);
+  let tar;
+  try { tar = gunzipSync(buf, { maxOutputLength: MAX_UNPACKED_BYTES }); }
+  catch (err) { throw new UpdateError(err?.code === 'ERR_BUFFER_TOO_LARGE' || /larger than|too large/i.test(String(err?.message)) ? 'The download unpacks to far more than a real release; refusing it.' : 'The downloaded file is not a valid package archive.'); }
   for (let off = 0; off + 512 <= tar.length;) {
     const name = tar.toString('utf8', off, off + 100).replace(/\0[\s\S]*$/, '');
     if (!name) break;
@@ -76,8 +79,25 @@ async function fetchLimited(fetchFn, url, { asBuffer = false } = {}) {
   catch (err) { throw new UpdateError(`Could not reach ${url}: ${err?.message || err}`); }
   if (res.ok === false || (res.status ?? 200) >= 400) throw new UpdateError(`${url} answered ${res.status ?? '?'}.`);
   if (!asBuffer) return res;
+  const tooBig = () => new UpdateError('The download is larger than expected; refusing it.');
+  const declared = Number(res.headers?.get?.('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_TARBALL_BYTES) throw tooBig();
+  if (res.body && typeof res.body.getReader === 'function') {
+    // Count while reading and stop at the cap: an endless body must not fill memory before any check runs.
+    const reader = res.body.getReader();
+    const chunks = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > MAX_TARBALL_BYTES) { try { await reader.cancel(); } catch { /* already closed */ } throw tooBig(); }
+      chunks.push(Buffer.from(value));
+    }
+    return Buffer.concat(chunks, total);
+  }
   const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > MAX_TARBALL_BYTES) throw new UpdateError('The download is larger than expected; refusing it.');
+  if (buf.length > MAX_TARBALL_BYTES) throw tooBig();
   return buf;
 }
 
@@ -134,9 +154,6 @@ export async function runUpdate(o, deps = {}) {
     buf = await fetchLimited(fetchFn, info.url, { asBuffer: true });
     const got = sha256(buf);
     if (got !== info.sha256) throw new UpdateError(`Checksum mismatch: downloaded ${got}, published ${info.sha256}. Refusing to install.`);
-    const inside = versionFromTarball(buf);
-    if (info.version && inside !== info.version) throw new UpdateError(`The tarball is ${inside} but the manifest says ${info.version}. Refusing to install.`);
-    info.version = inside;
     // Signature check: the manifest may carry it; otherwise the .sig file next to the tarball. Both come from the same
     // site, which is fine: only the embedded key decides. Missing or invalid means refuse.
     let signature = info.signature;
@@ -145,7 +162,14 @@ export async function runUpdate(o, deps = {}) {
       try { if (sigUrl) signature = String(await (await fetchLimited(fetchFn, sigUrl)).text()).trim(); } catch { /* treated as unsigned below */ }
     }
     if (!signature) throw new UpdateError(`This release is not signed (no ${new URL(info.url).pathname.split('/').pop()}.sig). Refusing to install an unsigned update.`);
-    if (!verifyRelease({ sha256: info.sha256, version: inside, signature, keyId: info.keyId }, deps.releaseKey)) throw new UpdateError('The release signature does not match the Hartii release key built into this CLI. Refusing to install.');
+    const badSignature = () => new UpdateError('The release signature does not match the Hartii release key built into this CLI. Refusing to install.');
+    // R3-F11: when the manifest names the version, the signature (sha256 + version) is checked BEFORE the archive is
+    // unpacked or parsed; only the checksum-file fallback has to read the version from the tarball first.
+    if (info.version && !verifyRelease({ sha256: info.sha256, version: info.version, signature, keyId: info.keyId }, deps.releaseKey)) throw badSignature();
+    const inside = versionFromTarball(buf);
+    if (info.version && inside !== info.version) throw new UpdateError(`The tarball is ${inside} but the manifest says ${info.version}. Refusing to install.`);
+    if (!info.version && !verifyRelease({ sha256: info.sha256, version: inside, signature, keyId: info.keyId }, deps.releaseKey)) throw badSignature();
+    info.version = inside;
   };
   if (!info.version) await download(); // fallback path: the version is only knowable from the tarball
 

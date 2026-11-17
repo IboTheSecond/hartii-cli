@@ -136,5 +136,17 @@ export function lookalikeOf(address, known) {
   if (h.length !== 40) return null;
   return known.find(k => hex(k.address) !== h && hex(k.address).slice(0, 4) === h.slice(0, 4) && hex(k.address).slice(-4) === h.slice(-4)) || null;
 }
+/**
+ * R3-F9: a look-alike shares its first 4 and last 4 characters with the address it imitates, so typing the last 4 proves
+ * nothing. The challenge is the 6 characters starting at the first position where the two addresses differ.
+ * @returns {{ start: number, end: number, expected: string }} 0-based hex positions after 0x, end exclusive
+ */
+export function lookalikeChallenge(address, knownAddress) {
+  const h = hex(address), k = hex(knownAddress);
+  let i = 0;
+  while (i < h.length && h[i] === k[i]) i++;
+  const start = Math.max(0, Math.min(i, h.length - 6));
+  return { start, end: start + 6, expected: h.slice(start, start + 6) };
+}
 export const lastFour = address => String(address).slice(-4).toLowerCase();
 

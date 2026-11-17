@@ -1,5 +1,5 @@
 === about @ 60 columns (NO_COLOR) ===
-  ▍ Hartii CLI  0.6.1  BETA
+  ▍ Hartii CLI  0.7.0  BETA
   ────────────────────────────────────────────
 
   Node      24.15.0
@@ -12,7 +12,7 @@
   BETA software: start with small amounts.
 
 === about @ 80 columns (NO_COLOR) ===
-  ▍ Hartii CLI  0.6.1  BETA
+  ▍ Hartii CLI  0.7.0  BETA
   ────────────────────────────────────────────
 
   Node      24.15.0
@@ -24,7 +24,7 @@
   BETA software: start with small amounts.
 
 === about @ 120 columns (NO_COLOR) ===
-  ▍ Hartii CLI  0.6.1  BETA
+  ▍ Hartii CLI  0.7.0  BETA
   ────────────────────────────────────────────
 
   Node      24.15.0

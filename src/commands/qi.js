@@ -3,13 +3,14 @@
 // `hartii qi address|balance|receive|send|notes` - Qi, Quai's UTXO cash coin with private payment codes.
 // Orchard first. The Qi wallet is derived from the selected wallet's recovery phrase (read from the
 // encrypted keystore, never printed); wallets made from a bare private key cannot do Qi.
-// Qi sends do not use writePipeline (that is the EVM pipeline); engine.js follows the same rules.
+// The Qi transaction itself is built by qi/port.js; the QUAI payment notice goes through writePipeline (R3-F4).
 import { Mnemonic } from 'quais';
 import { getHartiiHome, loadConfig } from '../config.js';
 import { resolveRuntimeNetwork, assertChainId } from '../network.js';
 import { resolveWalletAddress } from './balance.js';
 import { readKeystoreFile, decryptAccount, WalletError } from '../keystore.js';
 import { resolvePassword, confirm as defaultConfirm } from '../prompt.js';
+import { unlockLocalData } from '../localData.js';
 import { createProvider } from '../signer.js';
 import { createReceiveQr, renderReceiveQr } from '../qr.js';
 import { CliError } from '../errors.js';
@@ -55,9 +56,12 @@ async function unlock({ home, net, cfg }, opts, deps) {
   }
   const mnemonic = Mnemonic.fromEntropy(account.mnemonic.entropy);
   const provider = (deps.providerFactory || createProvider)(net.rpcUrl);
+  // The Qi ledger is sealed with the same local vault as the spend ledger, so unlock it with the password just entered.
+  const unlockData = () => unlockLocalData({ home, wallet: name, create: true, getPassword: async () => password });
+  await unlockData();
   const ledger = openQiLedger(home, net.name, name, { now: () => (deps.now ? new Date(deps.now) : new Date()) });
   const port = (deps.qiPortFactory || createQiPort)({ mnemonic, provider, ledger });
-  const mailbox = (deps.mailboxFactory || createMailbox)({ provider, network: net.name, signerKey: account.privateKey });
+  const mailbox = (deps.mailboxFactory || createMailbox)({ provider, network: net.name, signerKey: account.privateKey, run: { home, chainId: net.chainId, rpcUrl: net.rpcUrl, unlockData, walletFactory: deps.walletFactory, io: deps.io } });
   const scrub = scrubber([mnemonic.phrase, account.mnemonic.entropy, account.privateKey, password]);
   return { name, quaiAddress: address, provider, ledger, port, mailbox, scrub, cfg, cleanup: () => { try { provider.destroy?.(); } catch { /* teardown only */ } } };
 }

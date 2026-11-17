@@ -37,7 +37,7 @@ describe('audited wallet command repairs', () => {
   it('reviews the selected export identity before any secret prompt', async () => {
     const promptFn = vi.fn(() => { throw Error('Must not unlock'); });
     let label;
-    const result = await command(['wallet', 'export', '--wallet', 'second', '--json'], { promptFn, confirmTypedFn: async text => { label = text; return 'CANCEL'; } });
+    const result = await command(['wallet', 'export', '--wallet', 'second', '--json'], { stdin: { isTTY: true }, stdout: { isTTY: true, write() {} }, promptFn, confirmTypedFn: async text => { label = text; return 'CANCEL'; } });
     expect(result.exit).toBe(1); expect(label).toContain('"second"'); expect(promptFn).not.toHaveBeenCalled();
   });
   it.each(['browser', 'address-qr'])('treats %s as a boolean without consuming following positional data', flag => {

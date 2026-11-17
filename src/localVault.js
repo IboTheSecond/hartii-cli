@@ -34,14 +34,16 @@ export class VaultError extends CliError {}
 
 const VAULT_FORMAT = 'hartii-vault/v1';
 const SEALED_FORMAT = 'hartii-sealed/v1';
-const DEFAULT_N = 2 ** 15;
+export const VAULT_DEFAULT_N = 2 ** 17; // same cost as the keystore
+const DEFAULT_N = VAULT_DEFAULT_N;
 const MIN_N = 2 ** 14;
-const MAX_N = 2 ** 20;
+const MAX_N = 2 ** 18; // a tampered file must not buy a huge memory/CPU spend
 const KEYS = new Map(); // resolved home -> Buffer(32)
 
 const homeKey = home => resolve(home);
 export const vaultPath = home => join(home, 'vault.json');
 export const SEALED_PURPOSES = Object.freeze({ spend: 'spend', paid: 'paid', contacts: 'contacts' });
+export const qiPurpose = (home, file) => 'qi:' + relative(resolve(home), resolve(file)).split(sep).join('/');
 export const deskPurpose = (home, file) => 'desk:' + relative(resolve(home), resolve(file)).split(sep).join('/');
 
 const kdf = (password, salt, N) => new Promise((ok, fail) => scrypt(Buffer.from(String(password), 'utf8'), salt, 32, { N, r: 8, p: 1, maxmem: 256 * N * 8 + (1 << 20) }, (e, k) => (e ? fail(e) : ok(k))));
@@ -71,8 +73,9 @@ function readVault(home) {
   let doc;
   try { doc = JSON.parse(readFileSync(securePath(vaultPath(home), { regularFile: true }).path, 'utf8')); }
   catch { throw new VaultError('The local data vault is unreadable or damaged. Nothing was decrypted and nothing was reset.'); }
-  const slotOk = s => s && typeof s.wallet === 'string' && ['salt', 'nonce', 'wrapped'].every(k => typeof s[k] === 'string');
-  if (doc?.format !== VAULT_FORMAT || doc.kdf?.name !== 'scrypt' || !Number.isInteger(doc.kdf.N) || doc.kdf.N < MIN_N || doc.kdf.N > MAX_N
+  const nOk = n => Number.isInteger(n) && n >= MIN_N && n <= MAX_N && (n & (n - 1)) === 0;
+  const slotOk = s => s && typeof s.wallet === 'string' && ['salt', 'nonce', 'wrapped'].every(k => typeof s[k] === 'string') && (s.N === undefined || nOk(s.N));
+  if (doc?.format !== VAULT_FORMAT || doc.kdf?.name !== 'scrypt' || !nOk(doc.kdf.N)
     || !Array.isArray(doc.slots) || doc.slots.length === 0 || !doc.slots.every(slotOk)) throw new VaultError('The local data vault has an unsupported or tampered format. Nothing was decrypted and nothing was reset.');
   return doc;
 }
@@ -80,11 +83,11 @@ const writeVault = (home, doc, replace) => atomicPrivateWrite(vaultPath(home), J
 
 async function makeSlot(wallet, password, dataKey, N) {
   const salt = randomBytes(16), kek = await kdf(password, salt, N);
-  try { return { wallet, salt: salt.toString('base64'), ...(({ nonce, ct }) => ({ nonce, wrapped: ct }))(gcmSeal(kek, `hartii-vault-slot:${wallet}`, dataKey)) }; }
+  try { return { wallet, N, salt: salt.toString('base64'), ...(({ nonce, ct }) => ({ nonce, wrapped: ct }))(gcmSeal(kek, `hartii-vault-slot:${wallet}`, dataKey)) }; }
   finally { kek.fill(0); }
 }
-async function openSlot(slot, password, N) {
-  const kek = await kdf(password, Buffer.from(slot.salt, 'base64'), N);
+async function openSlot(slot, password, docN) {
+  const kek = await kdf(password, Buffer.from(slot.salt, 'base64'), slot.N ?? docN);
   try { return gcmOpen(kek, `hartii-vault-slot:${slot.wallet}`, slot.nonce, slot.wrapped); } catch { return null; } finally { kek.fill(0); }
 }
 
@@ -102,14 +105,19 @@ export async function createVault(home, { wallet, password, kdfN = DEFAULT_N } =
 }
 
 /** Unlock with a wallet's password. A wallet with no slot is enrolled when its password opens any existing slot. */
-export async function unlockVault(home, { wallet, password } = {}) {
+export async function unlockVault(home, { wallet, password, kdfN = DEFAULT_N } = {}) {
   if (isUnlocked(home)) return { unlocked: true };
   const doc = readVault(home), N = doc.kdf.N;
-  const own = doc.slots.find(s => s.wallet === wallet);
+  const own = doc.slots.find(s => s.wallet === wallet && !s.retired);
   let dataKey = own ? await openSlot(own, password, N) : null;
+  if (dataKey && (own.N ?? N) < kdfN) {
+    // Existing cheaper seal: re-wrap this wallet's slot at the current cost on this write.
+    doc.slots = doc.slots.map(s => (s === own ? null : s)).filter(Boolean);
+    doc.slots.push(await makeSlot(wallet, password, dataKey, kdfN)); writeVault(home, doc, true);
+  }
   if (!dataKey && !own) {
     for (const slot of doc.slots) { dataKey = await openSlot(slot, password, N); if (dataKey) break; }
-    if (dataKey) { doc.slots.push(await makeSlot(wallet, password, dataKey, N)); writeVault(home, doc, true); }
+    if (dataKey) { doc.slots = doc.slots.filter(s => !(s.retired && s.wallet === wallet)); doc.slots.push(await makeSlot(wallet, password, dataKey, kdfN)); writeVault(home, doc, true); }
   }
   if (!dataKey) throw new VaultError(own
     ? 'Wrong password for the local data vault.'
@@ -119,15 +127,33 @@ export async function unlockVault(home, { wallet, password } = {}) {
 }
 
 /** Add `wallet` to the vault using a password that already opens an enrolled wallet. */
-export async function enrollWallet(home, { existingPassword, wallet, password } = {}) {
+export async function enrollWallet(home, { existingPassword, wallet, password, kdfN = DEFAULT_N } = {}) {
   const doc = readVault(home), N = doc.kdf.N;
   let dataKey = null;
   for (const slot of doc.slots) { dataKey = await openSlot(slot, existingPassword, N); if (dataKey) break; }
   if (!dataKey) throw new VaultError('That password does not open the local data vault.');
   doc.slots = doc.slots.filter(s => s.wallet !== wallet);
-  doc.slots.push(await makeSlot(wallet, password, dataKey, N)); writeVault(home, doc, true);
+  doc.slots.push(await makeSlot(wallet, password, dataKey, kdfN)); writeVault(home, doc, true);
   KEYS.set(homeKey(home), dataKey);
   return { enrolled: true };
+}
+
+/**
+ * `wallet remove`: drop the wallet's vault slot so a wallet re-created under the same name cannot hit a stale slot
+ * ("Wrong password" with the right password). The LAST slot is never deleted (the data key would be lost for good):
+ * it is retired instead, and any password that opens it (or `vault enroll`) enrols the new wallet.
+ * @returns {{ removed: boolean, retired: boolean }}
+ */
+export function removeWalletSlot(home, wallet) {
+  if (!vaultExists(home)) return { removed: false, retired: false };
+  const doc = readVault(home);
+  const own = doc.slots.filter(s => s.wallet === wallet && !s.retired);
+  if (own.length === 0) return { removed: false, retired: false };
+  const others = doc.slots.filter(s => !(s.wallet === wallet && !s.retired) && !s.retired);
+  if (others.length > 0) doc.slots = doc.slots.filter(s => !(s.wallet === wallet && !s.retired));
+  else doc.slots = doc.slots.map(s => (s.wallet === wallet && !s.retired ? { ...s, retired: true } : s));
+  writeVault(home, doc, true);
+  return { removed: others.length > 0, retired: others.length === 0 };
 }
 
 /**
@@ -142,7 +168,7 @@ export async function ensureUnlocked(home, { wallet, getPassword, verifyPassword
   if (!exists && !create) return { unlocked: false, plain: true };
   if (!wallet) throw new VaultError(exists ? 'Pick the wallet whose password unlocks your local data (--wallet <name>).' : 'Create a wallet first: its password protects your local data.');
   const password = await getPassword();
-  if (exists) { await unlockVault(home, { wallet, password }); return { unlocked: true }; }
+  if (exists) { await unlockVault(home, { wallet, password, kdfN }); return { unlocked: true }; }
   if (verifyPassword) await verifyPassword(password);
   await createVault(home, { wallet, password, kdfN });
   return { unlocked: true, created: true };
@@ -172,6 +198,9 @@ export function unseal(home, purpose, text, { allowPlain = false } = {}) {
 
 function privateFiles(home) {
   const out = [{ path: join(home, 'spend.json'), purpose: SEALED_PURPOSES.spend }, { path: join(home, 'paid.json'), purpose: SEALED_PURPOSES.paid }, { path: join(home, 'contacts.json'), purpose: SEALED_PURPOSES.contacts }];
+  try {
+    for (const name of readdirSync(join(home, 'qi'))) if (/^[A-Za-z0-9_-]+\.json$/.test(name)) { const path = join(home, 'qi', name); out.push({ path, purpose: qiPurpose(home, path) }); }
+  } catch { /* no Qi ledger yet */ }
   const root = join(home, 'desk', 'mainnet');
   try {
     for (const day of readdirSync(root)) {

@@ -348,7 +348,7 @@ export function buildTools(ctx) {
       (a, m, v) => runSell({ ...c.base(), token: requireAddress(a.token, 'token'), amount: a.amount, slippage: a.slippage, ...m }, c.deps(v))),
     writeTool('hartii_swap', 'Swap on HartiiSwap (QUAI/WQUAI/tokens).',
       { tokenIn: WRITE_TOKEN, tokenOut: WRITE_TOKEN, amount: AMOUNT, slippage: SLIPPAGE },
-      (a, m, v) => runSwap({ ...c.base(), tokenIn: requireAddress(a.tokenIn, 'tokenIn', { allowNative: true }), tokenOut: requireAddress(a.tokenOut, 'tokenOut', { allowNative: true }), amount: a.amount, slippage: a.slippage, ...m }, c.deps(v))),
+      (a, m, v) => runSwap({ ...c.base(), tokenIn: requireAddress(a.tokenIn, 'tokenIn', { allowNative: true }), tokenOut: requireAddress(a.tokenOut, 'tokenOut', { allowNative: true }), amount: a.amount, slippage: a.slippage, requireVerifiedTokens: true, ...m }, c.deps(v))),
     writeTool('hartii_otc_fill', 'Fill an OTC offer: pays amountWanted + the live service fee in QUAI and receives the offered tokens.',
       { id: z.string().describe('Offer id (positive integer).') },
       (a, m, v) => runOtc({ ...c.base(), sub: 'fill', id: a.id, ...m }, c.deps(v))),

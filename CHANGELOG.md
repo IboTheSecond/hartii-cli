@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-11-17
+
+Security hardening from the 2026-11-17 review (each item has a test that failed before the fix), plus `hartii verify-site`. Ships with Labs 1.75.0.
+
+Security hardening from the 2026-11-17 adversarial review (R3). Still BETA.
+
+- **Export and remove need a terminal (R3-F1).** `wallet export` and `wallet remove` refuse without an interactive terminal, and export always asks for the password at a hidden prompt: `HARTII_PASSWORD`, `--key-env` and a pipe no longer unlock it.
+- **Raising a cap needs a terminal (R3-F2).** `config set limits.*` to a higher value or `none` asks for confirmation on a terminal and refuses in scripts; tightening or first-time setting works anywhere. README Security model now says plainly: MCP caps are a real control, a shell with `HARTII_PASSWORD` is full access.
+- **MCP swap is verified-token only (R3-F3).** `hartii_swap` accepts QUAI, WQUAI and factory-registered Hartii tokens; any other token address is refused.
+- **Qi payment notice uses the write pipeline (R3-F4).** The QUAI transaction that announces a payment-code send now gets the chain check, simulation, access list, 25 QUAI fee ceiling, spend ledger entry and write lock; the offline-signing wallet moved to `buildReviewedWallet` in `commandContext.js` so there is one signing path.
+- **Qi ledger sealed, merged on save (R3-F5).** The Qi address ledger is sealed with the same local vault as the spend ledger (a plain one is sealed when the vault is created) and reads as locked without a password.
+- **Qi and Quai address checksums (R3-F6).** A mixed-case Qi address with a wrong checksum is refused; all-lowercase is accepted and normalised. README wording corrected.
+- **Qi caps with more than 3 decimals are an error (R3-F7)**, never silently "no cap".
+- **Look-alike check is real (R3-F9).** For a look-alike address you type the 6 characters where it differs from the known address, not the shared last 4.
+- **Update path limits (R3-F11).** Streamed 50 MB download cap, 200 MB unpacked cap, signature checked before parsing when the manifest names the version.
+- **Vault (R3-F13, F14).** `wallet remove` drops the wallet's vault slot (the last slot is retired, never deleted, so data stays reachable and `vault enroll` guides re-enrolment); new slots use scrypt N=2^17 and a vault asking for more than 2^18 is refused; older slots are re-wrapped on the next unlock.
+- **`hartii verify-site`.** Checks that hartiilabs.com serves exactly the signed build: manifest + ed25519 signature verified with the web release key pinned in `src/webReleaseKey.js` (id `a17f68595150dac6`, same as `src/data/webReleaseKey.json`, kept in sync by a root test), every listed non-HTML file compared by sha256, and `/` must reference only signed scripts and styles. Fixed origin, no redirects, size caps (manifest 2 MB, signature 1 KB, 25 MB per file), concurrency 6, `--json` object `{ ok, version, commit, keyId, checked, failures }`, non-zero exit on any failure.
+- Fence test `test/writeLaneFence.test.mjs`: fails if any module outside the reviewed write lanes signs or broadcasts.
+
 ## [0.6.1] — 2026-11-17
 
 One setup fix and a docs patch.

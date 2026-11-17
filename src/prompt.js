@@ -119,6 +119,26 @@ export async function resolvePassword(deps = {}) {
   return promptFn(deps.label || 'Password: ', deps);
 }
 
+/** True only when both the input and the prompt output are a real terminal (injectable for tests). */
+export function isInteractiveTerminal(deps = {}) {
+  const stdin = deps.stdin || process.stdin;
+  const stdout = deps.stdout || process.stderr;
+  return stdin.isTTY === true && stdout.isTTY === true;
+}
+
+/** Refuses with a clear message unless a human is at a terminal (no pipe, no env shortcut). */
+export function requireInteractiveTerminal(deps, action) {
+  if (!isInteractiveTerminal(deps)) {
+    throw new WalletError(`${action} needs an interactive terminal: run it yourself in a terminal window. It is never available through a pipe, a script or HARTII_PASSWORD.`);
+  }
+}
+
+/** Hidden password prompt that IGNORES HARTII_PASSWORD and --key-env (used where a script must never succeed). */
+export function promptPasswordOnTerminal(label, deps = {}) {
+  const promptFn = deps.promptFn || readHiddenInput;
+  return promptFn(label, { ...deps, allowPipedSecret: false });
+}
+
 /**
  * Plain (unmasked) single-line prompt — used for typed confirmations (e.g. "type the wallet name
  * to confirm") where there is nothing secret to hide and seeing what you typed matters.

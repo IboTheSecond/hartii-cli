@@ -261,6 +261,21 @@ function initView(r, K) {
   return out;
 }
 
+// ---------- verify-site ----------
+function verifySiteView(r, K) {
+  const n = (r.failures || []).length;
+  const verdict = r.ok
+    ? `hartiilabs.com matches the signed build ${text(r.version)} (commit ${text(String(r.commit || '').slice(0, 12))}): ${r.checked} files checked.`
+    : `hartiilabs.com does NOT match a build Hartii signed: ${n} problem${n === 1 ? '' : 's'}.`;
+  if (K.terse) return [verdict];
+  const out = [...K.heading('Verify hartiilabs.com'), '', r.ok ? K.t.ok(K.t.bold(verdict)) : K.t.danger(K.t.bold(verdict)), ''];
+  for (const f of (r.failures || []).slice(0, 20)) out.push(...K.wrap(`${K.t.danger('FAIL')}  ${text(f)}`, { hang: '      ' }));
+  if (n > 20) out.push(K.t.muted(`...and ${n - 20} more (use --json for all)`));
+  if (n) out.push('');
+  out.push(...K.kv([['Signing key', K.t.muted(text(r.keyId))], ['Version', text(r.version)]]), '', K.t.muted(r.ok ? 'Checked against the key built into this CLI, not one the website supplies.' : 'Do not trust the site until this is resolved. Nothing was changed on your computer.'));
+  return out;
+}
+
 // ---------- doctor ----------
 const CHECK_LABELS = { rpc: 'Quai node', chainId: 'Network match', keystorePerms: 'Wallet files', addressLedger: 'Current wallet', api: 'Hartii service', clockSkew: 'Clock' };
 const FIXES = {
@@ -318,7 +333,7 @@ function walletHelpView(r, K) {
 
 const VIEWS = {
   balance: balanceView, whoami: whoamiView, networks: networksView, gas: gasView, limits: limitsView, token: tokenView, tokens: tokensView,
-  tx: txView, block: blockView, price: priceView, list: listView, about: aboutView, init: initView, doctor: doctorView, 'wallet.help': walletHelpView,
+  tx: txView, block: blockView, price: priceView, list: listView, about: aboutView, init: initView, doctor: doctorView, 'verify-site': verifySiteView, 'wallet.help': walletHelpView,
   'config.get': (r, K) => configView(r, K, 'config.get'), 'config.set': (r, K) => configView(r, K, 'config.set'),
   open: (r, K) => [K.t.accentBright(text(r.url))],
 };

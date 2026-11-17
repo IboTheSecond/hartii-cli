@@ -1,5 +1,6 @@
 // `hartii qi ...` end to end through cli.main with a REAL QiHDWallet (real derivation and signing)
 // against an offline Quai-shaped node (qiMock.mjs). Throwaway keys only.
+import { writePrivateText, qiPurpose } from '../../src/localVault.js';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -107,7 +108,9 @@ describe('qi read commands', () => {
     // the address was paid, then spent away (gone from the node): the local list remembers it
     const dir = join(home, 'qi');
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'orchard-default.json'), JSON.stringify({ version: 1, used: [first.toLowerCase()] }));
+    // the first command created the local vault, so the list is a sealed file now (a plain one would be refused as a downgrade)
+    const file = join(dir, 'orchard-default.json');
+    writePrivateText(home, qiPurpose(home, file), file, JSON.stringify({ version: 1, used: [first.toLowerCase()] }));
     out = [];
     await run(['qi', 'address', '--json']);
     expect(json().address).not.toBe(first);

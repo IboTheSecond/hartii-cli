@@ -33,6 +33,7 @@ import { runDesk } from './commands/desk.js';
 import { runContacts } from './commands/contacts.js';
 import { runVault } from './commands/vault.js';
 import { runQiCli } from './commands/qi.js';
+import { runVerifySite } from './commands/verifySite.js';
 import { createTraderReader } from './trader/readers.js';
 
 /** ctx = { args, flags, g, deps, env, io, home, write } — see cli.js. */
@@ -88,7 +89,7 @@ export const COMMAND_TABLE = {
     {...c.deps,env:c.env,io:c.io,write:c.write,passwordDeps:c.io.passwordDeps}),
   wallet: (c) => runWallet(c.args, c.flags, c),
   receive: (c)=>runReceive({...walletOpts(c),amount:c.flags.amount,memo:c.flags.memo,addressQr:c.flags['address-qr']===true,out:c.flags.out,expiresAt:c.flags.expires===undefined?null:parseReceiveExpiry(c.flags.expires,{now:c.deps.now?new Date(c.deps.now).getTime():Date.now()})}),
-  config: (c) => runConfig(c.args, c.home),
+  config: (c) => runConfig(c.args, c.home, c.io),
   balance: (c) => runBalance({ ...walletOpts(c), tokens: Boolean(c.flags.tokens), address: typeof c.flags.address === 'string' ? c.flags.address : undefined }, readDeps(c)),
   doctor: (c) => runDoctor(readOpts(c), { fetchFn: c.deps.fetchFn, now: c.deps.now, env: c.env }),
   tokens: (c) => runTokens({ sub: c.args[0], query: c.args[1], limit: c.flags.limit, home: c.home, network: c.g.network, demo: c.g.demo }, { fetchFn: c.deps.fetchFn }),
@@ -113,6 +114,7 @@ export const COMMAND_TABLE = {
     sub, message: sub === 'engrave' ? message : undefined, n: sub === 'recent' ? message : undefined, color: flags.color, token: flags.token,
   })),
   qi: runQiCli,
+  'verify-site': (c) => runVerifySite({ json: c.g.json }, { fetchFn: c.deps.fetchFn, webReleaseKey: c.deps.webReleaseKey, timeoutMs: c.deps.verifyTimeoutMs }),
   watch,
   mcp,
   ...Object.fromEntries([...EXTRA_COMMANDS].map((name) => [name, extra(name)])),

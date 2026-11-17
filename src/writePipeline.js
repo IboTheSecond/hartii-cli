@@ -19,7 +19,7 @@ import { resilientRead } from '../vendor/packages/agent-mcp/src/rpcClient.js';
 import { readGasPrice } from './gasPrice.js';
 import { classifyError } from '../vendor/packages/agent-mcp/src/errors.js';
 import { checkSpend, withSpendLock, reserveSpend, markSpendHash, settleSpend, assertNoPendingSpend, hasCaps } from './spendingGuard.js';
-import { hasPaid, knownAddresses, lookalikeOf, recordPaid, findContactByAddress, lastFour } from './contacts.js';
+import { hasPaid, knownAddresses, lookalikeOf, recordPaid, findContactByAddress, lastFour, lookalikeChallenge } from './contacts.js';
 import { readVisibleInput } from './prompt.js';
 import { NETWORKS } from './network.js';
 import { quaiscanTxUrl } from './quaiscan.js';
@@ -334,8 +334,14 @@ async function runWriteLocked(ctx, from) {
       const ask = io.typedConfirmFn || ((q) => readVisibleInput(q, io));
       const interactive = io.interactive ?? (io.typedConfirmFn ? true : Boolean(process.stdin.isTTY && process.stdout.isTTY));
       if (!interactive) throw new WriteError('This recipient is new and there is no terminal to confirm it. Run it in a terminal and type the last 4 characters of the address, or pass --yes --new-recipient-ok (needs spending caps).');
-      const typed = String(await ask(`New recipient. To confirm, type the last 4 characters of ${ctx.recipient}: `, io) ?? '').trim().toLowerCase();
-      if (typed !== lastFour(ctx.recipient)) return { ok: false, aborted: true, summary: jsonSafe(summary), reason: 'recipient-not-confirmed' };
+      // A look-alike shares its first and last 4 characters with a trusted address, so the last 4 prove nothing: ask for the
+      // characters where the two addresses first differ (R3-F9).
+      const challenge = payee.lookalike ? lookalikeChallenge(ctx.recipient, payee.lookalike.address) : null;
+      const question = challenge
+        ? `LOOK-ALIKE address: it starts and ends like ${payee.lookalike.label}, so the first and last characters prove nothing. To confirm, type characters ${challenge.start + 1} to ${challenge.end} after 0x of ${ctx.recipient}: `
+        : `New recipient. To confirm, type the last 4 characters of ${ctx.recipient}: `;
+      const typed = String(await ask(question, io) ?? '').trim().toLowerCase();
+      if (typed !== (challenge ? challenge.expected : lastFour(ctx.recipient))) return { ok: false, aborted: true, summary: jsonSafe(summary), reason: 'recipient-not-confirmed' };
     } else {
       const proceed = await confirmFn('Proceed?', io);
       if (!proceed) {

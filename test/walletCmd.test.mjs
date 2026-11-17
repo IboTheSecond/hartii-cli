@@ -11,8 +11,9 @@ import { loadConfig } from '../src/config.js';
 const SCRYPT_FAST = { N: 2, r: 1, p: 1 };
 const PASSWORD = 'correct-horse-battery-staple';
 
+const TTY = { stdin: { isTTY: true }, stdout: { isTTY: true, write() {} } };
 function deps(extra = {}) {
-  return { env: {}, promptFn: vi.fn().mockResolvedValueOnce(PASSWORD).mockResolvedValueOnce(PASSWORD), scrypt: SCRYPT_FAST, ...extra };
+  return { ...TTY, env: {}, promptFn: vi.fn().mockResolvedValueOnce(PASSWORD).mockResolvedValueOnce(PASSWORD), scrypt: SCRYPT_FAST, ...extra };
 }
 
 let home;
@@ -156,7 +157,7 @@ describe('walletExport', () => {
   it('is never short-circuited by the password alone — wrong password still fails even with the right typed name', async () => {
     await walletCmd.walletNew(home, 'alice', deps());
     await expect(
-      walletCmd.walletExport(home, 'alice', { env: {}, promptFn: vi.fn().mockResolvedValue('wrong-password'), confirmTypedFn: vi.fn().mockResolvedValue('alice') }),
+      walletCmd.walletExport(home, 'alice', { ...TTY, env: {}, promptFn: vi.fn().mockResolvedValue('wrong-password'), confirmTypedFn: vi.fn().mockResolvedValue('alice') }),
     ).rejects.toThrow(/wrong password/i);
   });
 });
@@ -180,13 +181,13 @@ describe('walletRename', () => {
 describe('walletRemove', () => {
   it('requires the exact typed name, not --yes', async () => {
     await walletCmd.walletNew(home, 'alice', deps());
-    await expect(walletCmd.walletRemove(home, 'alice', { confirmTypedFn: vi.fn().mockResolvedValue('nope') })).rejects.toThrow(/did not match/);
+    await expect(walletCmd.walletRemove(home, 'alice', { ...TTY, confirmTypedFn: vi.fn().mockResolvedValue('nope') })).rejects.toThrow(/did not match/);
     expect(walletCmd.walletList(home)).toHaveLength(1);
   });
 
   it('removes the wallet and clears currentWallet if it was active', async () => {
     await walletCmd.walletNew(home, 'alice', deps());
-    await walletCmd.walletRemove(home, 'alice', { confirmTypedFn: vi.fn().mockResolvedValue('alice') });
+    await walletCmd.walletRemove(home, 'alice', { ...TTY, confirmTypedFn: vi.fn().mockResolvedValue('alice') });
     expect(walletCmd.walletList(home)).toHaveLength(0);
     expect(loadConfig(home).currentWallet).toBeNull();
   });

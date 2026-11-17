@@ -102,7 +102,7 @@ describe('plain-terminal guided setup (hartii wallet new / init)', () => {
   it('a completed `wallet export` clears the reminder', async () => {
     const { result } = await run({ verify: 'later', caps: '5' });
     expect(readBackupPending(home)).toEqual([result.name]);
-    await walletExport(home, result.name, { confirmTypedFn: async () => result.name, env: { HARTII_PASSWORD: PW }, writeErr: () => {} });
+    await walletExport(home, result.name, { stdin: { isTTY: true }, stdout: { isTTY: true, write() {} }, confirmTypedFn: async () => result.name, promptFn: async () => PW, env: {}, writeErr: () => {} });
     expect(readBackupPending(home)).toEqual([]);
   });
 

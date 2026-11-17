@@ -11,6 +11,7 @@ import { deadlineTimestamp } from '../../vendor/src/utils/deadline.js';
 import { HARTIISWAP_ROUTER_ABI } from '../abi/hartiiSwapRouter.js';
 import { hartiiSwapAddresses } from '../liveAddresses.js';
 import { resolveToken, MarketError } from '../marketApi.js';
+import { assertVerifiedCurve } from '../curveState.js';
 import { parseSlippageBps, tradeWarnings } from '../trade.js';
 import { reserveFeeWei } from '../gasReserve.js';
 import { readErc20, ensureAllowance, approvalStop } from '../toolKit.js';
@@ -22,15 +23,33 @@ export class SwapError extends CliError {}
 const ROUTER_IFACE = new Interface(HARTIISWAP_ROUTER_ABI);
 
 /** Resolves one side of a swap to {kind:'native'|'erc20', address, symbol, decimals}. */
-async function resolveSide(input, { wquai, provider, from, deps }) {
+async function resolveSide(input, { wquai, provider, from, deps, verify = null }) {
   const raw = String(input || '').trim();
   if (!raw) throw new SwapError('Both <in> and <out> are required.');
   if (raw.toLowerCase() === 'quai') return { kind: 'native', address: null, symbol: 'QUAI', decimals: 18 };
   if (raw.toLowerCase() === 'wquai') return erc20Side(wquai, provider, from);
-  if (/^0x[0-9a-fA-F]{40}$/.test(raw)) return erc20Side(assertCyprus1QuaiAddress(raw), provider, from);
+  if (/^0x[0-9a-fA-F]{40}$/.test(raw)) {
+    const address = assertCyprus1QuaiAddress(raw);
+    if (verify && address.toLowerCase() !== String(verify.wquai).toLowerCase()) await assertHartiiVerifiedToken(address, verify);
+    return erc20Side(address, provider, from);
+  }
+  if (verify) throw new SwapError('Over MCP, swaps take QUAI, WQUAI or a token ADDRESS, never a ticker.');
   // Ticker — resolve through the launchpad API (works for any Hartii-indexed token, graduated or not).
   const info = await rethrowAs(MarketError, SwapError, () => resolveToken(raw, deps), `"${raw}" is neither QUAI/WQUAI, a 0x address, nor an indexed ticker: `);
   return erc20Side(assertCyprus1QuaiAddress(info.address), provider, from);
+}
+
+/**
+ * MCP-only gate (R3-F3): a token is accepted only when the market index knows a curve for it AND a bundled Hartii launch
+ * factory registers that curve for this exact token (same check buy/sell use). WQUAI/QUAI never reach here.
+ */
+async function assertHartiiVerifiedToken(address, { provider, netName, deps }) {
+  const refuse = (why) => new SwapError(`Refusing: ${address} is not a Hartii-verified token (${why}). Over MCP, swaps only accept QUAI, WQUAI and tokens launched by the Hartii factories.`);
+  let info;
+  try { info = await resolveToken(address, { ...deps, network: netName }); } catch { throw refuse('it is not in the Hartii market index'); }
+  if (!info?.curveAddress) throw refuse('it has no Hartii bonding curve');
+  try { await assertVerifiedCurve(provider, assertCyprus1QuaiAddress(info.curveAddress), address, netName); }
+  catch (err) { throw refuse(String(err?.message || err).slice(0, 160)); }
 }
 
 async function erc20Side(address, provider, from) {
@@ -70,9 +89,10 @@ async function runSwapCore(opts, deps = {}, approvedCtx = null) {
 
 
 
+  const verify = opts.requireVerifiedTokens === true ? { provider, netName: net.name, deps, wquai } : null;
   const [sideIn, sideOut] = await Promise.all([
-    resolveSide(opts.tokenIn, { wquai, provider, from: fromAddress, deps }),
-    resolveSide(opts.tokenOut, { wquai, provider, from: fromAddress, deps }),
+    resolveSide(opts.tokenIn, { wquai, provider, from: fromAddress, deps, verify }),
+    resolveSide(opts.tokenOut, { wquai, provider, from: fromAddress, deps, verify }),
   ]);
   if (sideIn.kind === 'native' && sideOut.kind === 'native') throw new SwapError('Cannot swap QUAI for QUAI.');
 

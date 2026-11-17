@@ -15,7 +15,7 @@ Wall of Blocks, plus the live trade feed. Runtime dependencies are only `quais`,
 and `zod`. A pinned, MIT-licensed QR encoder is included locally; QR creation never contacts a hosted service.
 The CLI has no application analytics. RPC/API/WebSocket providers and any agent client can observe or retain request metadata and public addresses; transactions are permanent on chain.
 
-> Status: beta (0.6.1). Verification uses isolated synthetic wallets and mocked RPC; run it against
+> Status: beta (0.7.0). Verification uses isolated synthetic wallets and mocked RPC; run it against
 > Orchard or with small amounts before trusting it with real money.
 
 ## Constraint Desk / Fill Ledger (0.5.0 beta)
@@ -139,6 +139,7 @@ No transaction is sent by receiving, `--demo` or `--dry-run`. Review the full re
 | `claim list [--mine\|--creator <addr>]` · `claim <campaignId> [--check]` | HartiiClaim: list a creator's campaigns; check or claim your allocation (Merkle leaves are re-verified against the on-chain root). |
 | `wall engrave "<message>" [--color #hex] [--token <addr\|ticker>]` · `wall stats` · `wall recent [n]` | Wall of Blocks (Global Wall). Price read live. |
 | `help` · `?` · `commands` · `completion <shell>` | Help for everything (`hartii ?`, `hartii buy ?`), a flat command list, shell completion. |
+| `verify-site` | Checks that hartiilabs.com serves exactly the build Hartii signed: fetches the signed manifest, verifies its ed25519 signature with the web release key pinned inside this CLI (key id `a17f68595150dac6`), compares the sha256 of every listed file and requires the home page to reference only signed scripts and styles. Only talks to `https://hartiilabs.com`; `--json` gives `{ ok, version, commit, keyId, checked, failures }`; exit code 1 on any failure. |
 | `init` · `whoami` · `limits` · `networks` · `about` · `update` | Guided setup (no wallet yet) or the first-run checklist, who you are, your spending caps and today's spend, networks, version/links, whether a newer CLI exists (`update`: `--check`, `--yes`). |
 | `price` · `quote <buy\|sell>` · `holders` · `trades` · `gas` · `block` · `open` | Read-only lookups; no wallet needed. |
 | shortcuts | `bal`, `pf`/`portfolio`, `ls`, `use`, `addr`, `top`, `new`, `search`, `me`. |
@@ -328,8 +329,11 @@ Changing wallet or network discards old balances and obsolete responses. Orchard
 - **Keys live only in an encrypted keystore** (`~/.hartii/keystore/<name>.json`, scrypt keystore v3, mode 0600 where
   the OS supports it). The password comes from a hidden prompt or `HARTII_PASSWORD`. `--key-env VAR` reads a raw key
   from an environment variable for CI and prints a loud warning.
-- **Keys and mnemonics are never printed**, except by `wallet export` after you type the wallet's name back.
-- **Local files are encrypted** with your wallet password (AES-256-GCM, scrypt-wrapped key) once you make a real send: the spending ledger, the paid list, contacts and the desk journal. Read commands show them as locked when no password is available. The watchlist (a public token list) stays readable.
+- **Keys and mnemonics are never printed**, except by `wallet export`, which needs a real terminal: you type the wallet's name back and enter the password at a hidden prompt. `HARTII_PASSWORD`, `--key-env` and a piped stdin never unlock an export (it refuses with a clear message). `wallet remove` needs the terminal too and also drops that wallet's slot in the local data vault.
+- **Two trust levels for AI agents.** The MCP server (`hartii mcp --allow-writes`) is the safe agent surface: its caps come from the operator's launch flags and can only tighten yours, every write needs a dry run plus a review token, and it has no export, config or update tool. A shell is different: any process that can run `hartii` with `HARTII_PASSWORD` (or `--key-env`) in its environment has full access to that wallet, the same as you. Caps and the typed checks stop mistakes and a hijacked agent on MCP; they do not stop a script you gave the password to. Do not export `HARTII_PASSWORD` into an agent's shell.
+- **Raising or removing a cap needs you at a terminal.** `config set limits.perTxQuai|dailyQuai` to a higher value or `none` asks for a yes on a real terminal and refuses in a script or pipe. Lowering a cap, or setting one where none existed, still works anywhere.
+- **Local files are encrypted** with your wallet password (AES-256-GCM, scrypt-wrapped key, N=2^17 like the keystore; older cheaper vaults still open and are re-wrapped on the next unlock, and a vault asking for more than N=2^18 is refused as tampered) once you make a real send: the spending ledger, the paid list, contacts, the desk journal and the Qi address ledger. Read commands show them as locked when no password is available. The watchlist (a public token list) stays readable.
+- **Check the live site**: `hartii verify-site` verifies the hartiilabs.com build manifest against a web release key (id `a17f68595150dac6`) pinned in the CLI, which itself ships as a signed release. A key that only lived in the website would not survive a takeover of the host; this one does not come from the site. It reports a mismatch, it does not fix one.
 - **Signed updates**: `hartii update` checks the release's ed25519 signature against the key built into the CLI before npm runs.
 - **Spending guard** on every write, including MCP: `limits.perTxQuai` and `limits.dailyQuai` once you set them (there are
   no caps by default; setup recommends them; `none` clears one), tracked in `~/.hartii/spend.json`. Canonical mined successes charge guarded value plus gas; canonical mined
@@ -344,8 +348,15 @@ Changing wallet or network discards old balances and obsolete responses. Orchard
 - **RPC transport**: `--rpc` must be `https://`; plain `http://` is refused unless `--allow-insecure-rpc` is passed and the host is localhost. The chain-id check times out after 8 seconds.
 - **TUI confirm**: the confirm overlay shows every summary line (wrapped, scrollable); `y` is accepted only after the end is visible, and a terminal too small to review refuses it ("resize or use the CLI").
 - **No blind signing**: every write is simulated from your address, carries an access list, an explicit gas limit, and
-  must return receipt status 1 before success is reported. Quai-ledger addresses only; mainnet requires checksummed
-  addresses and the chain id is verified first.
+  must return receipt status 1 before success is reported. Quai-ledger addresses only; a mixed-case address (Quai or Qi)
+  must carry a valid checksum or it is refused, an all-lowercase address is accepted and shown checksummed, and the
+  chain id is verified first. The Qi payment notice (a real QUAI transaction announcing a payment-code send) goes
+  through this same pipeline: chain check, simulation, access list, fee ceiling, spend ledger and the write lock.
+- **Qi caps** count in Qi with at most 3 decimals; a cap with more decimals is an error (never treated as "no cap").
+- **Look-alike recipients**: when an address starts and ends like one you already know, typing the last 4 characters proves
+  nothing, so the CLI asks for the 6 characters where the two addresses first differ. A look-alike is never sent unattended.
+- **Update limits**: the download is capped at 50 MB while streaming, the unpacked archive at 200 MB (a gzip bomb is refused),
+  and when the release manifest names the version its signature is checked before the archive is parsed.
 - **Hartii tool contracts**: the BUNDLED Airdrop / OTC / Claim addresses are authoritative. `hartiibiome.com/live-addresses.json`
   may only confirm them (`addressSource: live`); a different live address is refused with "update the CLI". Humans can
   override once with `--trust-live-addresses` (never available over MCP; labelled UNVERIFIED in the summary). Claim leaves files are
@@ -353,6 +364,7 @@ Changing wallet or network discards old balances and obsolete responses. Orchard
 - **Curves are factory-verified**: before any buy/sell/approve (and before valuing a token for the spend guard) the curve
   the market API names must be registered for that token by one of the bundled launch factories (`curveOf(token)`, from
   `src/data/liveAddresses.json`), then pass the curve's own `token()` binding. Otherwise the command refuses.
+- **MCP swaps are verified-token only**: `hartii_swap` accepts QUAI, WQUAI and tokens a bundled Hartii launch factory registers (the same check buy and sell use); any other token address is refused. `hartii swap` in the terminal is unchanged.
 - **MCP limits**: write tools take a token **address**, never a ticker; slippage above 10% is rejected; `--allow-writes`
   refuses to start without explicit `--max-per-tx` and `--max-per-day` (they only tighten the config caps); the fee
   ceiling cannot be raised over MCP.

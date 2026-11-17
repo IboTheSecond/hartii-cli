@@ -1,7 +1,7 @@
 // packages/hartii-cli/src/qi/recipient.js
 // A Qi send goes to a payment code (private, reusable) or to a Cyprus-1 Qi address. A Quai address is
 // the other ledger: Qi cannot be sent there directly, it has to be converted.
-import { decodeBase58, sha256, getBytes, isQiAddress, getZoneForAddress, Zone } from 'quais';
+import { decodeBase58, sha256, getBytes, isQiAddress, getZoneForAddress, getAddress, Zone } from 'quais';
 import { CliError } from '../errors.js';
 
 export class QiRecipientError extends CliError {}
@@ -27,10 +27,15 @@ export function classifyRecipient(input) {
     let qi = false;
     try { qi = isQiAddress(value); } catch { qi = false; }
     if (!qi) throw new QiRecipientError('That is a Quai address. Qi can only go to a payment code (starts with PM8T) or a Qi address, never straight to a Quai address. To get QUAI from Qi you convert it first.');
+    // R3-F6: a mixed-case address carries a checksum and a wrong one is a typo. All-lowercase (or all-uppercase) is accepted and normalised.
+    const body = value.slice(2);
+    let checksummed = value;
+    try { checksummed = getAddress(value); } catch { throw new QiRecipientError('That Qi address does not look right (its checksum is wrong). Copy it again.'); }
+    if (body !== body.toLowerCase() && body !== body.toUpperCase() && checksummed !== value) throw new QiRecipientError('That Qi address has a wrong checksum (a letter was mistyped or changed case). Copy it again.');
     let zone;
     try { zone = getZoneForAddress(value); } catch { zone = null; }
     if (zone !== Zone.Cyprus1) throw new QiRecipientError('That Qi address is not on Cyprus-1, the zone this CLI uses.');
-    return { kind: 'qi-address', value };
+    return { kind: 'qi-address', value: checksummed };
   }
   throw new QiRecipientError('Enter a payment code (starts with PM8T) or a Cyprus-1 Qi address.');
 }

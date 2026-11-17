@@ -9,7 +9,8 @@ export class QiCapError extends CliError {}
 const toQit = (v) => {
   if (v === null || v === undefined || v === '') return null;
   const s = String(v);
-  if (!/^\d+(\.\d{1,3})?$/.test(s)) return null;
+  // R3-F7: never treat a cap we cannot count as "no cap". Qi counts in thousandths.
+  if (!/^\d+(\.\d{1,3})?$/.test(s)) throw new QiCapError(`Your spending limit "${s}" cannot be counted in Qi (Qi has at most 3 decimals). Set it with at most 3 decimals, for example \`hartii config set limits.perTxQuai 5\`. Nothing was sent.`);
   const [w, f = ''] = s.split('.');
   return BigInt(w) * QIT_PER_QI + BigInt(f.padEnd(3, '0'));
 };
