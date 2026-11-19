@@ -40,7 +40,9 @@ describe('runDoctor — demo mode', () => {
 describe('runDoctor — real checks (mocked fetch)', () => {
   it('reports every check healthy when everything answers correctly', async () => {
     const fetchFn = fakeFetchAllHealthy();
-    const result = await runDoctor({ home, network: 'mainnet' }, { fetchFn });
+    // env: {} keeps the home-location check independent of the runner (the launcher sets HARTII_HOME
+    // outside the profile folder on CI).
+    const result = await runDoctor({ home, network: 'mainnet' }, { fetchFn, env: {} });
     expect(result.ok).toBe(true);
     for (const c of result.checks) expect(c.ok).toBe(true);
   });

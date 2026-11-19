@@ -24,6 +24,10 @@ const summary = {
   warnings: [{ level: 'danger', code: 'new-recipient', text: 'You have never sent to this address. Check every group of its address twice.' }],
 };
 
+// Snapshots must not depend on the Node that runs them (CI runs 22 and 24).
+const PINNED_NODE = '24.15.0';
+const pinNode = (r) => Object.assign(r, { node: PINNED_NODE });
+
 async function fixtures() {
   const demoToken = await runToken({ id: 'DEMO', demo: true });
   return {
@@ -50,8 +54,8 @@ async function fixtures() {
     'limits-none': tagView({ wallet: null, network: 'mainnet', perTxQuai: null, dailyQuai: null, spentTodayQuai: '0.0', reservedQuai: '0.0' }, 'limits'),
     block: tagView({ network: 'mainnet', height: 10412877 }, 'block'),
     config: runConfig(['get'], '/nonexistent-hartii-home'),
-    about: await runExtra('about', [], ctx()),
-    init: await runExtra('init', [], ctx()),
+    about: pinNode(await runExtra('about', [], ctx())),
+    init: pinNode(await runExtra('init', [], ctx())),
     'wallet-help': await runWallet([undefined], {}, { home: '/nonexistent', io: {}, g: {} }),
     'write-done': { ok: true, txHash: TX, status: 'success', quaiscanUrl: `https://quaiscan.io/tx/${TX}`, summary },
     'write-aborted': { ok: false, aborted: true, summary },
